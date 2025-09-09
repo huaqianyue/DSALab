@@ -1,6 +1,9 @@
-import { app, BrowserWindow, Menu, shell } from 'electron';
+// main.ts
+import { app, BrowserWindow, Menu, shell, ipcMain, dialog } from 'electron'; // 引入 ipcMain 和 dialog
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
+import { exec, execFile } from 'node:child_process'; // 引入 exec 和 execFile
+import { promises as fs } from 'node:fs'; // 引入 fs.promises
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -66,25 +69,24 @@ const createMenu = () => {
       ]
     }] : []),
     {
-      label: 'File',
+      label: '文件', 
       submenu: [
         {
-          label: 'New',
+          label: '新建', 
           accelerator: 'CmdOrCtrl+N',
           click: () => {
-            // Send message to renderer to create new file
             BrowserWindow.getFocusedWindow()?.webContents.send('menu-new-file');
           }
         },
         {
-          label: 'Open...',
+          label: '打开...', 
           accelerator: 'CmdOrCtrl+O',
           click: () => {
             BrowserWindow.getFocusedWindow()?.webContents.send('menu-open-file');
           }
         },
         {
-          label: 'Save',
+          label: '保存', 
           accelerator: 'CmdOrCtrl+S',
           click: () => {
             BrowserWindow.getFocusedWindow()?.webContents.send('menu-save-file');
@@ -95,45 +97,45 @@ const createMenu = () => {
       ]
     },
     {
-      label: 'Edit',
+      label: '编辑', 
       submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
+        { role: 'undo', label: '撤销' }, 
+        { role: 'redo', label: '重做' }, 
         { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
+        { role: 'cut', label: '剪切' }, 
+        { role: 'copy', label: '复制' }, 
+        { role: 'paste', label: '粘贴' }, 
         ...(isMac ? [
-          { role: 'pasteAndMatchStyle' },
-          { role: 'delete' },
-          { role: 'selectAll' },
+          { role: 'pasteAndMatchStyle', label: '粘贴并匹配样式' }, 
+          { role: 'delete', label: '删除' }, 
+          { role: 'selectAll', label: '全选' }, 
           { type: 'separator' },
           {
-            label: 'Speech',
+            label: '语音', 
             submenu: [
-              { role: 'startSpeaking' },
-              { role: 'stopSpeaking' }
+              { role: 'startSpeaking', label: '开始朗读' }, 
+              { role: 'stopSpeaking', label: '停止朗读' } 
             ]
           }
         ] : [
-          { role: 'delete' },
+          { role: 'delete', label: '删除' }, 
           { type: 'separator' },
-          { role: 'selectAll' }
+          { role: 'selectAll', label: '全选' } 
         ])
       ]
     },
     {
-      label: 'Code',
+      label: '代码', 
       submenu: [
         {
-          label: 'Run',
+          label: '运行', 
           accelerator: 'CmdOrCtrl+R',
           click: () => {
             BrowserWindow.getFocusedWindow()?.webContents.send('menu-run-code');
           }
         },
         {
-          label: 'Clear Output',
+          label: '清空输出', 
           accelerator: 'CmdOrCtrl+K',
           click: () => {
             BrowserWindow.getFocusedWindow()?.webContents.send('menu-clear-output');
@@ -142,45 +144,46 @@ const createMenu = () => {
       ]
     },
     {
-      label: 'View',
+      label: '视图', 
       submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools' },
+        { role: 'reload', label: '重新加载' }, 
+        { role: 'forceReload', label: '强制重新加载' }, 
+        { role: 'toggleDevTools', label: '切换开发者工具' }, 
         { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
+        { role: 'resetZoom', label: '重置缩放' }, 
+        { role: 'zoomIn', label: '放大' }, 
+        { role: 'zoomOut', label: '缩小' }, 
         { type: 'separator' },
-        { role: 'togglefullscreen' }
+        { role: 'togglefullscreen', label: '切换全屏' } 
       ]
     },
     {
-      label: 'Window',
+      label: '窗口', 
       submenu: [
-        { role: 'minimize' },
-        { role: 'close' },
+        { role: 'minimize', label: '最小化' }, 
+        { role: 'close', label: '关闭' }, 
         ...(isMac ? [
           { type: 'separator' },
-          { role: 'front' },
+          { role: 'front', label: '前置所有窗口' }, 
           { type: 'separator' },
-          { role: 'window' }
+          { role: 'window', label: '窗口' } 
         ] : [
-          { role: 'close' }
+          { role: 'close', label: '关闭' } 
         ])
       ]
     },
     {
       role: 'help',
+      label: '帮助', 
       submenu: [
         {
-          label: 'About WizardJS',
+          label: '关于 DSALab', 
           click: () => {
             BrowserWindow.getFocusedWindow()?.webContents.send('menu-about');
           }
         },
         {
-          label: 'Learn More',
+          label: '了解更多', 
           click: async () => {
             await shell.openExternal('https://github.com/FranciscoJBrito/WizardJS');
           }
@@ -192,6 +195,116 @@ const createMenu = () => {
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
 };
+
+// --- C++ Compilation and Execution Logic ---
+ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: number) => {
+  const tempDir = path.join(app.getPath('temp'), 'DSALab-cpp');
+  const sourceFilePath = path.join(tempDir, 'main.cpp');
+  const executablePath = path.join(tempDir, process.platform === 'win32' ? 'main.exe' : 'main');
+
+  try {
+    await fs.mkdir(tempDir, { recursive: true });
+    await fs.writeFile(sourceFilePath, code);
+
+    let output = '';
+    let error = '';
+
+    // 1. Compile C++ code
+    const compileCommand = `g++ "${sourceFilePath}" -o "${executablePath}"`;
+    const { stdout: compileStdout, stderr: compileStderr } = await new Promise<{ stdout: string, stderr: string }>((resolve, reject) => {
+      exec(compileCommand, { timeout: 10000 }, (err, stdout, stderr) => { // 10 seconds for compilation
+        if (err) {
+          reject(new Error(`Compilation failed: ${stderr || stdout || err.message}`));
+        } else {
+          resolve({ stdout, stderr });
+        }
+      });
+    });
+
+    if (compileStderr) {
+      error += `[编译错误]\n${compileStderr}\n`;
+    }
+    if (compileStdout) {
+      output += `[编译输出]\n${compileStdout}\n`;
+    }
+
+    // 2. Execute compiled program
+    const { stdout: runStdout, stderr: runStderr } = await new Promise<{ stdout: string, stderr: string }>((resolve, reject) => {
+      // For execution, use execFile for better security and argument handling
+      const child = execFile(executablePath, [], { timeout }, (err, stdout, stderr) => {
+        if (err && err.killed) {
+          reject(new Error(`Execution timed out after ${timeout / 1000} seconds.`));
+        } else if (err) {
+          reject(new Error(`Execution failed: ${stderr || stdout || err.message}`));
+        } else {
+          resolve({ stdout, stderr });
+        }
+      });
+    });
+
+    if (runStderr) {
+      error += `[运行时错误]\n${runStderr}\n`;
+    }
+    output += runStdout;
+
+    return { success: true, output, error };
+
+  } catch (e: any) {
+    return { success: false, output: '', error: e.message };
+  } finally {
+    // Clean up temporary files
+    try {
+      await fs.unlink(sourceFilePath).catch(() => {}); // Ignore errors if file doesn't exist
+      await fs.unlink(executablePath).catch(() => {}); // Ignore errors if file doesn't exist
+      // Optionally, remove the tempDir if empty, but keeping it might be fine for debugging
+      // await fs.rmdir(tempDir, { recursive: true }).catch(() => {});
+    } catch (e) {
+      console.error('Failed to clean up temporary files:', e);
+    }
+  }
+});
+
+// --- File Operations for renderer (using dialog) ---
+ipcMain.handle('show-open-dialog', async (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window) return null;
+
+  const result = await dialog.showOpenDialog(window, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'C++ Files', extensions: ['cpp', 'cxx', 'cc', 'c'] },
+      { name: 'All Files', extensions: ['*'] }
+    ]
+  });
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+
+  const filePath = result.filePaths[0];
+  const content = await fs.readFile(filePath, 'utf-8');
+  return { filePath, content };
+});
+
+ipcMain.handle('show-save-dialog', async (event, currentFilePath: string | null, defaultFileName: string, content: string) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window) return null;
+
+  const result = await dialog.showSaveDialog(window, {
+    defaultPath: currentFilePath || defaultFileName,
+    filters: [
+      { name: 'C++ Files', extensions: ['cpp', 'cxx', 'cc', 'c'] },
+      { name: 'All Files', extensions: ['*'] }
+    ]
+  });
+
+  if (result.canceled || !result.filePath) {
+    return null;
+  }
+
+  await fs.writeFile(result.filePath, content, 'utf-8');
+  return result.filePath;
+});
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

@@ -2,61 +2,61 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>WizardJS - JavaScript Playground</title>
+    <title>DSALab</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   </head>
   <body>
     <div id="app">
-      <!-- Sidebar minimalista -->
+      <!-- Minimalist Sidebar -->
       <aside class="sidebar">
         <div class="sidebar-top">
-           <!-- Logo removido para evitar superposición con controles de ventana -->
+           <!-- Logo removed to avoid overlapping with window controls -->
         </div>
         
         <nav class="sidebar-nav">
-          <button id="runBtn" class="sidebar-btn" title="Ejecutar (⌘R)">
+          <button id="runBtn" class="sidebar-btn" data-tooltip="Run (Ctrl+R)">
             <i class="fas fa-play"></i>
           </button>
-          <button id="newBtn" class="sidebar-btn" title="Nuevo archivo (⌘N)">
+          <button id="newBtn" class="sidebar-btn" data-tooltip="New File (Ctrl+N)">
             <i class="fas fa-file"></i>
           </button>
-          <button id="openBtn" class="sidebar-btn" title="Abrir archivo (⌘O)">
+          <button id="openBtn" class="sidebar-btn" data-tooltip="Open File (Ctrl+O)">
             <i class="fas fa-folder-open"></i>
           </button>
-          <button id="saveBtn" class="sidebar-btn" title="Guardar (⌘S)">
+          <button id="saveBtn" class="sidebar-btn" data-tooltip="Save (Ctrl+S)">
             <i class="fas fa-save"></i>
           </button>
           <div class="sidebar-divider"></div>
-          <button id="clearBtn" class="sidebar-btn" title="Limpiar salida (⌘K)">
+          <button id="clearBtn" class="sidebar-btn" data-tooltip="Clear Output (Ctrl+K)">
             <i class="fas fa-trash"></i>
           </button>
         </nav>
         
         <div class="sidebar-bottom">
-           <button id="settingsBtn" class="sidebar-btn" title="Configuración (⌘,)">
+           <button id="settingsBtn" class="sidebar-btn" data-tooltip="Settings (Ctrl+,)">
              <i class="fas fa-cog"></i>
            </button>
         </div>
       </aside>
         
-      <!-- Contenido principal -->
+      <!-- Main Content -->
       <main class="main-content">
-        <!-- Barra de tabs -->
+        <!-- Tabs Bar -->
         <div class="tabs-bar">
           <div class="tabs-list">
             <div class="tab active" data-tab-id="tab-1">
               <span class="tab-title">Untitled-1</span>
-              <button class="tab-close" title="Cerrar tab">
+              <button class="tab-close" data-tooltip="Close Tab">
                 <i class="fas fa-times"></i>
               </button>
             </div>
           </div>
-          <button class="add-tab-btn" title="Nuevo tab (⌘T)">
+          <button class="add-tab-btn" data-tooltip="New Tab (Ctrl+T)">
             <i class="fas fa-plus"></i>
           </button>
         </div>
         
-        <!-- Contenido de los tabs -->
+        <!-- Tab Content -->
         <div class="tabs-content">
           <div class="tab-pane active" data-tab-id="tab-1">
             <div class="split-view">
@@ -75,11 +75,11 @@
       </main>
     </div>
 
-    <!-- Panel de Configuraciones (fuera del app) -->
+    <!-- Settings Panel (outside app) -->
     <div id="settingsPanel" class="settings-panel">
       <div class="settings-modal">
         <div class="settings-header">
-          <h3>Configuraciones</h3>
+          <h3>Settings</h3>
           <button id="closeSettingsBtn" class="close-settings-btn">
             <i class="fas fa-times"></i>
           </button>
@@ -89,25 +89,25 @@
             <div class="settings-section">
               <h4>General</h4>
               <div class="setting-item">
-                <label>Idioma / Language:</label>
+                <label>Language:</label>
                 <select id="language-select">
                   <option value="en">English</option>
-                  <option value="es">Español</option>
+                  <option value="zh">简体中文</option>
                 </select>
               </div>
             </div>
             
             <div class="settings-section">
-              <h4>Apariencia</h4>
+              <h4>Appearance</h4>
               <div class="setting-item">
-                <label>Tema:</label>
+                <label>Theme:</label>
                 <select id="theme-select">
                   <option value="github-dark">GitHub Dark</option>
                   <option value="tomorrow-night-bright">Tomorrow Night Bright</option>
                 </select>
               </div>
               <div class="setting-item">
-                <label>Fuente:</label>
+                <label>Font:</label>
                 <select id="font-family-select">
                   <option value="JetBrains Mono">JetBrains Mono</option>
                   <option value="Fira Code">Fira Code</option>
@@ -117,7 +117,7 @@
                 </select>
               </div>
               <div class="setting-item">
-                <label>Tamaño de fuente:</label>
+                <label>Font Size:</label>
                 <input type="range" id="font-size-input" min="10" max="24" value="14">
                 <span id="font-size-value">14px</span>
               </div>
@@ -128,54 +128,48 @@
               <div class="setting-item">
                 <label>
                   <input type="checkbox" id="word-wrap-toggle" checked>
-                  Ajuste de línea automático
+                  Word Wrap
                 </label>
               </div>
               <div class="setting-item">
                <label>
                  <input type="checkbox" id="minimap-toggle">
-                 Mostrar minimap
+                 Show Minimap
                </label>
              </div>
-             <div class="setting-item">
-                <label>
-                  <input type="checkbox" id="auto-run-toggle" checked>
-                  Auto-ejecución en tiempo real
-                </label>
-              </div>
               <div class="setting-item">
                  <label>
                    <input type="checkbox" id="line-numbers-toggle">
-                   Mostrar números de línea
+                   Show Line Numbers
                  </label>
                </div>
               <div class="setting-item">
-                <label>Tamaño de tab:</label>
+                <label>Tab Size:</label>
                 <select id="tab-size-input">
-                  <option value="2">2 espacios</option>
-                  <option value="4">4 espacios</option>
-                  <option value="8">8 espacios</option>
+                  <option value="2">2 spaces</option>
+                  <option value="4">4 spaces</option>
+                  <option value="8">8 spaces</option>
                 </select>
               </div>
             </div>
             
             <div class="settings-section">
-              <h4>Atajos de teclado</h4>
+              <h4>Keyboard Shortcuts</h4>
               <div class="shortcut-item">
-                <span>Ejecutar código:</span>
-                <kbd>⌘R</kbd>
+                <span>Run code:</span>
+                <kbd>Ctrl+R</kbd>
               </div>
               <div class="shortcut-item">
-                <span>Nuevo tab:</span>
-                <kbd>⌘T</kbd>
+                <span>New tab:</span>
+                <kbd>Ctrl+T</kbd>
               </div>
               <div class="shortcut-item">
-                <span>Guardar:</span>
-                <kbd>⌘S</kbd>
+                <span>Save:</span>
+                <kbd>Ctrl+S</kbd>
               </div>
               <div class="shortcut-item">
-                <span>Configuraciones:</span>
-                <kbd>⌘,</kbd>
+                <span>Settings:</span>
+                <kbd>Ctrl+,</kbd>
               </div>
             </div>
           </div>

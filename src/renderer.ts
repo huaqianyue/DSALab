@@ -1,5 +1,6 @@
+// renderer.ts
 /**
- * WizardJS - JavaScript Playground
+ * WizardJS - C++ Playground
  * Open Source alternative to RunJs
  */
 
@@ -7,27 +8,26 @@ import './index.css';
 
 // Monaco Editor imports
 import * as monaco from 'monaco-editor';
-import * as ts from 'typescript';
 
-// The vite-plugin-monaco-editor will handle worker configuration automatically
+// Declare the 'electron' API exposed by preload.ts
+declare global {
+  interface Window {
+    electron: {
+      compileAndRunCpp: (code: string, timeout: number) => Promise<{ success: boolean; output: string; error: string }>;
+      showOpenDialog: () => Promise<{ filePath: string; content: string } | null>;
+      showSaveDialog: (currentFilePath: string | null, defaultFileName: string, content: string) => Promise<string | null>;
+    };
+  }
+}
 
 // WizardJS Application Class
 interface AppSettings {
-  autoRunEnabled: boolean;
   theme: string;
   fontSize: number;
   wordWrap: boolean;
   minimap: boolean;
   lineNumbers: boolean;
   tabSize: number;
-  fontFamily: string;
-  language: string;
-}
-
-interface EditorSettings {
-  theme: string;
-  fontSize: number;
-  lineNumbers: boolean;
   fontFamily: string;
   language: string;
 }
@@ -49,14 +49,10 @@ class WizardJSApp {
   private tabCounter = 1;
   private activeTabId = 'tab-1';
   private tabData: Map<string, { title: string; content: string; isDirty: boolean; file: string | null }> = new Map();
-  private autoRunEnabled = true;
-  private autoRunTimeout: Map<string, NodeJS.Timeout> = new Map();
-  private readonly AUTO_RUN_DELAY = 1000; // 1 segundo de delay
-  private readonly EXECUTION_TIMEOUT = 5000; // 5 segundos máximo de ejecución
-  private readonly MAX_OUTPUT_LINES = 1000; // Máximo 1000 líneas de output
+  private readonly EXECUTION_TIMEOUT = 5000; // 5 seconds maximum execution
+  private readonly MAX_OUTPUT_LINES = 1000; // Maximum 1000 lines of output
   private executionAbortController: Map<string, AbortController> = new Map();
   private settings: AppSettings = {
-    autoRunEnabled: true,
     theme: 'github-dark',
     fontSize: 14,
     wordWrap: true,
@@ -64,7 +60,7 @@ class WizardJSApp {
     lineNumbers: false,
     tabSize: 2,
     fontFamily: 'JetBrains Mono',
-    language: 'en'
+    language: 'zh' // Default to Chinese
   };
   private readonly SETTINGS_KEY = 'wizardjs-settings';
 
@@ -116,12 +112,15 @@ class WizardJSApp {
       run: 'Run',
       clear: 'Clear',
       // Tooltips
-      runTooltip: 'Run (⌘R)',
-      newTooltip: 'New file (⌘N)',
-      openTooltip: 'Open file (⌘O)',
-      saveTooltip: 'Save (⌘S)',
-      clearTooltip: 'Clear output (⌘K)',
-      settingsTooltip: 'Settings (⌘,)',
+      runTooltip: 'Run (Ctrl+R)',
+      newTooltip: 'New file (Ctrl+N)',
+      openTooltip: 'Open file (Ctrl+O)',
+      saveTooltip: 'Save (Ctrl+S)',
+      clearTooltip: 'Clear output (Ctrl+K)',
+      settingsTooltip: 'Settings (Ctrl+,)',
+      closeTabTooltip: 'Close Tab', // Added
+      newTabTooltip: 'New Tab (Ctrl+T)', // Added
+      confirmSaveOnClose: 'Do you want to save changes to', // Added
       // Settings panel
       general: 'General',
       appearance: 'Appearance',
@@ -130,47 +129,48 @@ class WizardJSApp {
       tabSize: 'Tab Size',
       wordWrap: 'Word Wrap',
       minimap: 'Show Minimap',
-      autoRun: 'Real-time Auto-execution',
       shortcuts: 'Keyboard Shortcuts',
       runCode: 'Run code:',
       newTab: 'New tab:',
       saveFile: 'Save:',
       openSettings: 'Settings:'
     },
-    es: {
-      file: 'Archivo',
-      new: 'Nuevo',
-      open: 'Abrir',
-      save: 'Guardar',
-      settings: 'Configuración',
-      theme: 'Tema',
-      fontSize: 'Tamaño de Fuente',
-      fontFamily: 'Familia de Fuente',
-      language: 'Idioma',
-      lineNumbers: 'Números de Línea',
-      run: 'Ejecutar',
-      clear: 'Limpiar',
+    zh: { // Chinese translations
+      file: '文件',
+      new: '新建',
+      open: '打开',
+      save: '保存',
+      settings: '设置',
+      theme: '主题',
+      fontSize: '字体大小',
+      fontFamily: '字体家族',
+      language: '语言',
+      lineNumbers: '行号',
+      run: '运行',
+      clear: '清空',
       // Tooltips
-      runTooltip: 'Ejecutar (⌘R)',
-      newTooltip: 'Nuevo archivo (⌘N)',
-      openTooltip: 'Abrir archivo (⌘O)',
-      saveTooltip: 'Guardar (⌘S)',
-      clearTooltip: 'Limpiar salida (⌘K)',
-      settingsTooltip: 'Configuración (⌘,)',
+      runTooltip: '运行 (Ctrl+R)',
+      newTooltip: '新建文件 (Ctrl+N)',
+      openTooltip: '打开文件 (Ctrl+O)',
+      saveTooltip: '保存 (Ctrl+S)',
+      clearTooltip: '清空输出 (Ctrl+K)',
+      settingsTooltip: '设置 (Ctrl+,)',
+      closeTabTooltip: '关闭标签页', // Added
+      newTabTooltip: '新建标签页 (Ctrl+T)', // Added
+      confirmSaveOnClose: '是否保存对', // Added
       // Settings panel
-      general: 'General',
-      appearance: 'Apariencia',
-      editor: 'Editor',
-      font: 'Fuente',
-      tabSize: 'Tamaño de Tab',
-      wordWrap: 'Ajuste de línea automático',
-      minimap: 'Mostrar minimap',
-      autoRun: 'Auto-ejecución en tiempo real',
-      shortcuts: 'Atajos de teclado',
-      runCode: 'Ejecutar código:',
-      newTab: 'Nuevo tab:',
-      saveFile: 'Guardar:',
-      openSettings: 'Configuraciones:'
+      general: '通用',
+      appearance: '外观',
+      editor: '编辑器',
+      font: '字体',
+      tabSize: 'Tab 大小',
+      wordWrap: '自动换行',
+      minimap: '显示小地图',
+      shortcuts: '键盘快捷键',
+      runCode: '运行代码:',
+      newTab: '新建标签页:',
+      saveFile: '保存:',
+      openSettings: '设置:'
     }
   };
 
@@ -187,50 +187,7 @@ class WizardJSApp {
   }
 
   private configureMonaco(): void {
-    // Disable all TypeScript diagnostics globally to prevent console errors
-    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
-      noSyntaxValidation: true,
-      noSemanticValidation: true,
-      noSuggestionDiagnostics: true,
-      diagnosticCodesToIgnore: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] // Ignore all diagnostic codes
-    });
-
-    // Also disable for JavaScript
-    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
-      noSyntaxValidation: true,
-      noSemanticValidation: true,
-      noSuggestionDiagnostics: true,
-      diagnosticCodesToIgnore: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    });
-
-    // Configure TypeScript compiler options ONCE at startup to avoid Monaco bug
-    // Issue: https://github.com/microsoft/monaco-editor/issues/4364
-    // Use Object.assign to merge with existing options instead of replacing them
-    monaco.languages.typescript.typescriptDefaults.setCompilerOptions(
-      Object.assign(
-        monaco.languages.typescript.typescriptDefaults.getCompilerOptions(),
-        {
-          target: monaco.languages.typescript.ScriptTarget.ES2020,
-          module: monaco.languages.typescript.ModuleKind.None,
-          lib: ['ES2020', 'DOM'],
-          allowJs: true,
-          checkJs: false,
-          strict: false,
-          noImplicitAny: false,
-          skipLibCheck: true,
-          removeComments: false,
-          sourceMap: false,
-          declaration: false,
-          allowNonTsExtensions: true,
-          moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
-          noEmit: true,
-          esModuleInterop: true
-        }
-      )
-    );
-
-    // IntelliSense features are now enabled since we use official TypeScript transpiler
-    // No need to disable hover or completion providers
+    // Monaco automatically provides basic C++ language features with 'cpp' language mode.
   }
 
   private initializeMonacoTheme(): void {
@@ -249,7 +206,7 @@ class WizardJSApp {
         { token: 'type', foreground: 'ffa657' },
         { token: 'struct', foreground: 'ffa657' },
         { token: 'class', foreground: 'ffa657' },
-        { token: 'interface', foreground: 'ffa657' },
+        { token: 'interface', foreground: 'ffa657' }, // Keeping for general syntax, not C++ specific
         { token: 'parameter', foreground: 'ffa657' },
         { token: 'variable', foreground: 'ffa657' },
         { token: 'function', foreground: 'd2a8ff' },
@@ -282,7 +239,7 @@ class WizardJSApp {
         { token: 'type', foreground: 'e7c547' },
         { token: 'struct', foreground: 'e7c547' },
         { token: 'class', foreground: 'e7c547' },
-        { token: 'interface', foreground: 'e7c547' },
+        { token: 'interface', foreground: 'e7c547' }, // Keeping for general syntax
         { token: 'parameter', foreground: 'e7c547' },
         { token: 'variable', foreground: 'eaeaea' },
         { token: 'function', foreground: '7aa6da' },
@@ -315,7 +272,7 @@ class WizardJSApp {
 
     const editor = monaco.editor.create(editorContainer, {
       value: this.tabData.get(tabId)?.content || '',
-      language: 'typescript', // TypeScript incluye soporte para JavaScript
+      language: 'cpp', // Changed to C++
       theme: this.settings.theme,
       fontSize: this.settings.fontSize,
       fontFamily: this.settings.fontFamily,
@@ -340,7 +297,6 @@ class WizardJSApp {
         bracketPairs: true,
         indentation: true
       },
-      // Enable IntelliSense features now that we use official TypeScript transpiler
       hover: { enabled: true },
       quickSuggestions: true,
       suggestOnTriggerCharacters: true,
@@ -353,18 +309,13 @@ class WizardJSApp {
       autoSurround: 'languageDefined'
     });
 
-    // Track changes for dirty state and auto-run
+    // Track changes for dirty state
     editor.onDidChangeModelContent(() => {
       const tabData = this.tabData.get(tabId);
       if (tabData) {
         tabData.isDirty = true;
         tabData.content = editor.getValue();
         this.updateTabTitle(tabId);
-        
-        // Auto-run functionality
-         if (this.autoRunEnabled && tabId === this.activeTabId) {
-           this.scheduleAutoRun(tabId);
-         }
        }
      });
 
@@ -425,9 +376,14 @@ class WizardJSApp {
 
   private setupTabSystem(): void {
     // Add tab button
-    document.querySelector('.add-tab-btn')?.addEventListener('click', () => {
+    const addTabBtn = document.querySelector('.add-tab-btn');
+    addTabBtn?.addEventListener('click', () => {
       this.addNewTab();
     });
+    // Set tooltip for add tab button
+    if (addTabBtn) {
+      addTabBtn.setAttribute('data-tooltip', this.t('newTabTooltip'));
+    }
 
     // Setup event delegation for tab clicks and close buttons
     document.querySelector('.tabs-list')?.addEventListener('click', (e) => {
@@ -445,8 +401,6 @@ class WizardJSApp {
         this.switchToTab(tabId);
       }
     });
-
-    // Clear output functionality is now handled by the sidebar button
   }
 
   private addNewTab(): void {
@@ -469,7 +423,7 @@ class WizardJSApp {
     newTab.setAttribute('data-tab-id', newTabId);
     newTab.innerHTML = `
       <span class="tab-title">${newTabTitle}</span>
-      <button class="tab-close" title="Cerrar tab">
+      <button class="tab-close" data-tooltip="${this.t('closeTabTooltip')}">
         <i class="fas fa-times"></i>
       </button>
     `;
@@ -512,7 +466,7 @@ class WizardJSApp {
 
     // Check if tab has unsaved changes
     if (tabData?.isDirty) {
-      const save = confirm(`¿Quieres guardar los cambios en ${tabData.title}?`);
+      const save = confirm(`${this.t('confirmSaveOnClose')} ${tabData.title}?`);
       if (save) {
         this.saveFile(tabId);
       }
@@ -563,34 +517,23 @@ class WizardJSApp {
     this.updateTitle();
   }
 
-  private executeCode(): void {
+  private async executeCode(): Promise<void> {
     const editor = this.editors.get(this.activeTabId);
     if (!editor) return;
 
     const code = editor.getValue();
     this.clearOutput(this.activeTabId);
-    this.executeCodeSafely(this.activeTabId, code);
+    await this.executeCodeSafely(this.activeTabId, code);
   }
 
-  private appendOutput(tabId: string, type: string, args: any[], timestamp: Date): void {
+  private appendOutput(tabId: string, type: string, text: string, timestamp: Date): void {
     const outputContainer = document.querySelector(`[data-tab-id="${tabId}"].output-container`) as HTMLElement;
     if (!outputContainer) return;
 
     const outputLine = document.createElement('div');
     outputLine.className = `output-${type}`;
     
-    const argsStr = args.map(arg => {
-      if (typeof arg === 'object') {
-        try {
-          return JSON.stringify(arg, null, 2);
-        } catch {
-          return String(arg);
-        }
-      }
-      return String(arg);
-    }).join(' ');
-    
-    outputLine.innerHTML = argsStr;
+    outputLine.innerHTML = text.replace(/\n/g, '<br>'); // Preserve newlines
     outputContainer.appendChild(outputLine);
     outputContainer.scrollTop = outputContainer.scrollHeight;
   }
@@ -609,58 +552,24 @@ class WizardJSApp {
 
   private async openFile(): Promise<void> {
     try {
-      // Use the File System Access API if available
-      if ('showOpenFilePicker' in window) {
-        const [fileHandle] = await (window as any).showOpenFilePicker({
-          types: [{
-            description: 'JavaScript files',
-            accept: { 'text/javascript': ['.js'] }
-          }]
-        });
-        
-        const file = await fileHandle.getFile();
-        const content = await file.text();
-        
+      const result = await window.electron.showOpenDialog();
+      
+      if (result && result.filePath && result.content !== undefined) {
         const editor = this.editors.get(this.activeTabId);
         if (editor) {
-          editor.setValue(content);
+          editor.setValue(result.content);
           const tabData = this.tabData.get(this.activeTabId);
           if (tabData) {
-            tabData.file = file.name;
-            tabData.title = file.name;
+            tabData.file = result.filePath;
+            tabData.title = result.filePath.split(/[\\/]/).pop() || 'Untitled';
             tabData.isDirty = false;
             this.updateTabTitle(this.activeTabId);
           }
         }
-      } else {
-        // Fallback for older browsers
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.js,.txt';
-        input.onchange = (e) => {
-          const file = (e.target as HTMLInputElement).files?.[0];
-          if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              const editor = this.editors.get(this.activeTabId);
-              if (editor) {
-                editor.setValue(e.target?.result as string || '');
-                const tabData = this.tabData.get(this.activeTabId);
-                if (tabData) {
-                  tabData.file = file.name;
-                  tabData.title = file.name;
-                  tabData.isDirty = false;
-                  this.updateTabTitle(this.activeTabId);
-                }
-              }
-            };
-            reader.readAsText(file);
-          }
-        };
-        input.click();
       }
     } catch (error) {
       console.error('Error opening file:', error);
+      this.appendFriendlyError(this.activeTabId, new Error(`打开文件失败: ${error instanceof Error ? error.message : String(error)}`));
     }
   }
 
@@ -672,41 +581,20 @@ class WizardJSApp {
     if (!editor || !tabData) return;
     
     const content = editor.getValue();
+    const defaultFileName = tabData.title.endsWith('.cpp') ? tabData.title : tabData.title + '.cpp';
     
     try {
-      // Use the File System Access API if available
-      if ('showSaveFilePicker' in window) {
-        const fileHandle = await (window as any).showSaveFilePicker({
-          suggestedName: tabData.file || tabData.title + '.js',
-          types: [{
-            description: 'JavaScript files',
-            accept: { 'text/javascript': ['.js'] }
-          }]
-        });
-        
-        const writable = await fileHandle.createWritable();
-        await writable.write(content);
-        await writable.close();
-        
-        tabData.file = fileHandle.name;
-        tabData.title = fileHandle.name;
-        tabData.isDirty = false;
-        this.updateTabTitle(targetTabId);
-      } else {
-        // Fallback for older browsers
-        const blob = new Blob([content], { type: 'text/javascript' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = tabData.file || tabData.title + '.js';
-        a.click();
-        URL.revokeObjectURL(url);
-        
+      const savedFilePath = await window.electron.showSaveDialog(tabData.file, defaultFileName, content);
+      
+      if (savedFilePath) {
+        tabData.file = savedFilePath;
+        tabData.title = savedFilePath.split(/[\\/]/).pop() || 'Untitled';
         tabData.isDirty = false;
         this.updateTabTitle(targetTabId);
       }
     } catch (error) {
       console.error('Error saving file:', error);
+      this.appendFriendlyError(this.activeTabId, new Error(`保存文件失败: ${error instanceof Error ? error.message : String(error)}`));
     }
   }
 
@@ -733,7 +621,6 @@ class WizardJSApp {
   }
 
   private setupSettingsPanel(): void {
-    // Settings panel HTML is now in index.html, just setup event listeners
     this.setupSettingsEventListeners();
     this.applySettingsToUI();
   }
@@ -743,22 +630,21 @@ class WizardJSApp {
     const settingsPanel = document.getElementById('settingsPanel');
     const closeSettingsBtn = document.getElementById('closeSettingsBtn');
     const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
-    const fontSizeSlider = document.getElementById('font-size-slider') as HTMLInputElement;
+    const fontSizeSlider = document.getElementById('font-size-input') as HTMLInputElement;
     const fontSizeValue = document.getElementById('font-size-value');
     const wordWrapToggle = document.getElementById('word-wrap-toggle') as HTMLInputElement;
     const minimapToggle = document.getElementById('minimap-toggle') as HTMLInputElement;
-    const autoRunToggle = document.getElementById('auto-run-toggle') as HTMLInputElement;
     const lineNumbersToggle = document.getElementById('line-numbers-toggle') as HTMLInputElement;
-    const tabSizeSelect = document.getElementById('tab-size-select') as HTMLSelectElement;
+    const tabSizeSelect = document.getElementById('tab-size-input') as HTMLSelectElement;
     const languageSelect = document.getElementById('language-select') as HTMLSelectElement;
     const fontFamilySelect = document.getElementById('font-family-select') as HTMLSelectElement;
 
-    // Abrir panel de configuraciones
+    // 打开设置面板
     settingsBtn?.addEventListener('click', () => {
       settingsPanel?.classList.add('open');
     });
 
-    // Cerrar panel de configuraciones
+    // 关闭设置面板
     closeSettingsBtn?.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -766,7 +652,7 @@ class WizardJSApp {
       settingsPanel?.classList.remove('open');
     });
 
-    // Cerrar modal haciendo click en el overlay
+    // 点击覆盖层关闭模态框
     settingsPanel?.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
       if (target === settingsPanel) {
@@ -774,14 +660,14 @@ class WizardJSApp {
       }
     });
 
-    // Cerrar con Escape
+    // 按 Escape 键关闭
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && settingsPanel?.classList.contains('open')) {
         settingsPanel.classList.remove('open');
       }
     });
 
-    // Configuración de tema
+    // 主题设置
     themeSelect?.addEventListener('change', () => {
       const theme = themeSelect.value;
       this.settings.theme = theme;
@@ -791,7 +677,7 @@ class WizardJSApp {
       this.saveSettings();
     });
 
-    // Configuración de tamaño de fuente
+    // 字体大小设置
     fontSizeSlider?.addEventListener('input', () => {
       const fontSize = parseInt(fontSizeSlider.value);
       this.settings.fontSize = fontSize;
@@ -808,7 +694,7 @@ class WizardJSApp {
       this.saveSettings();
     });
 
-    // Configuración de ajuste de línea
+    // 自动换行设置
     wordWrapToggle?.addEventListener('change', () => {
       const wordWrap = wordWrapToggle.checked ? 'on' : 'off';
       this.settings.wordWrap = wordWrapToggle.checked;
@@ -818,7 +704,7 @@ class WizardJSApp {
       this.saveSettings();
     });
 
-    // Configuración de minimap
+    // 小地图设置
     minimapToggle?.addEventListener('change', () => {
       const minimapEnabled = minimapToggle.checked;
       this.settings.minimap = minimapEnabled;
@@ -828,7 +714,7 @@ class WizardJSApp {
       this.saveSettings();
     });
 
-    // Configuración de números de línea
+    // 行号设置
     lineNumbersToggle?.addEventListener('change', () => {
       const lineNumbers = lineNumbersToggle.checked ? 'on' : 'off';
       this.settings.lineNumbers = lineNumbersToggle.checked;
@@ -838,19 +724,7 @@ class WizardJSApp {
       this.saveSettings();
     });
 
-    // Configuración de auto-ejecución
-    autoRunToggle?.addEventListener('change', () => {
-      this.autoRunEnabled = autoRunToggle.checked;
-      this.settings.autoRunEnabled = autoRunToggle.checked;
-      if (!this.autoRunEnabled) {
-        // Clear all pending timeouts
-        this.autoRunTimeout.forEach(timeout => clearTimeout(timeout));
-        this.autoRunTimeout.clear();
-      }
-      this.saveSettings();
-    });
-
-    // Configuración de tamaño de tab
+    // Tab 大小设置
     tabSizeSelect?.addEventListener('change', () => {
       const tabSize = parseInt(tabSizeSelect.value);
       this.settings.tabSize = tabSize;
@@ -860,7 +734,7 @@ class WizardJSApp {
       this.saveSettings();
     });
 
-    // Language configuration
+    // 语言设置
     languageSelect?.addEventListener('change', () => {
       this.settings.language = languageSelect.value;
       this.saveSettings();
@@ -868,7 +742,7 @@ class WizardJSApp {
       this.updateUILanguage();
     });
 
-    // Font family configuration
+    // 字体家族设置
     fontFamilySelect?.addEventListener('change', () => {
       const fontFamily = fontFamilySelect.value;
       this.settings.fontFamily = fontFamily;
@@ -879,345 +753,31 @@ class WizardJSApp {
     });
   }
 
-  private scheduleAutoRun(tabId: string): void {
-    // Clear existing timeout for this tab
-    const existingTimeout = this.autoRunTimeout.get(tabId);
-    if (existingTimeout) {
-      clearTimeout(existingTimeout);
-    }
-
-    // Schedule new auto-run with intelligent delay
-    const timeout = setTimeout(() => {
-      const editor = this.editors.get(tabId);
-      if (editor && this.isCodeReadyForExecution(editor.getValue())) {
-        this.autoExecuteCode(tabId);
-      }
-    }, this.AUTO_RUN_DELAY);
-
-    this.autoRunTimeout.set(tabId, timeout);
-  }
-
-  private isCodeReadyForExecution(code: string): boolean {
-    const trimmedCode = code.trim();
-    
-    // Don't execute empty code
-    if (!trimmedCode) return false;
-    
-    // Don't execute if code ends with incomplete syntax
-    if (this.hasIncompleteStatement(trimmedCode)) return false;
-    
-    // Don't execute if brackets/braces are unbalanced
-    if (!this.areBracketsBalanced(trimmedCode)) return false;
-    
-    // Don't execute if it looks like user is still typing
-    if (this.looksLikeIncompleteTyping(trimmedCode)) return false;
-    
-    return true;
-  }
-  
-  private hasIncompleteStatement(code: string): boolean {
-    const incompletePatterns = [
-      /\bif\s*\(.*\)\s*$/,           // if (...) at end
-      /\belse\s*$/,                 // else at end
-      /\bfor\s*\(.*\)\s*$/,         // for (...) at end
-      /\bwhile\s*\(.*\)\s*$/,       // while (...) at end
-      /\bfunction\s+\w*\s*\([^)]*\)\s*$/,  // function declaration at end
-      /\bconst\s+\w+\s*=\s*$/,      // const x = at end
-      /\blet\s+\w+\s*=\s*$/,        // let x = at end
-      /\bvar\s+\w+\s*=\s*$/,        // var x = at end
-      /\w+\s*=\s*$/,                // assignment at end
-      /\w+\s*\(\s*$/,               // function call start
-      /\w+\s*\.\s*$/,               // property access at end
-      /\binterface\s+\w*\s*$/,      // interface declaration
-      /\btype\s+\w*\s*=\s*$/        // type declaration
-    ];
-    
-    return incompletePatterns.some(pattern => pattern.test(code));
-  }
-  
-  private areBracketsBalanced(code: string): boolean {
-    const brackets = { '(': ')', '[': ']', '{': '}' };
-    const stack: string[] = [];
-    let inString = false;
-    let inComment = false;
-    let stringChar = '';
-    
-    for (let i = 0; i < code.length; i++) {
-      const char = code[i];
-      const nextChar = code[i + 1];
-      
-      // Handle comments
-      if (!inString && char === '/' && nextChar === '/') {
-        inComment = true;
-        continue;
-      }
-      if (inComment && char === '\n') {
-        inComment = false;
-        continue;
-      }
-      if (inComment) continue;
-      
-      // Handle strings
-      if (!inString && (char === '"' || char === "'" || char === '`')) {
-        inString = true;
-        stringChar = char;
-        continue;
-      }
-      if (inString && char === stringChar && code[i-1] !== '\\') {
-        inString = false;
-        stringChar = '';
-        continue;
-      }
-      if (inString) continue;
-      
-      // Handle brackets
-      if (char in brackets) {
-        stack.push(char);
-      } else if (Object.values(brackets).includes(char)) {
-        const lastOpen = stack.pop();
-        if (!lastOpen || brackets[lastOpen as keyof typeof brackets] !== char) {
-          return false;
-        }
-      }
-    }
-    
-    return stack.length === 0;
-  }
-  
-  private looksLikeIncompleteTyping(code: string): boolean {
-    const lines = code.split('\n');
-    const lastLine = lines[lines.length - 1].trim();
-    
-    // Check if last line looks incomplete
-    const incompleteTypingPatterns = [
-      /^\w+$/,                      // Single word
-      /^\w+\s*\.$/, // Word followed by dot
-      /^\w+\s*\($/,                 // Word followed by opening paren
-      /^\w+\s*\[$/,                 // Word followed by opening bracket
-      /^\w+\s*\{$/,                 // Word followed by opening brace
-      /^\w+\s*:\s*$/,               // Word followed by colon (TypeScript)
-      /^\s*\.\w*$/,                 // Dot followed by partial word
-    ];
-    
-    return incompleteTypingPatterns.some(pattern => pattern.test(lastLine));
-  }
-
-  private autoExecuteCode(tabId: string): void {
-    const editor = this.editors.get(tabId);
-    if (!editor || tabId !== this.activeTabId) return;
-
-    const code = editor.getValue().trim();
-    if (!code) {
-      this.clearOutput(tabId);
-      return;
-    }
-
-    this.clearOutput(tabId);
-    this.executeCodeSafely(tabId, code);
-  }
-
-  private isTypeScriptCode(code: string): boolean {
-    // Detect TypeScript-specific syntax
-    const tsPatterns = [
-      /interface\s+\w+/g,
-      /type\s+\w+\s*=/g,
-      /:\s*(string|number|boolean|object|any|void|never|unknown)\b/g,
-      /<[^>]+>/g, // Generic types
-      /as\s+\w+/g, // Type assertions
-      /enum\s+\w+/g,
-      /public\s+|private\s+|protected\s+|readonly\s+/g,
-      /implements\s+\w+/g,
-      /extends\s+\w+/g,
-      /abstract\s+class/g,
-      /declare\s+/g
-    ];
-
-    return tsPatterns.some(pattern => pattern.test(code));
-  }
-
-  private async compileTypeScript(code: string): Promise<string> {
-    try {
-      // Use the official TypeScript transpiler
-      const result = ts.transpileModule(code, {
-        compilerOptions: {
-          target: ts.ScriptTarget.ES2020,
-          module: ts.ModuleKind.None,
-          removeComments: false,
-          strict: false,
-          noImplicitAny: false,
-          skipLibCheck: true,
-          isolatedModules: true,
-          esModuleInterop: true,
-          allowSyntheticDefaultImports: true,
-          suppressImplicitAnyIndexErrors: true
-        }
-      });
-      
-      if (result.outputText) {
-         const jsCode = result.outputText
-          .replace(/^"use strict";?\s*/gm, '')
-          .replace(/^\s*\n+/gm, '')
-          .trim();
-        
-        console.log('📄 Original code length:', code.length);
-        console.log('🧹 Transpiled code length:', jsCode.length);
-        console.log('✅ Official TypeScript compilation successful');
-        
-        return jsCode;
-      } else {
-        console.log('❌ TypeScript transpilation returned no output');
-        return code;
-      }
-      
-    } catch (error: any) {
-      console.log('❌ TypeScript compilation error:', error.message);
-      return code;
-    }
-  }
-
   private async executeCodeSafely(tabId: string, code: string): Promise<void> {
-    // Abort any previous execution
-    const existingController = this.executionAbortController.get(tabId);
-    if (existingController) {
-      existingController.abort();
-    }
+    const outputContainer = document.querySelector(`[data-tab-id="${tabId}"].output-container`) as HTMLElement;
+    if (!outputContainer) return;
 
-    const abortController = new AbortController();
-    this.executionAbortController.set(tabId, abortController);
+    // Clear previous output
+    this.clearOutput(tabId);
+    this.appendOutput(tabId, 'info', '正在编译并运行C++代码...', new Date());
 
     try {
-      // Check for potentially dangerous patterns
-      if (this.containsDangerousCode(code)) {
-        this.appendSecurityError(tabId, 'Código potencialmente peligroso detectado');
-        return;
+      // Call main process to compile and run C++
+      const result = await window.electron.compileAndRunCpp(code, this.EXECUTION_TIMEOUT);
+
+      if (result.error) {
+        this.appendFriendlyError(tabId, new Error(result.error));
       }
-
-      let executableCode = code;
-      
-      // Detect and compile TypeScript if needed
-      if (this.isTypeScriptCode(code)) {
-        try {
-          executableCode = await this.compileTypeScript(code);
-        } catch (compileError: any) {
-          this.appendFriendlyError(tabId, compileError);
-          return;
-        }
+      if (result.output) {
+        this.appendOutput(tabId, 'log', result.output, new Date());
       }
-
-      // Create a safe execution context with limits
-      const logs: Array<{type: string, args: any[], timestamp: Date}> = [];
-      let outputLineCount = 0;
-      const executionStartTime = Date.now();
-      
-      // Override console methods with limits
-      const mockConsole = {
-        log: (...args: any[]) => {
-          if (abortController.signal.aborted) return;
-          if (outputLineCount >= this.MAX_OUTPUT_LINES) {
-            this.appendSecurityError(tabId, `Límite de output alcanzado (${this.MAX_OUTPUT_LINES} líneas)`);
-            abortController.abort();
-            return;
-          }
-          if (Date.now() - executionStartTime > this.EXECUTION_TIMEOUT) {
-            this.appendSecurityError(tabId, 'Ejecución detenida por timeout');
-            abortController.abort();
-            return;
-          }
-          logs.push({type: 'log', args, timestamp: new Date()});
-          outputLineCount++;
-        },
-        error: (...args: any[]) => {
-          if (abortController.signal.aborted) return;
-          logs.push({type: 'error', args, timestamp: new Date()});
-          outputLineCount++;
-        },
-        warn: (...args: any[]) => {
-          if (abortController.signal.aborted) return;
-          logs.push({type: 'warn', args, timestamp: new Date()});
-          outputLineCount++;
-        },
-        info: (...args: any[]) => {
-          if (abortController.signal.aborted) return;
-          logs.push({type: 'info', args, timestamp: new Date()});
-          outputLineCount++;
-        }
-      };
-
-      // Create execution timeout
-      const timeoutId = setTimeout(() => {
-        if (!abortController.signal.aborted) {
-          this.appendSecurityError(tabId, `Ejecución detenida por timeout (${this.EXECUTION_TIMEOUT/1000}s)`);
-          abortController.abort();
-        }
-      }, this.EXECUTION_TIMEOUT);
-
-      // Execute code in a restricted environment
-      const safeCode = this.wrapCodeForSafeExecution(executableCode);
-      const executeFunction = new Function('console', 'AbortSignal', safeCode);
-      
-      const result = executeFunction(mockConsole, abortController.signal);
-
-      clearTimeout(timeoutId);
-
-      if (abortController.signal.aborted) {
-        return;
-      }
-
-      // Display captured logs
-      logs.forEach(log => {
-        this.appendOutput(tabId, log.type, log.args, log.timestamp);
-      });
-
-      // Display result if it's not undefined
-      if (result !== undefined) {
-        this.appendOutput(tabId, 'result', [result], new Date());
+      if (result.success && !result.error && !result.output) {
+        this.appendOutput(tabId, 'result', '代码执行完成，无输出。', new Date());
       }
       
     } catch (error: any) {
-      if (abortController.signal.aborted) {
-        return;
-      }
-      // Friendly error display
       this.appendFriendlyError(tabId, error);
-    } finally {
-      this.executionAbortController.delete(tabId);
     }
-  }
-
-  private containsDangerousCode(code: string): boolean {
-    const dangerousPatterns = [
-      /while\s*\(\s*true\s*\)/gi, // while(true)
-      /for\s*\(\s*;\s*;\s*\)/gi, // for(;;)
-      /setInterval|setTimeout/gi, // Timers
-      /XMLHttpRequest|fetch/gi, // Network requests
-      /localStorage|sessionStorage/gi, // Storage access
-      /document\.|window\.|global\./gi, // DOM/Window access
-      /eval\s*\(/gi, // eval function
-      /Function\s*\(/gi, // Function constructor
-      /import\s|require\s*\(/gi, // Module imports
-    ];
-
-    return dangerousPatterns.some(pattern => pattern.test(code));
-  }
-
-  private wrapCodeForSafeExecution(code: string): string {
-    // Wrap code to detect infinite loops
-    return `
-      let __loopCount = 0;
-      const __maxLoops = 100000;
-      const __originalCode = function() {
-        ${code.replace(/for\s*\(/g, 'for (__loopCount++; __loopCount < __maxLoops && (').replace(/while\s*\(/g, 'while (__loopCount++ < __maxLoops && (')}
-      };
-      
-      try {
-        return __originalCode();
-      } catch (e) {
-        if (__loopCount >= __maxLoops) {
-          throw new Error('Bucle infinito detectado - ejecución detenida por seguridad');
-        }
-        throw e;
-      }
-    `;
   }
 
   private appendSecurityError(tabId: string, message: string): void {
@@ -1242,17 +802,16 @@ class WizardJSApp {
     let friendlyMessage = '';
     
     // Make error messages more friendly
-    if (error.message.includes('Unexpected token')) {
-      friendlyMessage = '❌ Error de sintaxis: Revisa que todas las llaves, paréntesis y comillas estén cerradas correctamente.';
-    } else if (error.message.includes('is not defined')) {
-      const variable = error.message.match(/(\w+) is not defined/)?.[1];
-      friendlyMessage = `❌ Variable no definida: '${variable}' no existe. ¿La escribiste correctamente?`;
-    } else if (error.message.includes('Cannot read property')) {
-      friendlyMessage = '❌ Error de propiedad: Intentas acceder a una propiedad de algo que es null o undefined.';
-    } else if (error.message.includes('Cannot access')) {
-      friendlyMessage = '❌ Error de acceso: Intentas usar una variable antes de declararla.';
+    if (error.message.includes('Compilation failed')) {
+      friendlyMessage = `❌ 编译失败：请检查你的C++语法错误。\n${error.message}`;
+    } else if (error.message.includes('Execution timed out')) {
+      friendlyMessage = `⚠️ 执行超时：你的程序运行时间过长，可能存在无限循环或性能问题。\n${error.message}`;
+    } else if (error.message.includes('Execution failed')) {
+      friendlyMessage = `❌ 运行时错误：程序执行失败。\n${error.message}`;
+    } else if (error.message.includes('g++')) {
+      friendlyMessage = `❌ 编译器错误：请确保你的系统已安装 g++ 编译器，并且在 PATH 中可访问。\n${error.message}`;
     } else {
-      friendlyMessage = `❌ Error: ${error.message}`;
+      friendlyMessage = `❌ 错误: ${error.message}`;
     }
     
     errorLine.innerHTML = friendlyMessage;
@@ -1265,7 +824,6 @@ class WizardJSApp {
       const savedSettings = localStorage.getItem(this.SETTINGS_KEY);
       if (savedSettings) {
         this.settings = { ...this.settings, ...JSON.parse(savedSettings) };
-        this.autoRunEnabled = this.settings.autoRunEnabled;
       }
     } catch (error) {
       console.warn('Error loading settings:', error);
@@ -1273,7 +831,7 @@ class WizardJSApp {
   }
 
   private t(key: string): string {
-    const lang = this.settings.language as 'en' | 'es';
+    const lang = this.settings.language as 'en' | 'zh';
     return this.translations[lang][key as keyof typeof this.translations.en] || key;
   }
 
@@ -1292,7 +850,6 @@ class WizardJSApp {
     const fontSizeValue = document.getElementById('font-size-value');
     const wordWrapToggle = document.getElementById('word-wrap-toggle') as HTMLInputElement;
     const minimapToggle = document.getElementById('minimap-toggle') as HTMLInputElement;
-    const autoRunToggle = document.getElementById('auto-run-toggle') as HTMLInputElement;
     const lineNumbersToggle = document.getElementById('line-numbers-toggle') as HTMLInputElement;
     const tabSizeInput = document.getElementById('tab-size-input') as HTMLSelectElement;
     const languageSelect = document.getElementById('language-select') as HTMLSelectElement;
@@ -1307,7 +864,6 @@ class WizardJSApp {
     }
     if (wordWrapToggle) wordWrapToggle.checked = this.settings.wordWrap;
     if (minimapToggle) minimapToggle.checked = this.settings.minimap;
-    if (autoRunToggle) autoRunToggle.checked = this.settings.autoRunEnabled;
     if (lineNumbersToggle) lineNumbersToggle.checked = this.settings.lineNumbers;
     if (tabSizeInput) tabSizeInput.value = this.settings.tabSize.toString();
     if (languageSelect) languageSelect.value = this.settings.language;
@@ -1323,12 +879,12 @@ class WizardJSApp {
     const saveBtn = document.getElementById('saveBtn');
     const settingsBtn = document.getElementById('settingsBtn');
 
-    if (runBtn) runBtn.setAttribute('title', this.t('runTooltip'));
-    if (clearBtn) clearBtn.setAttribute('title', this.t('clearTooltip'));
-    if (newBtn) newBtn.setAttribute('title', this.t('newTooltip'));
-    if (openBtn) openBtn.setAttribute('title', this.t('openTooltip'));
-    if (saveBtn) saveBtn.setAttribute('title', this.t('saveTooltip'));
-    if (settingsBtn) settingsBtn.setAttribute('title', this.t('settingsTooltip'));
+    if (runBtn) runBtn.setAttribute('data-tooltip', this.t('runTooltip'));
+    if (clearBtn) clearBtn.setAttribute('data-tooltip', this.t('clearTooltip'));
+    if (newBtn) newBtn.setAttribute('data-tooltip', this.t('newTooltip'));
+    if (openBtn) openBtn.setAttribute('data-tooltip', this.t('openTooltip'));
+    if (saveBtn) saveBtn.setAttribute('data-tooltip', this.t('saveTooltip'));
+    if (settingsBtn) settingsBtn.setAttribute('data-tooltip', this.t('settingsTooltip'));
 
     // Update settings panel content
     this.updateSettingsPanelLanguage();
@@ -1350,15 +906,15 @@ class WizardJSApp {
     const labels = document.querySelectorAll('.setting-item label');
     labels.forEach(label => {
       const text = label.textContent?.trim();
-      if (text?.includes('Idioma') || text?.includes('Language')) {
+      if (text?.includes('Language')) {
         label.childNodes[0].textContent = this.t('language') + ': ';
-      } else if (text?.includes('Tema') || text?.includes('Theme')) {
+      } else if (text?.includes('Theme')) {
         label.childNodes[0].textContent = this.t('theme') + ': ';
-      } else if (text?.includes('Fuente') || text?.includes('Font')) {
+      } else if (text?.includes('Font')) {
         label.childNodes[0].textContent = this.t('font') + ': ';
-      } else if (text?.includes('Tamaño de fuente') || text?.includes('Font Size')) {
+      } else if (text?.includes('Font Size')) {
         label.childNodes[0].textContent = this.t('fontSize') + ': ';
-      } else if (text?.includes('Tamaño de tab') || text?.includes('Tab Size')) {
+      } else if (text?.includes('Tab Size')) {
         label.childNodes[0].textContent = this.t('tabSize') + ': ';
       }
     });
@@ -1369,13 +925,11 @@ class WizardJSApp {
       const checkbox = label.querySelector('input[type="checkbox"]');
       if (checkbox) {
         const text = label.textContent?.trim();
-        if (text?.includes('Ajuste de línea') || text?.includes('Word Wrap')) {
+        if (text?.includes('Word Wrap')) {
           label.childNodes[2].textContent = this.t('wordWrap');
-        } else if (text?.includes('minimap') || text?.includes('Minimap')) {
+        } else if (text?.includes('Minimap')) {
           label.childNodes[2].textContent = this.t('minimap');
-        } else if (text?.includes('Auto-ejecución') || text?.includes('Auto-execution')) {
-          label.childNodes[2].textContent = this.t('autoRun');
-        } else if (text?.includes('números de línea') || text?.includes('Line Numbers')) {
+        } else if (text?.includes('Line Numbers')) {
           label.childNodes[2].textContent = this.t('lineNumbers');
         }
       }
@@ -1390,49 +944,55 @@ class WizardJSApp {
   }
 
   private getWelcomeCode(): string {
-    return `// ¡Bienvenido a WizardJS! 🚀
-// Tu playground de JavaScript y TypeScript open source
-// ✨ Auto-ejecución activada: el código se ejecuta automáticamente
-// 🔷 Soporte nativo para TypeScript - detección automática
+    return `// 欢迎来到 WizardJS! 🚀
+// 你的开源 C++ 演练场
 
-// Ejemplo básico JavaScript
-console.log('¡Hola WizardJS!');
+#include <iostream>
+#include <vector>
+#include <string>
 
-// Ejemplo TypeScript con tipos
-interface Persona {
-  nombre: string;
-  edad: number;
-  hobbies: string[];
+int main() {
+    // 基本 C++ 示例
+    std::cout << "你好 WizardJS!" << std::endl;
+
+    // 变量和数据类型
+    int age = 30;
+    std::string name = "张三";
+    bool isStudent = false;
+
+    std::cout << "姓名: " << name << std::endl;
+    std::cout << "年龄: " << age << std::endl;
+    std::cout << "是否学生: " << (isStudent ? "是" : "否") << std::endl;
+
+    // 循环
+    std::cout << "从 1 到 5 的数字:" << std::endl;
+    for (int i = 1; i <= 5; ++i) {
+        std::cout << i << " ";
+    }
+    std::cout << std::endl;
+
+    // 向量 (动态数组)
+    std::vector<int> numbers = {10, 20, 30, 40, 50};
+    std::cout << "向量元素:" << std::endl;
+    for (int num : numbers) {
+        std::cout << num << " ";
+    }
+    std::cout << std::endl;
+
+    // 函数示例
+    auto add = [](int a, int b) {
+        return a + b;
+    };
+    std::cout << "10 + 20 = " << add(10, 20) << std::endl;
+
+    // 按 Ctrl/Cmd + R 手动执行！
+    // 按 Ctrl/Cmd + T 新建标签页！
+    // 按 Ctrl/Cmd + S 保存！
+    // 按 Ctrl/Cmd + , 打开设置！
+
+    return 0;
 }
-
-const persona: Persona = {
-  nombre: 'Juan',
-  edad: 30,
-  hobbies: ['programar', 'leer', 'viajar']
-};
-
-// Función con tipos TypeScript
-function saludar(nombre: string): string {
-  return \`¡Hola, \${nombre}! Bienvenido a WizardJS\`;
-}
-
-console.log(saludar('Desarrollador'));
-console.log('Persona:', persona);
-console.log('Hobbies:', persona.hobbies.join(', '));
-
-// Operaciones con arrays tipados
-const numeros: number[] = [1, 2, 3, 4, 5];
-const cuadrados = numeros.map((n: number) => n * n);
-console.log('Números:', numeros);
-console.log('Cuadrados:', cuadrados);
-
-// ¡Presiona Ctrl/Cmd + R para ejecutar manualmente!
-// ¡Presiona Ctrl/Cmd + T para nuevo tab!
-// ¡Presiona Ctrl/Cmd + S para guardar!
-// ¡Presiona Ctrl/Cmd + , para configuraciones!
-
-// Resultado final
-'¡WizardJS con TypeScript está funcionando perfectamente!'`;
+`;
   }
 }
 
