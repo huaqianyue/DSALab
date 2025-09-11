@@ -1,41 +1,60 @@
 // renderer.ts
 /**
- * WizardJS - C++ Playground
- * Open Source alternative to RunJs
+ * DSALab - C++ Playground
  */
 
-import './index.css';
+import './index.css'; //导入主样式文件，应用于整个应用程序的UI
 
 // Monaco Editor imports
 import * as monaco from 'monaco-editor';
 
-// Declare the 'electron' API exposed by preload.ts
+// 声明全局的'electron'API，这个API由Electron的preload.ts脚本暴露给渲染进程。
+//这是渲染进程与主进程进行通信（IPC）的关键接口。
 declare global {
   interface Window {
     electron: {
+      /**
+       * 调用主进程编译并运行 C++ 代码。
+       * @param code 要编译和运行的 C++ 代码字符串。
+       * @param timeout 执行超时时间（毫秒）。
+       * @returns 一个 Promise，包含执行结果：success（是否成功）、output（标准输出）、error（错误信息）。
+       */
       compileAndRunCpp: (code: string, timeout: number) => Promise<{ success: boolean; output: string; error: string }>;
+      /**
+       * 调用主进程显示一个打开文件对话框。
+       * @returns 一个 Promise，包含选定文件的路径和内容，如果用户取消则返回 null。
+       */
       showOpenDialog: () => Promise<{ filePath: string; content: string } | null>;
+      /**
+       * 调用主进程显示一个保存文件对话框。
+       * @param currentFilePath 当前文件的路径，用于作为保存对话框的默认路径。
+       * @param defaultFileName 默认的文件名。
+       * @param content 要保存的文件内容。
+       * @returns 一个 Promise，包含保存文件的路径，如果用户取消则返回 null。
+       */
       showSaveDialog: (currentFilePath: string | null, defaultFileName: string, content: string) => Promise<string | null>;
     };
   }
 }
 
-// WizardJS Application Class
+// DSALab Application Class
+//定义应用程序的设置接口
 interface AppSettings {
-  theme: string;
-  fontSize: number;
-  wordWrap: boolean;
-  minimap: boolean;
-  lineNumbers: boolean;
-  tabSize: number;
-  fontFamily: string;
-  language: string;
+  theme: string;  //编辑器主题
+  fontSize: number;  //字体大小
+  wordWrap: boolean; //自动换行
+  minimap: boolean;  //是否显示小地图
+  lineNumbers: boolean; //是否显示行号
+  tabSize: number; //Tab键对应的空格数
+  fontFamily: string; //字体家族
+  language: string;  //UI语言（en，zh）
 }
 
+//定义主题的结构接口
 interface ThemeDefinition {
-  name: string;
-  displayName: string;
-  colors: {
+  name: string;  //主题的内部名称
+  displayName: string;  //主题的显示名称
+  colors: {  //主题颜色配置
     background: string;
     foreground: string;
     selection: string;
@@ -44,26 +63,33 @@ interface ThemeDefinition {
   };
 }
 
-class WizardJSApp {
+// DSALab 应用程序的主类，负责整个前端应用的逻辑和状态
+class DSALabApp {
+  //存储所有Monaco编辑器实例的Map，键为标签页ID，值为编辑器实例
   private editors: Map<string, monaco.editor.IStandaloneCodeEditor> = new Map();
+  //用于生成新标签页ID的计数器
   private tabCounter = 1;
+  //当前激活的标签页ID
   private activeTabId = 'tab-1';
+  //存储所有标签页的数据，包括标题、内容、是否修改、文件路径等。
   private tabData: Map<string, { title: string; content: string; isDirty: boolean; file: string | null }> = new Map();
-  private readonly EXECUTION_TIMEOUT = 5000; // 5 seconds maximum execution
-  private readonly MAX_OUTPUT_LINES = 1000; // Maximum 1000 lines of output
-  private executionAbortController: Map<string, AbortController> = new Map();
+  // 代码执行的最大超时时间（30秒）。
+  private readonly EXECUTION_TIMEOUT = 30000; 
+  // private readonly MAX_OUTPUT_LINES = 1000; // Maximum 1000 lines of output
+  // private executionAbortController: Map<string, AbortController> = new Map();
+  // 应用程序的当前设置，包含默认值。
   private settings: AppSettings = {
-    theme: 'github-dark',
-    fontSize: 14,
-    wordWrap: true,
-    minimap: false,
-    lineNumbers: false,
-    tabSize: 2,
-    fontFamily: 'JetBrains Mono',
-    language: 'zh' // Default to Chinese
+    theme: 'github-dark',  // 默认主题
+    fontSize: 14,  // 默认字体大小
+    wordWrap: true,  // 默认自动换行
+    minimap: false,  // 默认不显示小地图
+    lineNumbers: true,  // 默认显示行号
+    tabSize: 2,  // 默认 Tab 大小
+    fontFamily: 'JetBrains Mono',   // 默认字体家族
+    language: 'zh' // 默认语言为中文
   };
-  private readonly SETTINGS_KEY = 'wizardjs-settings';
-
+  private readonly SETTINGS_KEY = 'DSALab-settings'; // 用于在 localStorage 中存储设置的键名。
+  // 定义可用的主题列表
   private themes: ThemeDefinition[] = [
     {
       name: 'github-dark',
@@ -88,7 +114,7 @@ class WizardJSApp {
       }
     }
   ];
-
+  // 定义可用的字体家族列表
   private fontFamilies = [
     'JetBrains Mono',
     'Fira Code',
@@ -96,13 +122,10 @@ class WizardJSApp {
     'Monaco',
     'Menlo'
   ];
-
+  // 应用程序的国际化翻译文本
   private translations = {
     en: {
       file: 'File',
-      new: 'New',
-      open: 'Open',
-      save: 'Save',
       settings: 'Settings',
       theme: 'Theme',
       fontSize: 'Font Size',
@@ -113,15 +136,10 @@ class WizardJSApp {
       clear: 'Clear',
       // Tooltips
       runTooltip: 'Run (Ctrl+R)',
-      newTooltip: 'New file (Ctrl+N)',
-      openTooltip: 'Open file (Ctrl+O)',
-      saveTooltip: 'Save (Ctrl+S)',
       clearTooltip: 'Clear output (Ctrl+K)',
-      settingsTooltip: 'Settings (Ctrl+,)',
-      closeTabTooltip: 'Close Tab', // Added
-      newTabTooltip: 'New Tab (Ctrl+T)', // Added
-      confirmSaveOnClose: 'Do you want to save changes to', // Added
-      // Settings panel
+      settingsTooltip: 'Settings',
+      confirmSaveOnClose: 'Do you want to save changes to', // 关闭时确认保存的提示
+      // 设置面板相关
       general: 'General',
       appearance: 'Appearance',
       editor: 'Editor',
@@ -135,11 +153,8 @@ class WizardJSApp {
       saveFile: 'Save:',
       openSettings: 'Settings:'
     },
-    zh: { // Chinese translations
+    zh: { // 中文翻译
       file: '文件',
-      new: '新建',
-      open: '打开',
-      save: '保存',
       settings: '设置',
       theme: '主题',
       fontSize: '字体大小',
@@ -150,14 +165,9 @@ class WizardJSApp {
       clear: '清空',
       // Tooltips
       runTooltip: '运行 (Ctrl+R)',
-      newTooltip: '新建文件 (Ctrl+N)',
-      openTooltip: '打开文件 (Ctrl+O)',
-      saveTooltip: '保存 (Ctrl+S)',
       clearTooltip: '清空输出 (Ctrl+K)',
-      settingsTooltip: '设置 (Ctrl+,)',
-      closeTabTooltip: '关闭标签页', // Added
-      newTabTooltip: '新建标签页 (Ctrl+T)', // Added
-      confirmSaveOnClose: '是否保存对', // Added
+      settingsTooltip: '设置',
+      confirmSaveOnClose: '是否保存', 
       // Settings panel
       general: '通用',
       appearance: '外观',
@@ -173,23 +183,23 @@ class WizardJSApp {
       openSettings: '设置:'
     }
   };
-
+  // 构造函数，应用程序初始化时调用
   constructor() {
-    this.loadSettings();
-    this.configureMonaco();
-    this.initializeMonacoTheme();
-    this.initializeFirstTab();
-    this.setupEventListeners();
-    this.setupKeyboardShortcuts();
-    this.setupTabSystem();
-    this.setupSettingsPanel();
-    this.updateUILanguage();
+    this.loadSettings(); // 加载用户设置
+    this.configureMonaco(); // 配置 Monaco Editor
+    this.initializeMonacoTheme(); // 初始化 Monaco Editor 主题
+    this.initializeFirstTab();  // 初始化第一个标签页
+    this.setupEventListeners();  // 设置DOM事件监听器
+    this.setupKeyboardShortcuts();  // 设置键盘快捷键
+    // this.setupTabSystem();  // 设置标签页系统
+    this.setupSettingsPanel();  // 设置设置面板
+    this.updateUILanguage();  // 根据当前语言设置更新UI文本
   }
-
+  // 配置 Monaco Editor (目前只有占位，Monaco 自动提供 C++ 语言特性)
   private configureMonaco(): void {
     // Monaco automatically provides basic C++ language features with 'cpp' language mode.
   }
-
+  // 初始化 Monaco Editor 的自定义主题
   private initializeMonacoTheme(): void {
     // Configure Monaco Editor with GitHub Dark theme
     monaco.editor.defineTheme('github-dark', {
@@ -255,185 +265,137 @@ class WizardJSApp {
       }
     });
   }
-
+  // 初始化第一个标签页
   private initializeFirstTab(): void {
-    this.tabData.set('tab-1', {
-      title: 'Untitled-1',
-      content: this.getWelcomeCode(),
-      isDirty: false,
-      file: null
+    this.tabData.set('tab-1', {  // 设置第一个标签页的数据
+      title: 'Untitled-1',  // 默认标题
+      content: this.getWelcomeCode(),  // 欢迎代码作为初始内容
+      isDirty: false,  // 初始状态为未修改
+      file: null  // 初始未关联文件
     });
-    this.createEditor('tab-1');
+    this.createEditor('tab-1');  // 为第一个标签页创建编辑器实例
   }
-
+  // 为指定标签页ID创建 Monaco Editor 实例
   private createEditor(tabId: string): void {
-    const editorContainer = document.querySelector(`[data-tab-id="${tabId}"].editor-container`) as HTMLElement;
-    if (!editorContainer) return;
+    const editorContainer = document.querySelector(`[data-tab-id="${tabId}"].editor-container`) as HTMLElement; // 获取编辑器容器
+    if (!editorContainer) return; // 如果容器不存在则返回
 
-    const editor = monaco.editor.create(editorContainer, {
-      value: this.tabData.get(tabId)?.content || '',
-      language: 'cpp', // Changed to C++
-      theme: this.settings.theme,
-      fontSize: this.settings.fontSize,
-      fontFamily: this.settings.fontFamily,
-      minimap: { enabled: this.settings.minimap },
-      scrollBeyondLastLine: false,
-      automaticLayout: true,
-      tabSize: this.settings.tabSize,
-      insertSpaces: true,
-      wordWrap: this.settings.wordWrap ? 'on' : 'off',
-      lineNumbers: this.settings.lineNumbers ? 'on' : 'off',
-      renderWhitespace: 'selection',
-      contextmenu: true,
-      mouseWheelZoom: true,
-      cursorBlinking: 'blink',
-      cursorSmoothCaretAnimation: 'on',
-      smoothScrolling: true,
-      folding: true,
-      foldingHighlight: true,
-      showFoldingControls: 'always',
-      bracketPairColorization: { enabled: true },
-      guides: {
-        bracketPairs: true,
-        indentation: true
+    const editor = monaco.editor.create(editorContainer, {  // 创建 Monaco Editor 实例
+      value: this.tabData.get(tabId)?.content || '',  // 编辑器初始内容，从 tabData 获取
+      language: 'cpp', // 语言模式设置为 C++
+      theme: this.settings.theme,  // 应用当前设置的主题
+      fontSize: this.settings.fontSize,  // 应用当前设置的字体大小
+      fontFamily: this.settings.fontFamily,  // 应用当前设置的字体家族
+      minimap: { enabled: this.settings.minimap },  // 根据设置启用/禁用小地图
+      scrollBeyondLastLine: false,  // 不允许滚动到最后一行之外
+      automaticLayout: true,  // 自动布局，适应容器大小变化
+      tabSize: this.settings.tabSize,  // 应用当前设置的 Tab 大小
+      insertSpaces: true,  // 使用空格代替 Tab 键
+      wordWrap: this.settings.wordWrap ? 'on' : 'off',  // 根据设置启用/禁用自动换行
+      lineNumbers: this.settings.lineNumbers ? 'on' : 'off',  // 根据设置启用/禁用行号
+      renderWhitespace: 'selection',  // 仅在选中时渲染空白字符
+      contextmenu: false,  // 禁用右键菜单
+      mouseWheelZoom: true, // 启用鼠标滚轮缩放
+      cursorBlinking: 'blink', // 光标闪烁模式
+      cursorSmoothCaretAnimation: 'on',  // 平滑光标动画
+      smoothScrolling: true, // 平滑滚动
+      folding: true, // 启用代码折叠
+      foldingHighlight: true, // 启用折叠区域高亮
+      showFoldingControls: 'always', // 始终显示折叠控制
+      bracketPairColorization: { enabled: true }, // 启用括号对颜色化
+      guides: { // 启用代码指南
+        bracketPairs: true, // 括号对指南
+        indentation: true // 缩进指南
       },
-      hover: { enabled: true },
-      quickSuggestions: true,
-      suggestOnTriggerCharacters: true,
-      acceptSuggestionOnEnter: 'on',
-      tabCompletion: 'on',
-      wordBasedSuggestions: 'currentDocument',
-      parameterHints: { enabled: true },
-      autoClosingBrackets: 'languageDefined',
-      autoClosingQuotes: 'languageDefined',
-      autoSurround: 'languageDefined'
+      hover: { enabled: true }, // 启用悬停提示
+      quickSuggestions: true, // 启用快速建议
+      suggestOnTriggerCharacters: true, // 在触发字符时显示建议
+      acceptSuggestionOnEnter: 'on', // 按 Enter 键接受建议
+      tabCompletion: 'on', // 启用 Tab 补全
+      wordBasedSuggestions: 'currentDocument', // 基于当前文档的单词建议
+      parameterHints: { enabled: true }, // 启用参数提示
+      autoClosingBrackets: 'languageDefined',  // 自动关闭括号
+      autoClosingQuotes: 'languageDefined', // 自动关闭引号
+      autoSurround: 'languageDefined' // 自动环绕
     });
 
-    // Track changes for dirty state
+    // 监听编辑器内容变化，更新标签页的“已修改”状态
     editor.onDidChangeModelContent(() => {
       const tabData = this.tabData.get(tabId);
       if (tabData) {
-        tabData.isDirty = true;
-        tabData.content = editor.getValue();
-        this.updateTabTitle(tabId);
+        tabData.isDirty = true;  // 设置为已修改
+        tabData.content = editor.getValue();  // 更新标签页内容
+        this.updateTabTitle(tabId);  // 更新标签页标题以显示修改状态
        }
      });
 
-    this.editors.set(tabId, editor);
+    this.editors.set(tabId, editor);  // 将编辑器实例存储到 Map 中
   }
-
+  // 设置主要的DOM事件监听器
   private setupEventListeners(): void {
-    // Run button
+    // 运行按钮事件
     document.getElementById('runBtn')?.addEventListener('click', () => {
-      this.executeCode();
+      this.executeCode(); // 点击运行按钮执行代码
     });
 
-    // Clear button
+     // 清空输出按钮事件
     document.getElementById('clearBtn')?.addEventListener('click', () => {
-      this.clearOutput();
-    });
-
-    // File operations
-    document.getElementById('newBtn')?.addEventListener('click', () => {
-      this.newFile();
-    });
-
-    document.getElementById('openBtn')?.addEventListener('click', () => {
-      this.openFile();
-    });
-
-    document.getElementById('saveBtn')?.addEventListener('click', () => {
-      this.saveFile();
+      this.clearOutput();  // 点击清空按钮清空输出
     });
   }
-
+  // 设置键盘快捷键
   private setupKeyboardShortcuts(): void {
     document.addEventListener('keydown', (e) => {
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
-
-      if (cmdOrCtrl && e.key === 'r') {
-        e.preventDefault();
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;  // 判断是否为 Mac 系统
+      const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;  // 根据系统判断使用 Command 键还是 Control 键
+      
+        // 添加这一行进行调试
+      console.log('Keydown event:', {
+        key: e.key,
+        code: e.code,
+        ctrlKey: e.ctrlKey,
+        metaKey: e.metaKey,
+        shiftKey: e.shiftKey,
+        altKey: e.altKey
+      });
+      if (cmdOrCtrl && e.key === 'r') { // Ctrl/Cmd + R 运行代码
+        e.preventDefault();  // 阻止默认行为 (如浏览器刷新)
         this.executeCode();
-      } else if (cmdOrCtrl && e.key === 's') {
-        e.preventDefault();
-        this.saveFile();
-      } else if (cmdOrCtrl && e.key === 'n') {
-        e.preventDefault();
-        this.newFile();
-      } else if (cmdOrCtrl && e.key === 'o') {
-        e.preventDefault();
-        this.openFile();
-      } else if (cmdOrCtrl && e.key === 't') {
-        e.preventDefault();
-        this.addNewTab();
-      } else if (cmdOrCtrl && e.key === ',') {
-        e.preventDefault();
-        document.getElementById('settingsPanel')?.classList.add('open');
-      }
+      } 
     });
   }
-
-  private setupTabSystem(): void {
-    // Add tab button
-    const addTabBtn = document.querySelector('.add-tab-btn');
-    addTabBtn?.addEventListener('click', () => {
-      this.addNewTab();
-    });
-    // Set tooltip for add tab button
-    if (addTabBtn) {
-      addTabBtn.setAttribute('data-tooltip', this.t('newTabTooltip'));
-    }
-
-    // Setup event delegation for tab clicks and close buttons
-    document.querySelector('.tabs-list')?.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement;
-      const tab = target.closest('.tab') as HTMLElement;
-      
-      if (!tab) return;
-      
-      const tabId = tab.getAttribute('data-tab-id');
-      if (!tabId) return;
-
-      if (target.closest('.tab-close')) {
-        this.closeTab(tabId);
-      } else {
-        this.switchToTab(tabId);
-      }
-    });
-  }
-
+  // 添加新的标签页
   private addNewTab(): void {
-    this.tabCounter++;
-    const newTabId = `tab-${this.tabCounter}`;
-    const newTabTitle = `Untitled-${this.tabCounter}`;
+    this.tabCounter++; // 标签页计数器递增
+    const newTabId = `tab-${this.tabCounter}`; // 生成新的标签页ID
+    const newTabTitle = `Untitled-${this.tabCounter}`; // 生成新的默认标签页标题
 
-    // Add tab data
+    // 添加标签页数据
     this.tabData.set(newTabId, {
       title: newTabTitle,
-      content: '',
-      isDirty: false,
-      file: null
+      content: '', // 新标签页内容为空
+      isDirty: false, // 初始为未修改
+      file: null // 初始未关联文件
     });
 
-    // Create tab element
-    const tabsContainer = document.querySelector('.tabs-list');
-    const newTab = document.createElement('div');
-    newTab.className = 'tab';
-    newTab.setAttribute('data-tab-id', newTabId);
+    // 创建标签页的DOM元素
+    const tabsContainer = document.querySelector('.tabs-list'); // 获取标签页列表容器
+    const newTab = document.createElement('div'); // 创建新的 div 元素作为标签页
+    newTab.className = 'tab'; // 添加 'tab' 类
+    newTab.setAttribute('data-tab-id', newTabId); // 设置 data-tab-id 属性
     newTab.innerHTML = `
       <span class="tab-title">${newTabTitle}</span>
       <button class="tab-close" data-tooltip="${this.t('closeTabTooltip')}">
         <i class="fas fa-times"></i>
       </button>
-    `;
-    tabsContainer?.appendChild(newTab);
+    `; // 设置标签页内容，包括标题和关闭按钮
+    tabsContainer?.appendChild(newTab); // 将新标签页添加到列表中
 
-    // Create tab content
-    const tabsContent = document.querySelector('.tabs-content');
-    const newTabPane = document.createElement('div');
-    newTabPane.className = 'tab-pane';
-    newTabPane.setAttribute('data-tab-id', newTabId);
+    // 创建标签页内容的DOM元素 (编辑器和输出面板)
+    const tabsContent = document.querySelector('.tabs-content'); // 获取标签页内容容器
+    const newTabPane = document.createElement('div'); // 创建新的 div 元素作为标签页内容面板
+    newTabPane.className = 'tab-pane'; // 添加 'tab-pane' 类
+    newTabPane.setAttribute('data-tab-id', newTabId); // 设置 data-tab-id 属性
     newTabPane.innerHTML = `
       <div class="split-view">
          <div class="split-panel editor-panel">
@@ -446,157 +408,67 @@ class WizardJSApp {
             <div class="output-container" data-tab-id="${newTabId}"></div>
           </div>
        </div>
-    `;
-    tabsContent?.appendChild(newTabPane);
+    `; // 设置标签页内容面板的结构，包括编辑器容器和输出容器
+    tabsContent?.appendChild(newTabPane); // 将新标签页内容面板添加到容器中
 
-    // Create editor for new tab
+    // 延迟创建编辑器并切换到新标签页，确保DOM已渲染
     setTimeout(() => {
-      this.createEditor(newTabId);
-      this.switchToTab(newTabId);
+      this.createEditor(newTabId); // 为新标签页创建编辑器
+      this.switchToTab(newTabId); // 切换到新标签页
     }, 100);
   }
-
-  private closeTab(tabId: string): void {
-    const tabData = this.tabData.get(tabId);
-    
-    // Check if there's only one tab left
-    if (this.tabData.size <= 1) {
-      return; // Don't close the last tab
-    }
-
-    // Check if tab has unsaved changes
-    if (tabData?.isDirty) {
-      const save = confirm(`${this.t('confirmSaveOnClose')} ${tabData.title}?`);
-      if (save) {
-        this.saveFile(tabId);
-      }
-    }
-
-    // Remove editor
-    const editor = this.editors.get(tabId);
-    if (editor) {
-      editor.dispose();
-      this.editors.delete(tabId);
-    }
-
-    // Remove tab data
-    this.tabData.delete(tabId);
-
-    // Remove DOM elements
-    document.querySelector(`[data-tab-id="${tabId}"].tab`)?.remove();
-    document.querySelector(`[data-tab-id="${tabId}"].tab-pane`)?.remove();
-
-    // Switch to another tab if this was the active tab
-    if (this.activeTabId === tabId) {
-      const remainingTabs = Array.from(this.tabData.keys());
-      if (remainingTabs.length > 0) {
-        this.switchToTab(remainingTabs[0]);
-      }
-    }
-  }
-
+  // 切换到指定标签页
   private switchToTab(tabId: string): void {
-    // Remove active class from all tabs and panes
+    // 移除所有标签页和内容面板的 'active' 类
     document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
 
-    // Add active class to selected tab and pane
+    // 为选定的标签页和内容面板添加 'active' 类
     document.querySelector(`[data-tab-id="${tabId}"].tab`)?.classList.add('active');
     document.querySelector(`[data-tab-id="${tabId}"].tab-pane`)?.classList.add('active');
 
-    this.activeTabId = tabId;
+    this.activeTabId = tabId; // 更新当前激活的标签页ID
 
-    // Trigger editor resize
+    // 触发编辑器重新布局，以适应可能改变的容器大小
     setTimeout(() => {
       const editor = this.editors.get(tabId);
       if (editor) {
-        editor.layout();
+        editor.layout(); // 重新布局编辑器
       }
     }, 100);
 
-    this.updateTitle();
+    this.updateTitle(); // 更新窗口标题
   }
-
+  // 执行当前激活标签页中的代码
   private async executeCode(): Promise<void> {
-    const editor = this.editors.get(this.activeTabId);
-    if (!editor) return;
+    const editor = this.editors.get(this.activeTabId);  // 获取当前激活标签页的编辑器实例
+    if (!editor) return;  // 如果编辑器不存在则返回
 
-    const code = editor.getValue();
-    this.clearOutput(this.activeTabId);
-    await this.executeCodeSafely(this.activeTabId, code);
+    const code = editor.getValue();  // 获取编辑器中的代码
+    this.clearOutput(this.activeTabId);   // 清空当前标签页的输出
+    await this.executeCodeSafely(this.activeTabId, code);  // 安全地执行代码
   }
-
+  // 向指定标签页的输出面板追加内容
   private appendOutput(tabId: string, type: string, text: string, timestamp: Date): void {
-    const outputContainer = document.querySelector(`[data-tab-id="${tabId}"].output-container`) as HTMLElement;
-    if (!outputContainer) return;
+    const outputContainer = document.querySelector(`[data-tab-id="${tabId}"].output-container`) as HTMLElement;  // 获取输出容器
+    if (!outputContainer) return;   // 如果容器不存在则返回
 
-    const outputLine = document.createElement('div');
-    outputLine.className = `output-${type}`;
+    const outputLine = document.createElement('div');  // 创建新的 div 元素作为输出行
+    outputLine.className = `output-${type}`;  // 添加对应类型的类名 (如 output-info, output-log, output-error)
     
-    outputLine.innerHTML = text.replace(/\n/g, '<br>'); // Preserve newlines
-    outputContainer.appendChild(outputLine);
-    outputContainer.scrollTop = outputContainer.scrollHeight;
+    outputLine.innerHTML = text.replace(/\n/g, '<br>'); // 将换行符转换为 <br> 标签以保留格式
+    outputContainer.appendChild(outputLine);  // 将输出行添加到容器中
+    outputContainer.scrollTop = outputContainer.scrollHeight;  // 滚动到最新输出
   }
-
+  // 清空指定标签页（或当前激活标签页）的输出面板
   private clearOutput(tabId?: string): void {
-    const targetTabId = tabId || this.activeTabId;
-    const outputContainer = document.querySelector(`[data-tab-id="${targetTabId}"].output-container`) as HTMLElement;
+    const targetTabId = tabId || this.activeTabId;  // 确定目标标签页ID
+    const outputContainer = document.querySelector(`[data-tab-id="${targetTabId}"].output-container`) as HTMLElement;  // 获取输出容器
     if (outputContainer) {
-      outputContainer.innerHTML = '';
+      outputContainer.innerHTML = '';  // 清空容器内容
     }
   }
 
-  private newFile(): void {
-    this.addNewTab();
-  }
-
-  private async openFile(): Promise<void> {
-    try {
-      const result = await window.electron.showOpenDialog();
-      
-      if (result && result.filePath && result.content !== undefined) {
-        const editor = this.editors.get(this.activeTabId);
-        if (editor) {
-          editor.setValue(result.content);
-          const tabData = this.tabData.get(this.activeTabId);
-          if (tabData) {
-            tabData.file = result.filePath;
-            tabData.title = result.filePath.split(/[\\/]/).pop() || 'Untitled';
-            tabData.isDirty = false;
-            this.updateTabTitle(this.activeTabId);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error opening file:', error);
-      this.appendFriendlyError(this.activeTabId, new Error(`打开文件失败: ${error instanceof Error ? error.message : String(error)}`));
-    }
-  }
-
-  private async saveFile(tabId?: string): Promise<void> {
-    const targetTabId = tabId || this.activeTabId;
-    const editor = this.editors.get(targetTabId);
-    const tabData = this.tabData.get(targetTabId);
-    
-    if (!editor || !tabData) return;
-    
-    const content = editor.getValue();
-    const defaultFileName = tabData.title.endsWith('.cpp') ? tabData.title : tabData.title + '.cpp';
-    
-    try {
-      const savedFilePath = await window.electron.showSaveDialog(tabData.file, defaultFileName, content);
-      
-      if (savedFilePath) {
-        tabData.file = savedFilePath;
-        tabData.title = savedFilePath.split(/[\\/]/).pop() || 'Untitled';
-        tabData.isDirty = false;
-        this.updateTabTitle(targetTabId);
-      }
-    } catch (error) {
-      console.error('Error saving file:', error);
-      this.appendFriendlyError(this.activeTabId, new Error(`保存文件失败: ${error instanceof Error ? error.message : String(error)}`));
-    }
-  }
 
   private updateTabTitle(tabId: string): void {
     const tabData = this.tabData.get(tabId);
@@ -615,7 +487,7 @@ class WizardJSApp {
   private updateTitle(): void {
     const tabData = this.tabData.get(this.activeTabId);
     if (tabData) {
-      const title = `${tabData.title}${tabData.isDirty ? ' •' : ''} - WizardJS`;
+      const title = `${tabData.title}${tabData.isDirty ? ' •' : ''} - DSALab`;
       document.title = title;
     }
   }
@@ -769,6 +641,8 @@ class WizardJSApp {
         this.appendFriendlyError(tabId, new Error(result.error));
       }
       if (result.output) {
+        this.clearOutput(tabId);
+        this.appendOutput(tabId, 'info', '运行结果：', new Date());
         this.appendOutput(tabId, 'log', result.output, new Date());
       }
       if (result.success && !result.error && !result.output) {
@@ -874,16 +748,10 @@ class WizardJSApp {
     // Update tooltips for sidebar buttons
     const runBtn = document.getElementById('runBtn');
     const clearBtn = document.getElementById('clearBtn');
-    const newBtn = document.getElementById('newBtn');
-    const openBtn = document.getElementById('openBtn');
-    const saveBtn = document.getElementById('saveBtn');
     const settingsBtn = document.getElementById('settingsBtn');
 
     if (runBtn) runBtn.setAttribute('data-tooltip', this.t('runTooltip'));
     if (clearBtn) clearBtn.setAttribute('data-tooltip', this.t('clearTooltip'));
-    if (newBtn) newBtn.setAttribute('data-tooltip', this.t('newTooltip'));
-    if (openBtn) openBtn.setAttribute('data-tooltip', this.t('openTooltip'));
-    if (saveBtn) saveBtn.setAttribute('data-tooltip', this.t('saveTooltip'));
     if (settingsBtn) settingsBtn.setAttribute('data-tooltip', this.t('settingsTooltip'));
 
     // Update settings panel content
@@ -944,8 +812,7 @@ class WizardJSApp {
   }
 
   private getWelcomeCode(): string {
-    return `// 欢迎来到 WizardJS! 🚀
-// 你的开源 C++ 演练场
+    return `// 欢迎来到 DSALab! 🚀
 
 #include <iostream>
 #include <vector>
@@ -953,12 +820,12 @@ class WizardJSApp {
 
 int main() {
     // 基本 C++ 示例
-    std::cout << "你好 WizardJS!" << std::endl;
+    std::cout << "Hello DSALab!" << std::endl;
 
     // 变量和数据类型
-    int age = 30;
+    int age = 20;
     std::string name = "张三";
-    bool isStudent = false;
+    bool isStudent = true;
 
     std::cout << "姓名: " << name << std::endl;
     std::cout << "年龄: " << age << std::endl;
@@ -998,7 +865,7 @@ int main() {
 
 // Initialize the application when DOM is loaded
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => new WizardJSApp());
+  document.addEventListener('DOMContentLoaded', () => new DSALabApp());
 } else {
-  new WizardJSApp();
+  new DSALabApp();
 }
