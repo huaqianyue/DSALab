@@ -4,163 +4,108 @@
     <meta charset="UTF-8" />
     <title>DSALab</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- <link rel="stylesheet" href="style.css">  -->
   </head>
   <body>
     <div id="app">
-      <!-- Minimalist Sidebar -->
-      <aside class="sidebar">
-        <div class="sidebar-top">
-           <!-- Logo removed to avoid overlapping with window controls -->
+      <!-- 全局顶部导航栏 (Global Header Bar) -->
+      <header class="global-header-bar">
+        <div class="header-left">
+          <button class="header-btn" data-tooltip="首页"><i class="fas fa-home"></i></button>
+          <button class="header-btn" data-tooltip="后退"><i class="fas fa-arrow-left"></i></button>
+          <button class="header-btn" data-tooltip="前进"><i class="fas fa-arrow-right"></i></button>
         </div>
-        
-        <nav class="sidebar-nav">
-          <button id="runBtn" class="sidebar-btn" data-tooltip="Run (Ctrl+R)">
-            <i class="fas fa-play"></i>
-          </button>
-          <div class="sidebar-divider"></div>
-          <button id="clearBtn" class="sidebar-btn" data-tooltip="Clear Output (Ctrl+K)">
-            <i class="fas fa-trash"></i>
-          </button>
-        </nav>
-        
-        <div class="sidebar-bottom">
-           <button id="settingsBtn" class="sidebar-btn" data-tooltip="Settings">
-             <i class="fas fa-cog"></i>
-           </button>
+        <div class="header-center">
+          <!-- 运行按钮已移动到代码编辑器面板头部 -->
         </div>
-      </aside>
-        
-      <!-- Main Content -->
-      <main class="main-content">
-        <!-- Tabs Bar -->
-        <div class="tabs-bar">
-          <div class="tabs-list">
-            <div class="tab active" data-tab-id="tab-1">
-              <span class="tab-title">Untitled-1</span>
-              <!-- <button class="tab-close" data-tooltip="Close Tab">
-                <i class="fas fa-times"></i>
-              </button> -->
-            </div>
+        <div class="header-right">
+          <!-- 修改：学生信息改为可编辑输入框，横向排列 -->
+          <div class="user-info">
+            <input type="text" id="userNameInput" class="user-input" placeholder="输入姓名" value="张三" data-tooltip="姓名">
+            <input type="text" id="studentIdInput" class="user-input" placeholder="输入学号" value="20230001" data-tooltip="学号">
           </div>
-          <!-- <button class="add-tab-btn" data-tooltip="New Tab (Ctrl+T)">
-            <i class="fas fa-plus"></i>
-          </button> -->
+          <!-- 导出按钮 (在设置按钮之前) -->
+          <button id="exportBtn" class="header-btn" data-tooltip="导出">
+            <i class="fas fa-download"></i>
+          </button>
         </div>
-        
-        <!-- Tab Content -->
-        <div class="tabs-content">
-          <div class="tab-pane active" data-tab-id="tab-1">
-            <div class="split-view">
-              <div class="split-panel editor-panel">
-                <div class="editor-container" data-tab-id="tab-1"></div>
-              </div>
-              
-              <div class="split-divider"></div>
-              
-              <div class="split-panel output-panel">
-                <div class="output-container" data-tab-id="tab-1"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
+      </header>
 
-    <!-- Settings Panel (outside app) -->
-    <div id="settingsPanel" class="settings-panel">
-      <div class="settings-modal">
-        <div class="settings-header">
-          <h3>Settings</h3>
-          <button id="closeSettingsBtn" class="close-settings-btn">
-            <i class="fas fa-times"></i>
-          </button>
+      <!-- 主要工作区 (Workspace) - 左右分割 -->
+      <div class="workspace">
+        <!-- 左侧面板：题目描述 (Problem Description Panel) -->
+        <div class="problem-description-panel">
+          <div class="panel-header">
+            <!-- 修改：统一风格，添加图标和标题文字 -->
+            <div class="panel-title">
+              <i class="fas fa-book"></i> 题目描述
+            </div>
+          </div>
+          <div class="problem-container" data-tab-id="tab-1">
+            <!-- 这里放置题目描述的具体内容 -->
+            
+          </div>
+          <div class="horizontal-split-divider"></div>
+          <!-- 新增：音频录制与播放面板 -->
+          <div class="audio-panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i class="fas fa-microphone-alt"></i> 音频讲解
+              </div>
+            </div>
+            <div class="panel-content audio-controls">
+              <button id="recordAudioBtn" class="btn-audio" data-tooltip="录制音频">
+                <i class="fas fa-microphone"></i> 录制
+              </button>
+              <button id="playAudioBtn" class="btn-audio" data-tooltip="播放音频" disabled>
+                <i class="fas fa-play-circle"></i> 播放
+              </button>
+              <audio id="audioPlayback" controls style="display: none;"></audio>
+            </div>
+          </div>
         </div>
-        <div class="settings-modal-content">
-          <div class="settings-content">
-            <div class="settings-section">
-              <h4>General</h4>
-              <div class="setting-item">
-                <label>Language:</label>
-                <select id="language-select">
-                  <option value="en">English</option>
-                  <option value="zh">简体中文</option>
-                </select>
-              </div>
+
+        <!-- 主分割线 (Main Split Divider) -->
+        <div class="main-split-divider"></div>
+
+        <!-- 右侧面板：代码编辑器 & 运行结果 (Code Editor & Test Cases Panel) -->
+        <div class="code-test-panel">
+          <!-- 右侧面板顶部操作栏 -->
+          <div class="panel-header">
+            <div class="panel-title">
+              <i class="fas fa-code"></i> 代码
             </div>
-            
-            <div class="settings-section">
-              <h4>Appearance</h4>
-              <div class="setting-item">
-                <label>Theme:</label>
-                <select id="theme-select">
-                  <option value="github-dark">GitHub Dark</option>
-                  <option value="tomorrow-night-bright">Tomorrow Night Bright</option>
-                </select>
-              </div>
-              <div class="setting-item">
-                <label>Font:</label>
-                <select id="font-family-select">
-                  <option value="JetBrains Mono">JetBrains Mono</option>
-                  <option value="Fira Code">Fira Code</option>
-                  <option value="Consolas">Consolas</option>
-                  <option value="Monaco">Monaco</option>
-                  <option value="Menlo">Menlo</option>
-                </select>
-              </div>
-              <div class="setting-item">
-                <label>Font Size:</label>
-                <input type="range" id="font-size-input" min="10" max="24" value="14">
-                <span id="font-size-value">14px</span>
-              </div>
+            <div class="panel-actions">
+              <!-- 修改：运行按钮移动到此处，并删除语言选择和默认模式 -->
+              <button id="runBtn" class="header-btn run-btn" data-tooltip="运行 (Ctrl+R)">
+                <i class="fas fa-play"></i> 运行
+              </button>
             </div>
-            
-            <div class="settings-section">
-              <h4>Editor</h4>
-              <div class="setting-item">
-                <label>
-                  <input type="checkbox" id="word-wrap-toggle" checked>
-                  Word Wrap
-                </label>
+          </div>
+
+          <!-- 代码编辑器区域 -->
+          <div class="editor-container" data-tab-id="tab-1">
+            <!-- Monaco Editor 或其他编辑器会在此处初始化 -->
+          </div>
+
+          <!-- 右侧面板内部水平分割线 -->
+          <div class="horizontal-split-divider"></div>
+
+          <!-- 运行结果区域 -->
+          <div class="test-output-area">
+            <div class="panel-header">
+              <!-- 修改：统一风格，添加图标和标题文字 -->
+              <div class="panel-title">
+                <i class="fas fa-terminal"></i> 终端
               </div>
-              <div class="setting-item">
-               <label>
-                 <input type="checkbox" id="minimap-toggle">
-                 Show Minimap
-               </label>
-             </div>
-              <div class="setting-item">
-                 <label>
-                   <input type="checkbox" id="line-numbers-toggle">
-                   Show Line Numbers
-                 </label>
-               </div>
-              <div class="setting-item">
-                <label>Tab Size:</label>
-                <select id="tab-size-input">
-                  <option value="2">2 spaces</option>
-                  <option value="4">4 spaces</option>
-                  <option value="8">8 spaces</option>
-                </select>
-              </div>
+              <button id="clearOutputBtn" class="clear-output-btn" data-tooltip="清空输出">
+                <i class="fas fa-trash"></i>清除
+              </button>
             </div>
-            
-            <div class="settings-section">
-              <h4>Keyboard Shortcuts</h4>
-              <div class="shortcut-item">
-                <span>Run code:</span>
-                <kbd>Ctrl+R</kbd>
-              </div>
-              <div class="shortcut-item">
-                <span>New tab:</span>
-                <kbd>Ctrl+T</kbd>
-              </div>
-              <div class="shortcut-item">
-                <span>Save:</span>
-                <kbd>Ctrl+S</kbd>
-              </div>
-              <div class="shortcut-item">
-                <span>Settings:</span>
-                <kbd>Ctrl+,</kbd>
+            <div class="panel-content">
+              <!-- 修改：删除测试用例输入区域 -->
+              <!-- 输出结果区域 -->
+              <div class="output-container" data-tab-id="tab-1">
               </div>
             </div>
           </div>

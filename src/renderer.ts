@@ -88,7 +88,6 @@ class DSALabApp {
     fontFamily: 'JetBrains Mono',   // 默认字体家族
     language: 'zh' // 默认语言为中文
   };
-  private readonly SETTINGS_KEY = 'DSALab-settings'; // 用于在 localStorage 中存储设置的键名。
   // 定义可用的主题列表
   private themes: ThemeDefinition[] = [
     {
@@ -139,19 +138,6 @@ class DSALabApp {
       clearTooltip: 'Clear output (Ctrl+K)',
       settingsTooltip: 'Settings',
       confirmSaveOnClose: 'Do you want to save changes to', // 关闭时确认保存的提示
-      // 设置面板相关
-      general: 'General',
-      appearance: 'Appearance',
-      editor: 'Editor',
-      font: 'Font',
-      tabSize: 'Tab Size',
-      wordWrap: 'Word Wrap',
-      minimap: 'Show Minimap',
-      shortcuts: 'Keyboard Shortcuts',
-      runCode: 'Run code:',
-      newTab: 'New tab:',
-      saveFile: 'Save:',
-      openSettings: 'Settings:'
     },
     zh: { // 中文翻译
       file: '文件',
@@ -168,37 +154,18 @@ class DSALabApp {
       clearTooltip: '清空输出 (Ctrl+K)',
       settingsTooltip: '设置',
       confirmSaveOnClose: '是否保存', 
-      // Settings panel
-      general: '通用',
-      appearance: '外观',
-      editor: '编辑器',
-      font: '字体',
-      tabSize: 'Tab 大小',
-      wordWrap: '自动换行',
-      minimap: '显示小地图',
-      shortcuts: '键盘快捷键',
-      runCode: '运行代码:',
-      newTab: '新建标签页:',
-      saveFile: '保存:',
-      openSettings: '设置:'
     }
   };
   // 构造函数，应用程序初始化时调用
   constructor() {
-    this.loadSettings(); // 加载用户设置
-    this.configureMonaco(); // 配置 Monaco Editor
     this.initializeMonacoTheme(); // 初始化 Monaco Editor 主题
     this.initializeFirstTab();  // 初始化第一个标签页
     this.setupEventListeners();  // 设置DOM事件监听器
     this.setupKeyboardShortcuts();  // 设置键盘快捷键
     // this.setupTabSystem();  // 设置标签页系统
-    this.setupSettingsPanel();  // 设置设置面板
-    this.updateUILanguage();  // 根据当前语言设置更新UI文本
+
   }
-  // 配置 Monaco Editor (目前只有占位，Monaco 自动提供 C++ 语言特性)
-  private configureMonaco(): void {
-    // Monaco automatically provides basic C++ language features with 'cpp' language mode.
-  }
+
   // 初始化 Monaco Editor 的自定义主题
   private initializeMonacoTheme(): void {
     // Configure Monaco Editor with GitHub Dark theme
@@ -339,7 +306,7 @@ class DSALabApp {
     });
 
      // 清空输出按钮事件
-    document.getElementById('clearBtn')?.addEventListener('click', () => {
+    document.getElementById('clearOutputBtn')?.addEventListener('click', () => {
       this.clearOutput();  // 点击清空按钮清空输出
     });
   }
@@ -492,138 +459,7 @@ class DSALabApp {
     }
   }
 
-  private setupSettingsPanel(): void {
-    this.setupSettingsEventListeners();
-    this.applySettingsToUI();
-  }
 
-  private setupSettingsEventListeners(): void {
-    const settingsBtn = document.getElementById('settingsBtn');
-    const settingsPanel = document.getElementById('settingsPanel');
-    const closeSettingsBtn = document.getElementById('closeSettingsBtn');
-    const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
-    const fontSizeSlider = document.getElementById('font-size-input') as HTMLInputElement;
-    const fontSizeValue = document.getElementById('font-size-value');
-    const wordWrapToggle = document.getElementById('word-wrap-toggle') as HTMLInputElement;
-    const minimapToggle = document.getElementById('minimap-toggle') as HTMLInputElement;
-    const lineNumbersToggle = document.getElementById('line-numbers-toggle') as HTMLInputElement;
-    const tabSizeSelect = document.getElementById('tab-size-input') as HTMLSelectElement;
-    const languageSelect = document.getElementById('language-select') as HTMLSelectElement;
-    const fontFamilySelect = document.getElementById('font-family-select') as HTMLSelectElement;
-
-    // 打开设置面板
-    settingsBtn?.addEventListener('click', () => {
-      settingsPanel?.classList.add('open');
-    });
-
-    // 关闭设置面板
-    closeSettingsBtn?.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('Close button clicked'); // Debug
-      settingsPanel?.classList.remove('open');
-    });
-
-    // 点击覆盖层关闭模态框
-    settingsPanel?.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement;
-      if (target === settingsPanel) {
-        settingsPanel.classList.remove('open');
-      }
-    });
-
-    // 按 Escape 键关闭
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && settingsPanel?.classList.contains('open')) {
-        settingsPanel.classList.remove('open');
-      }
-    });
-
-    // 主题设置
-    themeSelect?.addEventListener('change', () => {
-      const theme = themeSelect.value;
-      this.settings.theme = theme;
-      this.editors.forEach(editor => {
-        monaco.editor.setTheme(theme);
-      });
-      this.saveSettings();
-    });
-
-    // 字体大小设置
-    fontSizeSlider?.addEventListener('input', () => {
-      const fontSize = parseInt(fontSizeSlider.value);
-      this.settings.fontSize = fontSize;
-      
-      // Update the display value
-      if (fontSizeValue) {
-        fontSizeValue.textContent = `${fontSize}px`;
-      }
-      
-      // Update all editors
-      this.editors.forEach(editor => {
-        editor.updateOptions({ fontSize });
-      });
-      this.saveSettings();
-    });
-
-    // 自动换行设置
-    wordWrapToggle?.addEventListener('change', () => {
-      const wordWrap = wordWrapToggle.checked ? 'on' : 'off';
-      this.settings.wordWrap = wordWrapToggle.checked;
-      this.editors.forEach(editor => {
-        editor.updateOptions({ wordWrap });
-      });
-      this.saveSettings();
-    });
-
-    // 小地图设置
-    minimapToggle?.addEventListener('change', () => {
-      const minimapEnabled = minimapToggle.checked;
-      this.settings.minimap = minimapEnabled;
-      this.editors.forEach(editor => {
-        editor.updateOptions({ minimap: { enabled: minimapEnabled } });
-      });
-      this.saveSettings();
-    });
-
-    // 行号设置
-    lineNumbersToggle?.addEventListener('change', () => {
-      const lineNumbers = lineNumbersToggle.checked ? 'on' : 'off';
-      this.settings.lineNumbers = lineNumbersToggle.checked;
-      this.editors.forEach(editor => {
-        editor.updateOptions({ lineNumbers });
-      });
-      this.saveSettings();
-    });
-
-    // Tab 大小设置
-    tabSizeSelect?.addEventListener('change', () => {
-      const tabSize = parseInt(tabSizeSelect.value);
-      this.settings.tabSize = tabSize;
-      this.editors.forEach(editor => {
-        editor.updateOptions({ tabSize });
-      });
-      this.saveSettings();
-    });
-
-    // 语言设置
-    languageSelect?.addEventListener('change', () => {
-      this.settings.language = languageSelect.value;
-      this.saveSettings();
-      // Update UI with new language
-      this.updateUILanguage();
-    });
-
-    // 字体家族设置
-    fontFamilySelect?.addEventListener('change', () => {
-      const fontFamily = fontFamilySelect.value;
-      this.settings.fontFamily = fontFamily;
-      this.editors.forEach(editor => {
-        editor.updateOptions({ fontFamily });
-      });
-      this.saveSettings();
-    });
-  }
 
   private async executeCodeSafely(tabId: string, code: string): Promise<void> {
     const outputContainer = document.querySelector(`[data-tab-id="${tabId}"].output-container`) as HTMLElement;
@@ -693,124 +529,19 @@ class DSALabApp {
     outputContainer.scrollTop = outputContainer.scrollHeight;
   }
 
-  private loadSettings(): void {
-    try {
-      const savedSettings = localStorage.getItem(this.SETTINGS_KEY);
-      if (savedSettings) {
-        this.settings = { ...this.settings, ...JSON.parse(savedSettings) };
-      }
-    } catch (error) {
-      console.warn('Error loading settings:', error);
-    }
-  }
+
 
   private t(key: string): string {
     const lang = this.settings.language as 'en' | 'zh';
     return this.translations[lang][key as keyof typeof this.translations.en] || key;
   }
 
-  private saveSettings(): void {
-    try {
-      localStorage.setItem(this.SETTINGS_KEY, JSON.stringify(this.settings));
-    } catch (error) {
-      console.warn('Error saving settings:', error);
-    }
-  }
 
-  private applySettingsToUI(): void {
-    // Update UI elements with current settings
-    const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
-    const fontSizeInput = document.getElementById('font-size-input') as HTMLInputElement;
-    const fontSizeValue = document.getElementById('font-size-value');
-    const wordWrapToggle = document.getElementById('word-wrap-toggle') as HTMLInputElement;
-    const minimapToggle = document.getElementById('minimap-toggle') as HTMLInputElement;
-    const lineNumbersToggle = document.getElementById('line-numbers-toggle') as HTMLInputElement;
-    const tabSizeInput = document.getElementById('tab-size-input') as HTMLSelectElement;
-    const languageSelect = document.getElementById('language-select') as HTMLSelectElement;
-    const fontFamilySelect = document.getElementById('font-family-select') as HTMLSelectElement;
+  
 
-    if (themeSelect) themeSelect.value = this.settings.theme;
-    if (fontSizeInput) {
-      fontSizeInput.value = this.settings.fontSize.toString();
-      if (fontSizeValue) {
-        fontSizeValue.textContent = `${this.settings.fontSize}px`;
-      }
-    }
-    if (wordWrapToggle) wordWrapToggle.checked = this.settings.wordWrap;
-    if (minimapToggle) minimapToggle.checked = this.settings.minimap;
-    if (lineNumbersToggle) lineNumbersToggle.checked = this.settings.lineNumbers;
-    if (tabSizeInput) tabSizeInput.value = this.settings.tabSize.toString();
-    if (languageSelect) languageSelect.value = this.settings.language;
-    if (fontFamilySelect) fontFamilySelect.value = this.settings.fontFamily;
-  }
+  
 
-  private updateUILanguage(): void {
-    // Update tooltips for sidebar buttons
-    const runBtn = document.getElementById('runBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const settingsBtn = document.getElementById('settingsBtn');
-
-    if (runBtn) runBtn.setAttribute('data-tooltip', this.t('runTooltip'));
-    if (clearBtn) clearBtn.setAttribute('data-tooltip', this.t('clearTooltip'));
-    if (settingsBtn) settingsBtn.setAttribute('data-tooltip', this.t('settingsTooltip'));
-
-    // Update settings panel content
-    this.updateSettingsPanelLanguage();
-  }
-
-  private updateSettingsPanelLanguage(): void {
-    // Update settings panel headers and labels
-    const settingsTitle = document.querySelector('.settings-header h3');
-    if (settingsTitle) settingsTitle.textContent = this.t('settings');
-
-    // Update section headers
-    const sections = document.querySelectorAll('.settings-section h4');
-    if (sections[0]) sections[0].textContent = this.t('general');
-    if (sections[1]) sections[1].textContent = this.t('appearance');
-    if (sections[2]) sections[2].textContent = this.t('editor');
-    if (sections[3]) sections[3].textContent = this.t('shortcuts');
-
-    // Update labels
-    const labels = document.querySelectorAll('.setting-item label');
-    labels.forEach(label => {
-      const text = label.textContent?.trim();
-      if (text?.includes('Language')) {
-        label.childNodes[0].textContent = this.t('language') + ': ';
-      } else if (text?.includes('Theme')) {
-        label.childNodes[0].textContent = this.t('theme') + ': ';
-      } else if (text?.includes('Font')) {
-        label.childNodes[0].textContent = this.t('font') + ': ';
-      } else if (text?.includes('Font Size')) {
-        label.childNodes[0].textContent = this.t('fontSize') + ': ';
-      } else if (text?.includes('Tab Size')) {
-        label.childNodes[0].textContent = this.t('tabSize') + ': ';
-      }
-    });
-
-    // Update checkbox labels
-    const checkboxLabels = document.querySelectorAll('.setting-item label');
-    checkboxLabels.forEach(label => {
-      const checkbox = label.querySelector('input[type="checkbox"]');
-      if (checkbox) {
-        const text = label.textContent?.trim();
-        if (text?.includes('Word Wrap')) {
-          label.childNodes[2].textContent = this.t('wordWrap');
-        } else if (text?.includes('Minimap')) {
-          label.childNodes[2].textContent = this.t('minimap');
-        } else if (text?.includes('Line Numbers')) {
-          label.childNodes[2].textContent = this.t('lineNumbers');
-        }
-      }
-    });
-
-    // Update keyboard shortcuts section
-    const shortcutItems = document.querySelectorAll('.shortcut-item span');
-    if (shortcutItems[0]) shortcutItems[0].textContent = this.t('runCode');
-    if (shortcutItems[1]) shortcutItems[1].textContent = this.t('newTab');
-    if (shortcutItems[2]) shortcutItems[2].textContent = this.t('saveFile');
-    if (shortcutItems[3]) shortcutItems[3].textContent = this.t('openSettings');
-  }
-
+  
   private getWelcomeCode(): string {
     return `// 欢迎来到 DSALab! 🚀
 

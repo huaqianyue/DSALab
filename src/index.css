@@ -1,688 +1,494 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background: #000000;
-  color: #e6edf3;
-  overflow: hidden;
-  height: 100vh;
-}
-
-#app {
-  display: flex;
-  height: 100vh;
-}
-
-/* 侧边栏样式 */
-.sidebar {
-  width: 48px;
-  background: #0d1117;
-  border-right: 1px solid #21262d;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 8px 0;
-  padding-top: 28px; /* 减少空间以更好地对齐 */
-  flex-shrink: 0;
-  z-index: 10;
-}
-
-.sidebar-top {
-  margin-bottom: 16px;
-}
-
-.logo {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #f7df1e;
-  font-size: 20px;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background 0.2s ease;
-}
-
-.logo:hover {
-  background: #21262d;
-}
-
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-}
-
-.sidebar-btn {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  color: #cccccc;
-  font-size: 20px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative; /* 确保按钮是定位上下文 */
-}
-
-.sidebar-btn:hover {
-  background: #21262d;
-  color: #ffffff;
-}
-
-.sidebar-btn:active {
-  background: #1f6feb;
-  color: #ffffff;
-}
-
-/* 特殊风格的执行按钮 */
-#runBtn {
-  color: #4ec9b0;
-}
-
-#runBtn:hover {
-  background: #0e4f3c;
-  color: #4ec9b0;
-}
-
-/* 侧边栏分隔线 */
-.sidebar-divider {
-  width: 40px;
-  height: 1px;
-  background: #3e3e42;
-  margin: 8px 0;
-}
-
-.sidebar-bottom {
-  margin-top: auto;
-}
-
-/* 通用工具提示样式 (适用于侧边栏按钮和 logo) */
-.sidebar-btn[data-tooltip]:hover::after,
-.logo[data-tooltip]:hover::after,
-.tab-close[data-tooltip]:hover::after { /* tab-close 按钮的工具提示也保持在右侧 */
-  content: attr(data-tooltip);
-  position: absolute;
-  left: 48px; /* 相对于 sidebar-btn 的父元素 (sidebar) */
-  top: 50%;
-  transform: translateY(-50%);
-  background: #2d2d30;
-  color: #cccccc;
-  padding: 6px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  white-space: nowrap;
-  z-index: 1000;
-  border: 1px solid #3e3e42;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  pointer-events: none;
-}
-
-/* 通用工具提示箭头样式 (适用于侧边栏按钮和 logo) */
-.sidebar-btn[data-tooltip]:hover::before,
-.logo[data-tooltip]:hover::before,
-.tab-close[data-tooltip]:hover::before { /* tab-close 按钮的工具提示箭头也保持在右侧 */
-  content: '';
-  position: absolute;
-  left: 42px; /* 相对于 sidebar-btn 的父元素 (sidebar) */
-  top: 50%;
-  transform: translateY(-50%);
-  width: 0;
-  height: 0;
-  border-top: 4px solid transparent;
-  border-bottom: 4px solid transparent;
-  border-right: 4px solid #3e3e42; /* 箭头指向左侧 */
-  z-index: 1001;
-  pointer-events: none;
-}
-
-.btn-small {
-  padding: 4px 6px;
-  font-size: 11px;
-  border: none;
-  background: transparent;
-  color: #d4d4d4;
-  cursor: pointer;
-  border-radius: 3px;
-}
-
-.btn-small:hover {
-  background: #3e3e42;
-}
-
-/* 主内容 */
-.main-content {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  background: #000000;
-}
-
-/* 标签页系统 */
-.tabs-bar {
-  display: flex;
-  align-items: center;
-  background: #0d1117;
-  border-bottom: 1px solid #21262d;
-  height: 40px;
-  flex-shrink: 0;
-  padding-left: 80px; /* 针对 macOS 窗口控制按钮优化的空间 */
-  -webkit-app-region: drag; /* 允许拖动窗口 */
-}
-
-.tabs-list, .add-tab-btn {
-  -webkit-app-region: no-drag; /* 标签页和按钮不应拖动窗口 */
-}
-
-.tabs-list {
-  display: flex;
-  align-items: center;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.tabs-list::-webkit-scrollbar {
-  display: none;
-}
-
-.tab {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: #21262d;
-  border: none;
-  border-right: 1px solid #30363d;
-  color: #7d8590;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  height: 40px;
-  min-width: 120px;
-  max-width: 200px;
-  position: relative;
-  white-space: nowrap;
-}
-
-.tab:hover {
-  background: #30363d;
-  color: #e6edf3;
-}
-
-.tab.active {
-  background: #0d1117;
-  color: #e6edf3;
-  border-bottom: 2px solid #1f6feb;
-}
-
-.tab-title {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tab-close {
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 3px;
-  color: #7d8590;
-  font-size: 10px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  opacity: 0;
-  position: relative; /* 确保按钮是定位上下文 */
-}
-
-.tab:hover .tab-close {
-  opacity: 1;
-}
-
-.tab-close:hover {
-  background: #f85149;
-  color: #ffffff;
-}
-
-.add-tab-btn {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  color: #7d8590;
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  margin-left: 4px;
-  flex-shrink: 0;
-  position: relative; /* 确保按钮是定位上下文 */
-}
-
-.add-tab-btn:hover {
-  background: #21262d;
-  color: #e6edf3;
-}
-
-/* 针对 .add-tab-btn 的工具提示样式 */
-.add-tab-btn[data-tooltip]:hover::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  left: calc(100% + 8px); /* 位于按钮右侧，并留有间距 */
-  top: 50%;
-  transform: translateY(-50%);
-  background: #2d2d30;
-  color: #cccccc;
-  padding: 6px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  white-space: nowrap;
-  z-index: 1000;
-  border: 1px solid #3e3e42;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  pointer-events: none;
-}
-
-/* 针对 .add-tab-btn 的工具提示箭头样式 */
-.add-tab-btn[data-tooltip]:hover::before {
-  content: '';
-  position: absolute;
-  left: calc(100% + 2px); /* 箭头位置，稍微重叠按钮 */
-  top: 50%;
-  transform: translateY(-50%);
-  width: 0;
-  height: 0;
-  border-top: 4px solid transparent;
-  border-bottom: 4px solid transparent;
-  border-left: 4px solid #3e3e42; /* 箭头指向右侧 */
-  z-index: 1001;
-  pointer-events: none;
-}
-
-
-/* 标签页内容 */
-.tabs-content {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-}
-
-.tab-pane {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: none;
-}
-
-.tab-pane.active {
-  display: block;
-}
-
-/* 分割视图 */
-.split-view {
-  display: flex;
-  height: 100%;
-  background: #0d1117;
-}
-
-.split-panel {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 300px;
-}
-
-.split-divider {
-  width: 4px;
-  background: #21262d;
-  flex-shrink: 0;
-}
-
-.panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #161b22;
-  border-bottom: 1px solid #21262d;
-  padding: 8px 12px;
-  height: 32px;
-  flex-shrink: 0;
-}
-
-.panel-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #e6edf3;
-}
-
-.panel-title i {
-  font-size: 11px;
-  color: #7d8590;
-}
-
-.clear-output-btn {
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 3px;
-  color: #7d8590;
-  font-size: 10px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.clear-output-btn:hover {
-  background: #21262d;
-  color: #e6edf3;
-}
-
-/* 编辑器容器 */
-.editor-container {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: #0d1117;
-}
-
-/* 输出容器 */
-.output-container {
-  width: 100%;
-  height: 100%;
-  padding: 16px;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  overflow-y: auto;
-  background: #0d1117;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  color: #e6edf3;
-}
-
-.output-container::-webkit-scrollbar {
-  width: 8px;
-}
-
-.output-container::-webkit-scrollbar-track {
-  background: #0d1117;
-}
-
-.output-container::-webkit-scrollbar-thumb {
-  background: #21262d;
-  border-radius: 4px;
-}
-
-.output-container::-webkit-scrollbar-thumb:hover {
-  background: #30363d;
-}
-
-/* 设置面板 - 浮动模态框 */
-.settings-panel {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.7);
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  visibility: hidden;
-  transition: all 0.3s ease;
-  pointer-events: none;
-}
-
-.settings-panel.open {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-}
-
-.settings-modal {
-  width: 500px;
-  max-width: 90vw;
-  max-height: 80vh;
-  background: #161b22;
-  border: 1px solid #21262d;
-  border-radius: 8px;
-  overflow: hidden;
-  transform: scale(0.9);
-  transition: transform 0.3s ease;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-}
-
-.settings-panel.open .settings-modal {
-  transform: scale(1);
-}
-
-.settings-modal-content {
-  max-height: calc(80vh - 60px);
-  overflow-y: auto;
-}
-
-.settings-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid #21262d;
-  background: #0d1117;
-}
-
-.settings-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #e6edf3;
-}
-
-.close-settings-btn {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  color: #7d8590;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  z-index: 1001;
-  position: relative;
-  font-size: 12px;
-}
-
-.close-settings-btn i {
-  pointer-events: none;
-}
-
-.close-settings-btn:hover {
-  background: #21262d;
-  color: #e6edf3;
-}
-
-.settings-content {
-  padding: 20px;
-}
-
-.settings-section {
-  margin-bottom: 32px;
-}
-
-.settings-section h4 {
-  margin: 0 0 16px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #e6edf3;
-  border-bottom: 1px solid #21262d;
-  padding-bottom: 8px;
-}
-
-.setting-item {
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.setting-item label {
-  font-size: 13px;
-  color: #e6edf3;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-
-.setting-item select {
-  background: #21262d;
-  border: 1px solid #30363d;
-  border-radius: 4px;
-  color: #e6edf3;
-  padding: 6px 8px;
-  font-size: 12px;
-  min-width: 120px;
-}
-
-.setting-item select:focus {
-  outline: none;
-  border-color: #1f6feb;
-}
-
-.setting-item input[type="range"] {
-  flex: 1;
-  max-width: 100px;
-}
-
-.setting-item input[type="checkbox"] {
-  margin: 0;
-}
-
-#fontSizeValue {
-  font-size: 12px;
-  color: #7d8590;
-  min-width: 35px;
-  text-align: right;
-}
-
-.shortcut-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 0;
-  font-size: 13px;
-  color: #e6edf3;
-}
-
-kbd {
-  background: #21262d;
-  border: 1px solid #30363d;
-  border-radius: 3px;
-  padding: 2px 6px;
-  font-size: 11px;
-  font-family: monospace;
-  color: #e6edf3;
-}
-
-.settings-modal-content::-webkit-scrollbar {
-  width: 8px;
-}
-
-.settings-modal-content::-webkit-scrollbar-track {
-  background: #161b22;
-}
-
-.settings-modal-content::-webkit-scrollbar-thumb {
-  background: #21262d;
-  border-radius: 4px;
-}
-
-.settings-modal-content::-webkit-scrollbar-thumb:hover {
-  background: #30363d;
-}
-
-/* 输出样式 - GitHub 暗色主题 */
-.output-log {
-  color: #d2a8ff;
-  margin-bottom: 6px;
-}
-
-.output-error {
-  color: #f85149;
-  margin-bottom: 6px;
-}
-
-.output-error-friendly {
-  color: #f85149;
-  margin-bottom: 8px;
-  padding: 8px 12px;
-  background: rgba(248, 81, 73, 0.1);
-  border-left: 3px solid #f85149;
-  border-radius: 4px;
-  font-weight: 500;
-}
-
-.output-security-error {
-  color: #ffa657;
-  margin-bottom: 8px;
-  padding: 8px 12px;
-  background: rgba(255, 166, 87, 0.1);
-  border-left: 3px solid #ffa657;
-  border-radius: 4px;
-  font-weight: 600;
-  border: 1px solid rgba(255, 166, 87, 0.2);
-}
-
-.output-warn {
-  color: #d29922;
-  margin-bottom: 6px;
-}
-
-.output-info {
-  color: #58a6ff;
-  margin-bottom: 6px;
-}
-
-.output-result {
-  color: #56d364;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-
-.output-timestamp {
-  color: #7d8590;
-  font-size: 11px;
-  opacity: 0.8;
-}
+/* ==========================================================================
+   全局重置与基本样式 (Global Resets & Base Styles)
+   对应 HTML: * { ... }, body { ... }, #app { ... }
+   ========================================================================== */
+   * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #000000;
+    color: #e6edf3;
+    overflow: hidden; /* 防止整体滚动，由内部面板处理 */
+    height: 100vh;
+  }
+  
+  #app {
+    display: flex;
+    flex-direction: column; /* #app 现在垂直排列：顶部栏 + 工作区 */
+    height: 100vh;
+  }
+  
+  /* ==========================================================================
+     全局顶部导航栏 (Global Header Bar)
+     对应 HTML: <header class="global-header-bar"> ... </header>
+     ========================================================================== */
+  .global-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 48px; /* 根据图片调整高度 */
+    background: #161b22; /* 深色背景 */
+    border-bottom: 1px solid #21262d;
+    padding: 0 16px; /* 左右内边距 */
+    flex-shrink: 0; /* 防止缩小 */
+    -webkit-app-region: drag; /* 允许拖动窗口 (Electron/桌面应用特性) */
+  }
+  
+  /* 对应 HTML: <div class="header-left">, <div class="header-center">, <div class="header-right"> */
+  .global-header-bar .header-left,
+  .global-header-bar .header-center,
+  .global-header-bar .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px; /* 按钮间距 */
+  }
+  
+  /* 对应 HTML: <div class="user-info"> */
+  .global-header-bar .user-info {
+    display: flex;
+    flex-direction: row; /* 横排 */
+    align-items: center;
+    gap: 8px; /* 输入框之间的间距 */
+    margin-right: 12px; /* 与按钮保持间距 */
+    -webkit-app-region: no-drag; /* 不应拖动窗口 */
+  }
+  
+  /* 对应 HTML: <input type="text" id="userNameInput" class="user-input">, <input type="text" id="studentIdInput" class="user-input"> */
+  .global-header-bar .user-info .user-input {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    color: #e6edf3;
+    padding: 4px 8px;
+    font-size: 12px;
+    width: 80px; /* 适当宽度 */
+    transition: border-color 0.2s ease;
+  }
+  
+  .global-header-bar .user-info .user-input::placeholder {
+    color: #7d8590;
+  }
+  
+  .global-header-bar .user-info .user-input:focus {
+    outline: none;
+    border-color: #1f6feb;
+  }
+  
+  /* 对应 HTML: <button class="header-btn"> */
+  .global-header-bar .header-btn {
+    background: transparent;
+    border: none;
+    color: #7d8590;
+    font-size: 18px; /* 图标大小 */
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    -webkit-app-region: no-drag; /* 按钮不应拖动窗口 */
+  }
+  
+  .global-header-bar .header-btn:hover {
+    background: #21262d;
+    color: #e6edf3;
+  }
+  
+  /* 禁用按钮样式 (通用) */
+  .global-header-bar .header-btn:disabled,
+  .btn-audio:disabled { /* 扩展到新的音频按钮 */
+    color: #444c56; /* 更暗的颜色 */
+    cursor: not-allowed;
+    background: transparent;
+    border-color: transparent; /* 禁用时边框也透明 */
+  }
+  
+  .global-header-bar .header-btn:disabled:hover,
+  .btn-audio:disabled:hover { /* 扩展到新的音频按钮 */
+    background: transparent;
+    border-color: transparent;
+    color: #444c56;
+  }
+  
+  /* ==========================================================================
+     主要工作区 (Workspace)
+     对应 HTML: <div class="workspace"> ... </div>
+     ========================================================================== */
+  .workspace {
+    display: flex; /* 工作区内部水平排列左右面板 */
+    flex: 1; /* 占据 #app 剩余的所有垂直空间 */
+    overflow: hidden; /* 防止内容溢出，内部面板将处理滚动 */
+  }
+  
+  /* ==========================================================================
+     面板通用样式 (General Panel Styles)
+     这些样式被多个面板的头部和内容区域共享
+     ========================================================================== */
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #161b22;
+    border-bottom: 1px solid #21262d;
+    padding: 0 12px; /* 调整内边距 */
+    height: 40px; /* 统一头部高度 */
+    flex-shrink: 0;
+  }
+  
+  .panel-header .panel-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #e6edf3;
+  }
+  
+  .panel-header .panel-title i {
+    font-size: 13px;
+    color: #7d8590;
+  }
+  
+  .panel-header .panel-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  /* ==========================================================================
+     左侧面板：题目描述 (Problem Description Panel)
+     对应 HTML: <div class="problem-description-panel"> ... </div>
+     ========================================================================== */
+  .problem-description-panel {
+    flex: 0 0 40%; /* 左侧面板占据 40% 宽度，可根据需要调整 */
+    border-right: 1px solid #21262d;
+    display: flex; /* 使其成为 flex 容器，以便垂直堆叠题目描述和音频面板 */
+    flex-direction: column;
+    background: #0d1117; /* 面板背景色 */
+    overflow: hidden; /* 隐藏内部滚动条，由 panel-content 处理 */
+  }
+  
+  /* 对应 HTML: <div class="problem-description-panel"> <div class="panel-content"> */
+  .problem-description-panel .problem-container {
+    flex: 1; /* 允许题目描述内容占据剩余空间并滚动 */
+    overflow-y: auto; /* 允许内容滚动 */
+    padding: 16px;
+    color: #e6edf3;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  
+  /* 对应 HTML: <h2> */
+  .problem-description-panel .panel-content h2 {
+    font-size: 20px;
+    margin-bottom: 12px;
+    color: #e6edf3;
+  }
+  
+  /* 对应 HTML: <h4> */
+  .problem-description-panel .panel-content h4 {
+    font-size: 16px;
+    margin-top: 20px;
+    margin-bottom: 10px;
+    color: #e6edf3;
+  }
+  
+  /* 对应 HTML: <p> */
+  .problem-description-panel .panel-content p {
+    margin-bottom: 10px;
+  }
+  
+  /* 对应 HTML: <code> */
+  .problem-description-panel .panel-content code {
+    background: #21262d;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 13px;
+  }
+  
+  /* 对应 HTML: <pre class="example"> */
+  .problem-description-panel .panel-content pre.example {
+    background: #161b22;
+    border-left: 3px solid #1f6feb;
+    padding: 10px 15px;
+    margin: 15px 0;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  
+  /* 对应 HTML: <ul class="hint"> */
+  .problem-description-panel .panel-content ul.hint {
+    list-style-type: disc;
+    margin-left: 20px;
+    padding-left: 0;
+    margin-top: 15px;
+  }
+  
+  /* 对应 HTML: <ul class="hint"> <li> */
+  .problem-description-panel .panel-content ul.hint li {
+    margin-bottom: 5px;
+    font-size: 13px;
+    color: #7d8590;
+  }
+  .horizontal-split-divider {
+    height: 4px;
+    background: #21262d;
+    flex-shrink: 0;
+  }
+  /* ==========================================================================
+     新增：音频录制与播放面板 (Audio Panel)
+     对应 HTML: <div class="audio-panel"> ... </div>
+     ========================================================================== */
+  .audio-panel {
+    flex-shrink: 0; /* 防止缩小，保持固定高度或内容自适应 */
+    background: #0d1117;
+    border-top: 1px solid #21262d; /* 与题目描述内容分隔 */
+  }
+  
+  /* 对应 HTML: <div class="audio-panel"> <div class="panel-header"> */
+  /* 继承自通用 panel-header，此处无需额外样式，除非有特定覆盖 */
+  
+  /* 对应 HTML: <div class="audio-panel"> <div class="panel-content audio-controls"> */
+  .audio-panel .panel-content.audio-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+  
+  /* 对应 HTML: <button class="btn-audio"> */
+  .btn-audio {
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #e6edf3;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+  
+  .btn-audio:hover {
+    background: #30363d;
+    border-color: #444c56;
+  }
+  
+  /* 对应 HTML: <audio id="audioPlayback"> */
+  #audioPlayback {
+      flex: 1; /* 让音频播放器占据剩余空间 */
+      min-width: 0; /* 防止内容溢出 */
+      height: 30px; /* 调整高度 */
+  }
+  
+  /* ==========================================================================
+     主分割线 (Main Split Divider)
+     对应 HTML: <div class="main-split-divider"> ... </div>
+     ========================================================================== */
+  .main-split-divider {
+    width: 4px;
+    background: #21262d;
+    flex-shrink: 0;
+    cursor: ew-resize; /* 左右调整大小的光标 */
+  }
+  
+  /* ==========================================================================
+     右侧面板：代码编辑器 & 运行结果 (Code Editor & Test Cases Panel)
+     对应 HTML: <div class="code-test-panel"> ... </div>
+     ========================================================================== */
+  .code-test-panel {
+    flex: 1; /* 右侧面板占据剩余宽度 */
+    display: flex;
+    flex-direction: column;
+    background: #0d1117; /* 面板背景色 */
+    overflow: hidden; /* 隐藏内部滚动条，由 panel-content 处理 */
+  }
+  
+  /* 对应 HTML: <button id="runBtn" class="header-btn run-btn"> */
+  .run-btn {
+    color: #4ec9b0;
+    background: #21262d; /* 添加背景色，使其更像一个按钮 */
+    border: 1px solid #30363d;
+    padding: 6px 10px; /* 调整内边距 */
+    font-size: 14px; /* 调整字体大小 */
+    display: flex; /* 让图标和文字横向排列 */
+    align-items: center;
+    gap: 6px; /* 图标和文字间距 */
+  }
+  
+  .run-btn:hover {
+    background: #0e4f3c;
+    color: #4ec9b0;
+    border-color: #4ec9b0;
+  }
+  
+  /* ==========================================================================
+     代码编辑器区域 (Editor Container)
+     对应 HTML: <div class="editor-container"> ... </div>
+     ========================================================================== */
+  .editor-container {
+    flex: 1; /* 占据右侧面板的剩余垂直空间 */
+    overflow: hidden;
+    background: #0d1117;
+    /* Monaco Editor 将在此处初始化并处理其自身的样式 */
+    /* 临时内容样式 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #e6edf3;
+    font-family: monospace;
+    font-size: 14px;
+  }
+  
+  /* ==========================================================================
+     右侧面板内部水平分割线 (Horizontal Split Divider)
+     对应 HTML: <div class="horizontal-split-divider"> ... </div>
+     ========================================================================== */
+  .horizontal-split-divider {
+    height: 4px;
+    background: #21262d;
+    flex-shrink: 0;
+    cursor: ns-resize; /* 垂直方向调整大小的光标 */
+  }
+  
+  /* ==========================================================================
+     运行结果区域 (Test Output Area)
+     对应 HTML: <div class="test-output-area"> ... </div>
+     ========================================================================== */
+  .test-output-area {
+    flex: 0 0 300px; /* 底部运行结果区域固定高度，可根据需要调整或使用 flex-grow 控制比例 */
+    display: flex;
+    flex-direction: column;
+    background: #0d1117;
+  }
+  
+  /* 对应 HTML: <button id="clearOutputBtn" class="clear-output-btn"> */
+  .clear-output-btn {
+    
+    background: transparent;
+    border-radius: 3px;
+    color: #e6edf3;
+    border: 1px solid #30363d;
+    padding: 6px 10px; /* 调整内边距 */
+    font-size: 14px; /* 调整字体大小 */
+    display: flex; /* 让图标和文字横向排列 */
+    align-items: center;
+    gap: 6px; /* 图标和文字间距 */
+  }
+  
+  .clear-output-btn:hover {
+    background: #21262d;
+    color: #e6edf3;
+  }
+  
+  /* 对应 HTML: <div class="test-output-area"> <div class="panel-content"> */
+  .test-output-area .panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px; /* 保持内边距以美化输出内容 */
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* 对应 HTML: <div class="output-container"> */
+  .output-container {
+    flex: 1; /* 输出容器占据剩余空间 */
+    background: transparent;
+    overflow-y: auto; /* 确保输出内容可滚动 */
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: #e6edf3;
+  }
+  
+  /* ==========================================================================
+     滚动条样式 (Scrollbar Styles)
+     ========================================================================== */
+  .output-container::-webkit-scrollbar,
+  .problem-description-panel .panel-content::-webkit-scrollbar,
+  .audio-panel .panel-content::-webkit-scrollbar,
+  .test-output-area .panel-content::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .output-container::-webkit-scrollbar-track,
+  .problem-description-panel .panel-content::-webkit-scrollbar-track,
+  .audio-panel .panel-content::-webkit-scrollbar-track,
+  .test-output-area .panel-content::-webkit-scrollbar-track {
+    background: #0d1117;
+  }
+  
+  .output-container::-webkit-scrollbar-thumb,
+  .problem-description-panel .panel-content::-webkit-scrollbar-thumb,
+  .audio-panel .panel-content::-webkit-scrollbar-thumb,
+  .test-output-area .panel-content::-webkit-scrollbar-thumb {
+    background: #21262d;
+    border-radius: 4px;
+  }
+  
+  .output-container::-webkit-scrollbar-thumb:hover,
+  .problem-description-panel .panel-content::-webkit-scrollbar-thumb:hover,
+  .audio-panel .panel-content::-webkit-scrollbar-thumb:hover,
+  .test-output-area .panel-content::-webkit-scrollbar-thumb:hover {
+    background: #30363d;
+  }
+  
+  /* ==========================================================================
+     工具提示样式 (Tooltip Styles)
+     ========================================================================== */
+  [data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    background: #2d2d30;
+    color: #cccccc;
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    z-index: 1000;
+    border: 1px solid #3e3e42;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+    /* 默认位置调整，具体元素可能需要覆盖 */
+    transform: translateY(-50%);
+  }
+  
+  /* 为全局顶部栏按钮和输入框调整工具提示位置 */
+  .global-header-bar .header-btn[data-tooltip]:hover::after,
+  .global-header-bar .user-input[data-tooltip]:hover::after,
+  .btn-audio[data-tooltip]:hover::after,
+  .run-btn[data-tooltip]:hover::after,
+  .clear-output-btn[data-tooltip]:hover::after { /* 添加 clear-output-btn */
+    top: calc(100% + 8px); /* 位于按钮下方 */
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  
+  .global-header-bar .header-btn[data-tooltip]:hover::before,
+  .global-header-bar .user-input[data-tooltip]:hover::before,
+  .btn-audio[data-tooltip]:hover::before,
+  .run-btn[data-tooltip]:hover::before,
+  .clear-output-btn[data-tooltip]:hover::before { /* 添加 clear-output-btn */
+    content: '';
+    position: absolute;
+    top: calc(100% + 2px); /* 箭头位于按钮下方 */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 4px solid #3e3e42; /* 箭头指向上方 */
+    z-index: 1001;
+    pointer-events: none;
+  }
