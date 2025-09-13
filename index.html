@@ -11,19 +11,16 @@
       <!-- 全局顶部导航栏 (Global Header Bar) -->
       <header class="global-header-bar">
         <div class="header-left">
-          <button class="header-btn" data-tooltip="首页"><i class="fas fa-home"></i></button>
-          <button class="header-btn" data-tooltip="后退"><i class="fas fa-arrow-left"></i></button>
-          <button class="header-btn" data-tooltip="前进"><i class="fas fa-arrow-right"></i></button>
+          <!-- 修改：学生信息改为可编辑输入框，横向排列，并移动到左侧 -->
+          <div class="user-info">
+            <input type="text" id="userNameInput" class="user-input" placeholder="输入姓名" value="张三" data-tooltip="姓名">
+            <input type="text" id="studentIdInput" class="user-input" placeholder="输入学号" value="20230001" data-tooltip="学号">
+          </div>
         </div>
         <div class="header-center">
           <!-- 运行按钮已移动到代码编辑器面板头部 -->
         </div>
         <div class="header-right">
-          <!-- 修改：学生信息改为可编辑输入框，横向排列 -->
-          <div class="user-info">
-            <input type="text" id="userNameInput" class="user-input" placeholder="输入姓名" value="张三" data-tooltip="姓名">
-            <input type="text" id="studentIdInput" class="user-input" placeholder="输入学号" value="20230001" data-tooltip="学号">
-          </div>
           <!-- 导出按钮 (在设置按钮之前) -->
           <button id="exportBtn" class="header-btn" data-tooltip="导出">
             <i class="fas fa-download"></i>
@@ -35,16 +32,36 @@
       <div class="workspace">
         <!-- 左侧面板：题目描述 (Problem Description Panel) -->
         <div class="problem-description-panel">
-          <div class="panel-header">
-            <!-- 修改：统一风格，添加图标和标题文字 -->
-            <div class="panel-title">
+          <!-- 新增：题目列表和题目描述的标签页头部 -->
+          <div class="problem-panel-tabs">
+            <div class="problem-tab-header active" data-tab-target="problem-list">
+              <i class="fas fa-list-ul"></i> 题目列表
+            </div>
+            <div class="problem-tab-header" data-tab-target="problem-description">
               <i class="fas fa-book"></i> 题目描述
             </div>
           </div>
-          <div class="problem-container" data-tab-id="tab-1">
-            <!-- 这里放置题目描述的具体内容 -->
-            
+
+          <!-- 新增：题目列表内容区域 -->
+          <div class="problem-list-content panel-content active" data-tab-id="problem-list">
+            <ul class="problem-list">
+              <li class="problem-item active" data-problem-id="1">第一题：数组求和</li>
+              <li class="problem-item" data-problem-id="2">第二题：链表反转</li>
+              <li class="problem-item" data-problem-id="3">第三题：二叉树遍历</li>
+              <li class="problem-item" data-problem-id="4">第四题：排序算法</li>
+              <li class="problem-item" data-problem-id="5">第五题：图的遍历</li>
+              <li class="problem-item" data-problem-id="6">第六题：动态规划入门</li>
+              <li class="problem-item" data-problem-id="7">第七题：字符串匹配</li>
+              <li class="problem-item" data-problem-id="8">第八题：哈希表应用</li>
+            </ul>
           </div>
+
+          <!-- 题目描述的具体内容，现在是第二个标签页的内容 -->
+          <div class="problem-description-content panel-content" data-tab-id="problem-description">
+            <!-- 初始加载时显示一个提示，或者由JS加载第一个题目的描述 -->
+            <p>请从左侧的“题目列表”中选择一个题目查看其描述。</p>
+          </div>
+
           <div class="horizontal-split-divider"></div>
           <!-- 新增：音频录制与播放面板 -->
           <div class="audio-panel">
@@ -77,6 +94,7 @@
             </div>
             <div class="panel-actions">
               <!-- 修改：运行按钮移动到此处，并删除语言选择和默认模式 -->
+               
               <button id="runBtn" class="header-btn run-btn" data-tooltip="运行 (Ctrl+R)">
                 <i class="fas fa-play"></i> 运行
               </button>
