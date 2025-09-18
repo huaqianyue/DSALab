@@ -1,18 +1,17 @@
-// main.ts
-import { app, BrowserWindow, Menu, shell, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain, dialog } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { exec, spawn, ChildProcessWithoutNullStreams } from 'node:child_process';
 import { promises as fs } from 'node:fs';
-import { Buffer } from 'node:buffer'; // <--- 新增导入 Buffer
+import { Buffer } from 'node:buffer';
 
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
+
 if (started) {
   app.quit();
 }
 
 const createWindow = () => {
-  // Create the browser window.
+
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -25,179 +24,33 @@ const createWindow = () => {
       contextIsolation: true,
     },
     icon: path.join(__dirname, '../build/icon.png'),
-    show: false, // Don't show until ready
+    show: false, 
   });
 
-  // Show window when ready to prevent visual flash
+
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
   });
 
-  // and load the index.html of the app.
+
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
     mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
 
-  // Open the DevTools in development
+
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools();
   }
 
-  // Create application menu
-  createMenu();
 
+  Menu.setApplicationMenu(null); 
+  
   return mainWindow;
 };
 
-const createMenu = () => {
-  const isMac = process.platform === 'darwin';
 
-  const template: any[] = [
-    ...(isMac ? [{
-      label: app.getName(),
-      submenu: [
-        { role: 'about' },
-        { type: 'separator' },
-        { role: 'services' },
-        { type: 'separator' },
-        { role: 'hide' },
-        { role: 'hideothers' },
-        { role: 'unhide' },
-        { type: 'separator' },
-        { role: 'quit' }
-      ]
-    }] : []),
-    {
-      label: '文件',
-      submenu: [
-        {
-          label: '新建',
-          accelerator: 'CmdOrCtrl+N',
-          click: () => {
-            BrowserWindow.getFocusedWindow()?.webContents.send('menu-new-file');
-          }
-        },
-        {
-          label: '打开...',
-          accelerator: 'CmdOrCtrl+O',
-          click: () => {
-            BrowserWindow.getFocusedWindow()?.webContents.send('menu-open-file');
-          }
-        },
-        {
-          label: '保存',
-          accelerator: 'CmdOrCtrl+S',
-          click: () => {
-            BrowserWindow.getFocusedWindow()?.webContents.send('menu-save-file');
-          }
-        },
-        { type: 'separator' },
-        isMac ? { role: 'close' } : { role: 'quit' }
-      ]
-    },
-    {
-      label: '编辑',
-      submenu: [
-        { role: 'undo', label: '撤销' },
-        { role: 'redo', label: '重做' },
-        { type: 'separator' },
-        { role: 'cut', label: '剪切' },
-        { role: 'copy', label: '复制' },
-        { role: 'paste', label: '粘贴' },
-        ...(isMac ? [
-          { role: 'pasteAndMatchStyle', label: '粘贴并匹配样式' },
-          { role: 'delete', label: '删除' },
-          { role: 'selectAll', label: '全选' },
-          { type: 'separator' },
-          {
-            label: '语音',
-            submenu: [
-              { role: 'startSpeaking', label: '开始朗读' },
-              { role: 'stopSpeaking', label: '停止朗读' }
-            ]
-          }
-        ] : [
-          { role: 'delete', label: '删除' },
-          { type: 'separator' },
-          { role: 'selectAll', label: '全选' }
-        ])
-      ]
-    },
-    {
-      label: '代码',
-      submenu: [
-        {
-          label: '运行',
-          accelerator: 'CmdOrCtrl+R',
-          click: () => {
-            BrowserWindow.getFocusedWindow()?.webContents.send('menu-run-code');
-          }
-        },
-        {
-          label: '清空输出',
-          accelerator: 'CmdOrCtrl+K',
-          click: () => {
-            BrowserWindow.getFocusedWindow()?.webContents.send('menu-clear-output');
-          }
-        }
-      ]
-    },
-    {
-      label: '视图',
-      submenu: [
-        { role: 'reload', label: '重新加载' },
-        { role: 'forceReload', label: '强制重新加载' },
-        { role: 'toggleDevTools', label: '切换开发者工具' },
-        { type: 'separator' },
-        { role: 'resetZoom', label: '重置缩放' },
-        { role: 'zoomIn', label: '放大' },
-        { role: 'zoomOut', label: '缩小' },
-        { type: 'separator' },
-        { role: 'togglefullscreen', label: '切换全屏' }
-      ]
-    },
-    {
-      label: '窗口',
-      submenu: [
-        { role: 'minimize', label: '最小化' },
-        { role: 'close', label: '关闭' },
-        ...(isMac ? [
-          { type: 'separator' },
-          { role: 'front', label: '前置所有窗口' },
-          { type: 'separator' },
-          { role: 'window', label: '窗口' }
-        ] : [
-          { role: 'close', label: '关闭' }
-        ])
-      ]
-    },
-    {
-      role: 'help',
-      label: '帮助',
-      submenu: [
-        {
-          label: '关于 DSALab',
-          click: () => {
-            BrowserWindow.getFocusedWindow()?.webContents.send('menu-about');
-          }
-        },
-        {
-          label: '了解更多',
-          click: async () => {
-            await shell.openExternal('https://github.com/FranciscoJBrito/WizardJS');
-          }
-        }
-      ]
-    }
-  ];
-
-  const menu = Menu.buildFromTemplate(template);
-  Menu.setApplicationMenu(menu);
-};
-
-// --- C++ Compilation and Execution Logic ---
 let cppProcess: ChildProcessWithoutNullStreams | null = null; // 用于跟踪当前正在运行的C++进程
 
 ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: number) => {
@@ -227,7 +80,16 @@ ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: numbe
     const { stdout: compileStdout, stderr: compileStderr } = await new Promise<{ stdout: string, stderr: string }>((resolve, reject) => {
       exec(compileCommand, { timeout: 10000 }, (err, stdout, stderr) => { // 编译超时10秒
         if (err) {
-          reject(new Error(`Compilation failed: ${stderr || stdout || err.message}`));
+          // 检查是否是 g++ 命令未找到的错误
+          if (err.message.includes('command not found') || err.message.includes('不是内部或外部命令')) {
+            dialog.showErrorBox(
+              '编译环境错误',
+              `无法找到 g++ 编译器。请确保您的系统已安装 g++ 并且其路径已添加到环境变量 (PATH) 中。详细错误: ${err.message}`
+            );
+            reject(new Error(`Compilation failed: g++ compiler not found or not in PATH. ${stderr || stdout || err.message}`));
+          } else {
+            reject(new Error(`Compilation failed: ${stderr || stdout || err.message}`));
+          }
         } else {
           resolve({ stdout, stderr });
         }
@@ -272,7 +134,7 @@ ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: numbe
     });
 
     // 处理子进程退出
-    const { code: exitCode, signal } = await new Promise<{ code: number | null, signal: NodeJS.Signals | null }>((resolve) => { // <--- 重命名 code 为 exitCode，避免与参数 code 混淆 (虽然不是直接原因，但为了清晰)
+    const { code: exitCode, signal } = await new Promise<{ code: number | null, signal: NodeJS.Signals | null }>((resolve) => {
       cppProcess?.on('close', (code, signal) => {
         resolve({ code, signal });
       });
@@ -294,7 +156,7 @@ ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: numbe
     if (signal === 'SIGKILL') {
       // 超时或被强制终止的消息已由超时处理器或主动终止发送
       return { success: false, output: finalOutput, error: finalError };
-    } else if (exitCode !== 0) { // <--- 使用 exitCode
+    } else if (exitCode !== 0) {
       finalError += `程序以非零状态码 ${exitCode} 退出。\n`;
       webContents.send('cpp-output-chunk', { type: 'error', data: `程序以非零状态码 ${exitCode} 退出。\n` });
       return { success: false, output: finalOutput, error: finalError };
@@ -323,7 +185,6 @@ ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: numbe
 // 新增：用于接收渲染进程发送的用户输入
 ipcMain.on('send-user-input', (event, input: string) => {
   if (cppProcess && !cppProcess.killed && cppProcess.stdin.writable) {
-    // <--- 解决第一个错误：将字符串转换为 Buffer
     cppProcess.stdin.write(Buffer.from(input + '\n', 'utf8'));
   } else {
     event.sender.send('cpp-output-chunk', { type: 'error', data: '错误：没有正在运行的程序可以接收输入。\n' });
@@ -348,9 +209,8 @@ ipcMain.handle('show-open-dialog', async (event) => {
   }
 
   const filePath = result.filePaths[0];
-  // const content = await fs.readFile(filePath, 'utf-8'); // <--- 这是你原始的第 274 行附近
-  const fileContent = await fs.readFile(filePath, 'utf-8'); // <--- 将 content 重命名为 fileContent，以防万一有隐式冲突（尽管不太可能）
-  return { filePath, content: fileContent }; // <--- 返回时也使用 fileContent
+  const fileContent = await fs.readFile(filePath, 'utf-8');
+  return { filePath, content: fileContent };
 });
 
 ipcMain.handle('show-save-dialog', async (event, currentFilePath: string | null, defaultFileName: string, content: string) => {
@@ -373,14 +233,10 @@ ipcMain.handle('show-save-dialog', async (event, currentFilePath: string | null,
   return result.filePath;
 });
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
+
 app.on('ready', createWindow);
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
@@ -388,12 +244,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
 });
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.

@@ -47,20 +47,7 @@ declare global {
   }
 }
 
-// DSALab Application Class
-//定义应用程序的设置接口
-interface AppSettings {
-  theme: string;  //编辑器主题
-  fontSize: number;  //字体大小
-  wordWrap: boolean; //自动换行
-  minimap: boolean;  //是否显示小地图
-  lineNumbers: boolean; //是否显示行号
-  tabSize: number; //Tab键对应的空格数
-  fontFamily: string; //字体家族
-  language: string;  //UI语言（en，zh）
-}
-
-//定义主题的结构接口
+// 定义主题的结构接口
 interface ThemeDefinition {
   name: string;  //主题的内部名称
   displayName: string;  //主题的显示名称
@@ -104,18 +91,18 @@ class DSALabApp {
 
   // 代码执行的最大超时时间（30秒）。
   private readonly EXECUTION_TIMEOUT = 30000; 
-  // 应用程序的当前设置，包含默认值。
-  private settings: AppSettings = {
-    theme: 'github-dark',  // 默认主题
-    fontSize: 14,  // 默认字体大小
-    wordWrap: true,  // 默认自动换行
-    minimap: false,  // 默认不显示小地图
-    lineNumbers: true,  // 默认显示行号
-    tabSize: 2,  // 默认 Tab 大小
-    fontFamily: 'JetBrains Mono',   // 默认字体家族
-    language: 'zh' // 默认语言为中文
-  };
-  // 定义可用的主题列表
+  
+  // 硬编码的编辑器设置，不再使用 AppSettings 接口
+  private currentLanguage: 'en' | 'zh' = 'zh'; // 默认语言为中文
+  private readonly defaultTheme = 'github-dark';
+  private readonly defaultFontSize = 14;
+  private readonly defaultWordWrap = true;
+  private readonly defaultMinimap = false;
+  private readonly defaultLineNumbers = true;
+  private readonly defaultTabSize = 2;
+  private readonly defaultFontFamily = 'JetBrains Mono';
+
+  // 定义可用的主题列表 (仅用于主题定义，不用于设置UI)
   private themes: ThemeDefinition[] = [
     {
       name: 'github-dark',
@@ -140,67 +127,78 @@ class DSALabApp {
       }
     }
   ];
-  // 定义可用的字体家族列表
-  private fontFamilies = [
-    'JetBrains Mono',
-    'Fira Code',
-    'Consolas',
-    'Monaco',
-    'Menlo'
-  ];
+  
   // 应用程序的国际化翻译文本
   private translations = {
     en: {
-      file: 'File',
-      settings: 'Settings',
-      theme: 'Theme',
-      fontSize: 'Font Size',
-      fontFamily: 'Font Family',
-      language: 'Language',
-      lineNumbers: 'Line Numbers',
       run: 'Run',
       clear: 'Clear',
-      export: 'Export', // New translation
-      recordAudio: 'Record Audio', // New translation
-      playAudio: 'Play Audio', // New translation
-      prevProblem: 'Previous Problem', // New translation
-      nextProblem: 'Next Problem', // New translation
+      export: 'Export',
+      recordAudio: 'Record Audio',
+      playAudio: 'Play Audio',
+      prevProblem: 'Previous Problem',
+      nextProblem: 'Next Problem',
       // Tooltips
       runTooltip: 'Run (Ctrl+R)',
       clearTooltip: 'Clear output',
-      settingsTooltip: 'Settings',
-      exportTooltip: 'Export current problem code and audio', // New tooltip
-      recordAudioTooltip: 'Record audio explanation', // New tooltip
-      playAudioTooltip: 'Play recorded audio', // New tooltip
-      prevProblemTooltip: 'Go to previous problem', // New tooltip
-      nextProblemTooltip: 'Go to next problem', // New tooltip
-      confirmSaveOnClose: 'Do you want to save changes to', // 关闭时确认保存的提示
+      exportTooltip: 'Export current problem code and audio',
+      recordAudioTooltip: 'Record audio explanation',
+      playAudioTooltip: 'Play recorded audio',
+      prevProblemTooltip: 'Go to previous problem',
+      nextProblemTooltip: 'Go to next problem',
+      confirmSaveOnClose: 'Do you want to save changes to',
+      compiling: 'Compiling C++ code...',
+      running: 'Compilation successful, running...',
+      compilationFailed: 'Compilation failed',
+      executionTimedOut: 'Execution timed out',
+      runtimeError: 'Runtime error',
+      compilerNotFound: 'Compiler Error: g++ not found',
+      programExitedNonZero: 'Program exited with non-zero status code',
+      noOutput: 'Code executed, no output.',
+      error: 'Error',
+      previousProgramTerminated: 'Previous program was forcefully terminated.',
+      noProgramToReceiveInput: 'Error: No program is currently running to receive input.',
+      microphoneAccessFailed: 'Failed to access microphone',
+      recordingStarted: 'Started audio recording...',
+      recordingStopped: 'Recording stopped.',
+      playbackFailed: 'Failed to play audio.',
+      loadingProblemsFailed: 'Failed to load problems:',
+      selectProblem: 'Please select a problem from the "Problem List" on the left to view its description.'
     },
     zh: { // 中文翻译
-      file: '文件',
-      settings: '设置',
-      theme: '主题',
-      fontSize: '字体大小',
-      fontFamily: '字体家族',
-      language: '语言',
-      lineNumbers: '行号',
       run: '运行',
       clear: '清空',
-      export: '导出', // New translation
-      recordAudio: '录制', // New translation
-      playAudio: '播放', // New translation
-      prevProblem: '前一题', // New translation
-      nextProblem: '后一题', // New translation
+      export: '导出',
+      recordAudio: '录制',
+      playAudio: '播放',
+      prevProblem: '前一题',
+      nextProblem: '后一题',
       // Tooltips
       runTooltip: '运行 (Ctrl+R)',
       clearTooltip: '清空输出',
-      settingsTooltip: '设置',
-      exportTooltip: '导出当前题目代码和讲解音频', // New tooltip
-      recordAudioTooltip: '录制音频讲解', // New tooltip
-      playAudioTooltip: '播放录制音频', // New tooltip
-      prevProblemTooltip: '切换到上一题', // New tooltip
-      nextProblemTooltip: '切换到下一题', // New tooltip
-      confirmSaveOnClose: '是否保存', 
+      exportTooltip: '导出当前题目代码和讲解音频',
+      recordAudioTooltip: '录制音频讲解',
+      playAudioTooltip: '播放录制音频',
+      prevProblemTooltip: '切换到上一题',
+      nextProblemTooltip: '切换到下一题',
+      confirmSaveOnClose: '是否保存',
+      compiling: '正在编译C++代码...',
+      running: '编译成功，正在运行...',
+      compilationFailed: '编译失败',
+      executionTimedOut: '执行超时',
+      runtimeError: '运行时错误',
+      compilerNotFound: '编译器错误：g++ 未找到',
+      programExitedNonZero: '程序以非零状态码退出',
+      noOutput: '代码执行完成，无输出。',
+      error: '错误',
+      previousProgramTerminated: '上一个程序被强制终止。',
+      noProgramToReceiveInput: '错误：没有正在运行的程序可以接收输入。',
+      microphoneAccessFailed: '无法访问麦克风',
+      recordingStarted: '开始录制音频...',
+      recordingStopped: '录制结束。',
+      playbackFailed: '播放音频失败。',
+      loadingProblemsFailed: '加载题目失败:',
+      selectProblem: '请从左侧的“题目列表”中选择一个题目查看其描述。'
     }
   };
 
@@ -214,6 +212,18 @@ class DSALabApp {
   private terminalInput: HTMLInputElement | null = null;
   private isProgramRunning: boolean = false; // 跟踪程序是否正在运行
 
+  // Splitter properties
+  private isDraggingMainSplitter = false;
+  private isDraggingRightHorizontalSplitter = false;
+  private mainSplitter: HTMLElement | null = null;
+  private rightPanelHorizontalSplitter: HTMLElement | null = null;
+  private problemDescriptionPanel: HTMLElement | null = null;
+  private codeTestPanel: HTMLElement | null = null;
+  private audioPanel: HTMLElement | null = null;
+  private editorContainer: HTMLElement | null = null;
+  private testOutputArea: HTMLElement | null = null;
+  private problemPanelTabs: HTMLElement | null = null;
+
 
   // 构造函数，应用程序初始化时调用
   constructor() {
@@ -221,8 +231,9 @@ class DSALabApp {
     this.createEditor(); // 创建单个编辑器实例
     this.fetchProblemsAndInitializeUI();  // 获取问题并初始化UI
     this.setupEventListeners();  // 设置DOM事件监听器
-    this.setupTerminalInput(); // 新增：设置终端输入
-    this.setupIpcListeners(); // 新增：设置IPC监听器
+    this.setupTerminalInput(); // 设置终端输入
+    this.setupIpcListeners(); // 设置IPC监听器
+    this.setupSplitters(); // 设置分割线拖动功能
   }
 
   // 初始化 Monaco Editor 的自定义主题
@@ -303,16 +314,16 @@ class DSALabApp {
     this.editor = monaco.editor.create(editorContainer, {  // 创建 Monaco Editor 实例
       value: this.getWelcomeCode(),  // 初始内容为欢迎代码
       language: 'cpp', // 语言模式设置为 C++
-      theme: this.settings.theme,  // 应用当前设置的主题
-      fontSize: this.settings.fontSize,  // 应用当前设置的字体大小
-      fontFamily: this.settings.fontFamily,  // 应用当前设置的字体家族
-      minimap: { enabled: this.settings.minimap },  // 根据设置启用/禁用小地图
+      theme: this.defaultTheme,  // 应用硬编码的主题
+      fontSize: this.defaultFontSize,  // 应用硬编码的字体大小
+      fontFamily: this.defaultFontFamily,  // 应用硬编码的字体家族
+      minimap: { enabled: this.defaultMinimap },  // 根据硬编码设置启用/禁用小地图
       scrollBeyondLastLine: false,  // 不允许滚动到最后一行之外
       automaticLayout: true,  // 自动布局，适应容器大小变化
-      tabSize: this.settings.tabSize,  // 应用当前设置的 Tab 大小
+      tabSize: this.defaultTabSize,  // 应用硬编码的 Tab 大小
       insertSpaces: true,  // 使用空格代替 Tab 键
-      wordWrap: this.settings.wordWrap ? 'on' : 'off',  // 根据设置启用/禁用自动换行
-      lineNumbers: this.settings.lineNumbers ? 'on' : 'off',  // 根据设置启用/禁用行号
+      wordWrap: this.defaultWordWrap ? 'on' : 'off',  // 根据硬编码设置启用/禁用自动换行
+      lineNumbers: this.defaultLineNumbers ? 'on' : 'off',  // 根据硬编码设置启用/禁用行号
       renderWhitespace: 'selection',  // 仅在选中时渲染空白字符
       contextmenu: false,  // 禁用右键菜单
       mouseWheelZoom: true, // 启用鼠标滚轮缩放
@@ -365,12 +376,21 @@ class DSALabApp {
       if (this.problems.length > 0) {
         // 默认加载第一个问题
         this.switchToProblem(this.problems[0].id);
+      } else {
+        const problemDescriptionContent = document.getElementById('problemDescriptionContent') as HTMLElement;
+        if (problemDescriptionContent) {
+          problemDescriptionContent.innerHTML = `<p>${this.t('selectProblem')}</p>`;
+        }
       }
     } catch (error) {
-      console.error('Failed to fetch problems:', error);
+      console.error(this.t('loadingProblemsFailed'), error);
       const problemListContent = document.querySelector('.problem-list-content') as HTMLElement;
       if (problemListContent) {
-        problemListContent.innerHTML = `<p style="color: red;">加载题目失败: ${error instanceof Error ? error.message : String(error)}</p>`;
+        problemListContent.innerHTML = `<p style="color: red;">${this.t('loadingProblemsFailed')} ${error instanceof Error ? error.message : String(error)}</p>`;
+      }
+      const problemDescriptionContent = document.getElementById('problemDescriptionContent') as HTMLElement;
+      if (problemDescriptionContent) {
+        problemDescriptionContent.innerHTML = `<p style="color: red;">${this.t('loadingProblemsFailed')} ${error instanceof Error ? error.message : String(error)}</p>`;
       }
     }
   }
@@ -479,6 +499,8 @@ class DSALabApp {
       document.getElementById('prevProblemBtn')?.addEventListener('click', () => this.navigateProblem(-1));
       document.getElementById('nextProblemBtn')?.addEventListener('click', () => this.navigateProblem(1));
       this.updateNavigationButtons(); // Update disabled state after re-rendering
+    } else if (problemDescriptionContent) {
+      problemDescriptionContent.innerHTML = `<p>${this.t('selectProblem')}</p>`;
     }
   }
 
@@ -529,7 +551,7 @@ class DSALabApp {
     document.getElementById('playAudioBtn')?.addEventListener('click', () => this.playAudio());
   }
 
-  // 新增：设置终端输入框的事件监听
+  // 设置终端输入框的事件监听
   private setupTerminalInput(): void {
     this.terminalInput = document.getElementById('terminalInput') as HTMLInputElement;
     if (this.terminalInput) {
@@ -545,7 +567,7 @@ class DSALabApp {
     }
   }
 
-  // 新增：设置IPC监听器，接收主进程的实时输出
+  // 设置IPC监听器，接收主进程的实时输出
   private setupIpcListeners(): void {
     window.electron.onCppOutputChunk((chunk) => {
       this.appendOutput(chunk.type, chunk.data);
@@ -682,12 +704,6 @@ class DSALabApp {
     const outputContainer = document.querySelector('.output-container') as HTMLElement;
     if (!outputContainer) return;
 
-    // 清除 "正在编译并运行C++代码..." 如果它是最后一条消息
-    // （在实时输出模式下，这条可能由主进程发送，但为了健壮性保留）
-    if (outputContainer.lastElementChild?.textContent?.includes('正在编译并运行C++代码...')) {
-      outputContainer.removeChild(outputContainer.lastElementChild);
-    }
-
     const errorLine = document.createElement('div');
     errorLine.className = 'output-error-friendly';
     
@@ -695,18 +711,24 @@ class DSALabApp {
     
     // Make error messages more friendly
     if (error.message.includes('Compilation failed')) {
-      friendlyMessage = `❌ 编译失败：请检查你的C++语法错误。\n${error.message}`;
+      if (error.message.includes('g++ compiler not found')) {
+        friendlyMessage = `❌ ${this.t('compilerNotFound')}：${error.message.replace('Compilation failed: g++ compiler not found or not in PATH.', '').trim()}\n请确保你的系统已安装 g++ 编译器，并且在 PATH 中可访问。`;
+      } else {
+        friendlyMessage = `❌ ${this.t('compilationFailed')}：请检查你的C++语法错误。\n详细信息: ${error.message}`;
+      }
     } else if (error.message.includes('Execution timed out')) {
-      friendlyMessage = `⚠️ 执行超时：你的程序运行时间过长，可能存在无限循环或性能问题。\n${error.message}`;
+      friendlyMessage = `⚠️ ${this.t('executionTimedOut')}：你的程序运行时间过长，可能存在无限循环或性能问题 (超过 ${this.EXECUTION_TIMEOUT / 1000} 秒)。\n详细信息: ${error.message}`;
     } else if (error.message.includes('Execution failed')) {
-      friendlyMessage = `❌ 运行时错误：程序执行失败。\n${error.message}`;
-    } else if (error.message.includes('g++')) {
-      friendlyMessage = `❌ 编译器错误：请确保你的系统已安装 g++ 编译器，并且在 PATH 中可访问。\n${error.message}`;
+      friendlyMessage = `❌ ${this.t('runtimeError')}：程序执行失败。\n详细信息: ${error.message}`;
+    } else if (error.message.includes('Previous program was forcefully terminated')) {
+      friendlyMessage = `⚠️ ${this.t('previousProgramTerminated')}`;
+    } else if (error.message.includes('No program is currently running to receive input')) {
+      friendlyMessage = `❌ ${this.t('noProgramToReceiveInput')}`;
     } else {
-      friendlyMessage = `❌ 错误: ${error.message}`;
+      friendlyMessage = `❌ ${this.t('error')}: ${error.message}`;
     }
     
-    errorLine.innerHTML = friendlyMessage;
+    errorLine.innerHTML = friendlyMessage.replace(/\n/g, '<br>');
     outputContainer.appendChild(errorLine);
     outputContainer.scrollTop = outputContainer.scrollHeight;
 
@@ -720,9 +742,9 @@ class DSALabApp {
   }
 
   // 国际化翻译函数
-  private t(key: string): string {
-    const lang = this.settings.language as 'en' | 'zh';
-    return this.translations[lang][key as keyof typeof this.translations.en] || key;
+  private t(key: keyof typeof this.translations.en): string {
+    const lang = this.currentLanguage as 'en' | 'zh';
+    return this.translations[lang][key] || key;
   }
 
   // 切换录音状态
@@ -766,24 +788,24 @@ class DSALabApp {
 
         this.mediaRecorder.start();
         this.isRecording = true;
-        recordBtn.innerHTML = `<i class="fas fa-stop"></i> 停止`;
+        recordBtn.innerHTML = `<i class="fas fa-stop"></i> ${this.t('recordAudio')}`; // Change text to "Stop"
         recordBtn.classList.add('recording'); // Add a class for visual feedback
         playBtn.disabled = true; // Disable play during recording
         audioPlayback.style.display = 'none'; // Hide audio player during recording
         audioPlayback.src = ''; // Clear source
-        this.appendOutput('info', '开始录制音频...');
+        this.appendOutput('info', this.t('recordingStarted'));
       } catch (err) {
-        console.error('无法访问麦克风:', err);
-        this.appendOutput('error', `无法录制音频: ${err instanceof Error ? err.message : String(err)}`);
+        console.error(this.t('microphoneAccessFailed'), err);
+        this.appendOutput('error', `${this.t('microphoneAccessFailed')}: ${err instanceof Error ? err.message : String(err)}`);
       }
     } else {
       // Stop recording
       this.mediaRecorder?.stop();
       this.mediaRecorder?.stream.getTracks().forEach(track => track.stop()); // Stop microphone access
       this.isRecording = false;
-      recordBtn.innerHTML = `<i class="fas fa-microphone"></i> 录制`;
+      recordBtn.innerHTML = `<i class="fas fa-microphone"></i> ${this.t('recordAudio')}`; // Change text back to "Record"
       recordBtn.classList.remove('recording');
-      this.appendOutput('info', '录制结束。');
+      this.appendOutput('info', this.t('recordingStopped'));
     }
   }
 
@@ -791,7 +813,10 @@ class DSALabApp {
   private playAudio(): void {
     const audioPlayback = document.getElementById('audioPlayback') as HTMLAudioElement;
     if (audioPlayback && audioPlayback.src) {
-      audioPlayback.play().catch(e => console.error('播放音频失败:', e));
+      audioPlayback.play().catch(e => {
+        console.error(this.t('playbackFailed'), e);
+        this.appendOutput('error', `${this.t('playbackFailed')}: ${e instanceof Error ? e.message : String(e)}`);
+      });
     }
   }
 
@@ -815,9 +840,110 @@ class DSALabApp {
 
     // Reset recording button state
     this.isRecording = false;
-    recordBtn.innerHTML = `<i class="fas fa-microphone"></i> 录制`;
+    recordBtn.innerHTML = `<i class="fas fa-microphone"></i> ${this.t('recordAudio')}`;
     recordBtn.classList.remove('recording');
   }
+
+  // --- Splitter Logic ---
+  private setupSplitters(): void {
+    this.mainSplitter = document.querySelector('.main-split-divider');
+    // this.leftPanelHorizontalSplitter = document.querySelector('.problem-description-panel > .horizontal-split-divider'); // 移除
+    this.rightPanelHorizontalSplitter = document.querySelector('.code-test-panel > .horizontal-split-divider');
+
+    this.problemDescriptionPanel = document.querySelector('.problem-description-panel');
+    this.codeTestPanel = document.querySelector('.code-test-panel');
+    // this.problemContentArea = document.querySelector('.problem-description-panel .panel-content.active'); // 不再需要动态获取
+    this.audioPanel = document.querySelector('.audio-panel');
+    this.editorContainer = document.querySelector('.editor-container');
+    this.testOutputArea = document.querySelector('.test-output-area');
+    this.problemPanelTabs = document.querySelector('.problem-panel-tabs');
+
+
+    if (this.mainSplitter) {
+      this.mainSplitter.addEventListener('mousedown', this.startDragMainSplitter);
+    }
+    if (this.rightPanelHorizontalSplitter) {
+      this.rightPanelHorizontalSplitter.addEventListener('mousedown', this.startDragRightHorizontalSplitter);
+    }
+  }
+
+  private startDragMainSplitter = (e: MouseEvent) => {
+    e.preventDefault();
+    this.isDraggingMainSplitter = true;
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none'; // Prevent text selection during drag
+    document.addEventListener('mousemove', this.dragMainSplitter);
+    document.addEventListener('mouseup', this.stopDragMainSplitter);
+  };
+
+  private dragMainSplitter = (e: MouseEvent) => {
+    if (!this.isDraggingMainSplitter || !this.problemDescriptionPanel || !this.codeTestPanel) return;
+
+    const workspace = document.querySelector('.workspace') as HTMLElement;
+    if (!workspace) return;
+
+    const workspaceRect = workspace.getBoundingClientRect();
+    let newLeftPanelWidth = e.clientX - workspaceRect.left;
+
+    // Minimum width constraints
+    const minLeftWidth = 250; // Minimum width for problem panel
+    const minRightWidth = 350; // Minimum width for code/output panel
+    const maxLeftWidth = workspaceRect.width - minRightWidth;
+
+    newLeftPanelWidth = Math.max(minLeftWidth, Math.min(newLeftPanelWidth, maxLeftWidth));
+
+    this.problemDescriptionPanel.style.flexBasis = `${newLeftPanelWidth}px`;
+    this.codeTestPanel.style.flexBasis = `${workspaceRect.width - newLeftPanelWidth - (this.mainSplitter?.offsetWidth || 0)}px`;
+    
+    this.editor?.layout(); // Re-layout Monaco Editor after resize
+  };
+
+  private stopDragMainSplitter = () => {
+    this.isDraggingMainSplitter = false;
+    document.body.style.cursor = 'default';
+    document.body.style.userSelect = 'auto';
+    document.removeEventListener('mousemove', this.dragMainSplitter);
+    document.removeEventListener('mouseup', this.stopDragMainSplitter);
+  };
+
+
+  private startDragRightHorizontalSplitter = (e: MouseEvent) => {
+    e.preventDefault();
+    this.isDraggingRightHorizontalSplitter = true;
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', this.dragRightHorizontalSplitter);
+    document.addEventListener('mouseup', this.stopDragRightHorizontalSplitter);
+  };
+
+  private dragRightHorizontalSplitter = (e: MouseEvent) => {
+    if (!this.isDraggingRightHorizontalSplitter || !this.codeTestPanel || !this.editorContainer || !this.testOutputArea) return;
+
+    const codeTestPanelRect = this.codeTestPanel.getBoundingClientRect();
+    const headerHeight = (document.querySelector('.code-test-panel > .panel-header') as HTMLElement)?.offsetHeight || 0;
+    let newEditorHeight = e.clientY - codeTestPanelRect.top - headerHeight;
+
+    // Minimum height constraints
+    const minEditorHeight = 150;
+    const minOutputAreaHeight = 150;
+    const maxEditorHeight = codeTestPanelRect.height - headerHeight - minOutputAreaHeight - (this.rightPanelHorizontalSplitter?.offsetHeight || 0);
+
+    newEditorHeight = Math.max(minEditorHeight, Math.min(newEditorHeight, maxEditorHeight));
+
+    this.editorContainer.style.flexBasis = `${newEditorHeight}px`;
+    this.testOutputArea.style.flexBasis = `${codeTestPanelRect.height - headerHeight - newEditorHeight - (this.rightPanelHorizontalSplitter?.offsetHeight || 0)}px`;
+    
+    this.editor?.layout(); // Re-layout Monaco Editor after resize
+  };
+
+  private stopDragRightHorizontalSplitter = () => {
+    this.isDraggingRightHorizontalSplitter = false;
+    document.body.style.cursor = 'default';
+    document.body.style.userSelect = 'auto';
+    document.removeEventListener('mousemove', this.dragRightHorizontalSplitter);
+    document.removeEventListener('mouseup', this.stopDragRightHorizontalSplitter);
+  };
+
 
   private getWelcomeCode(): string {
     return `// 欢迎来到 DSALab! 🚀

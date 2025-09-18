@@ -9,7 +9,7 @@
   }
   
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     background: #000000;
     color: #e6edf3;
     overflow: hidden; /* 防止整体滚动，由内部面板处理 */
@@ -91,7 +91,7 @@
     font-size: 18px; /* 图标大小 */
     cursor: pointer;
     padding: 6px;
-    border-radius: 4px;
+    border-radius: 44px;
     transition: all 0.2s ease;
     -webkit-app-region: no-drag; /* 按钮不应拖动窗口 */
   }
@@ -168,11 +168,13 @@
      ========================================================================== */
   .problem-description-panel {
     flex: 0 0 40%; /* 左侧面板占据 40% 宽度，可根据需要调整 */
-    border-right: 1px solid #21262d;
+    /* flex-basis 应该由JS控制，这里提供一个初始值 */
+    flex-basis: 40%; 
     display: flex; /* 使其成为 flex 容器，以便垂直堆叠题目描述和音频面板 */
     flex-direction: column;
     background: #0d1117; /* 面板背景色 */
     overflow: hidden; /* 隐藏内部滚动条，由 panel-content 处理 */
+    min-width: 250px; /* 最小宽度 */
   }
   
   /* 新增：题目列表和题目描述的标签页头部容器 */
@@ -236,6 +238,7 @@
     font-size: 14px;
     line-height: 1.6;
     display: none; /* 默认隐藏 */
+    /* min-height: 100px; /* 最小高度，用于拖动 */ /* 由父容器控制 */
   }
   
   .problem-list-content.active {
@@ -278,13 +281,14 @@
     line-height: 1.6;
     display: none; /* 默认隐藏 */
     padding-bottom: 10px; /* Adjust if needed to prevent buttons from being too close to scrollbar */
+    /* min-height: 100px; /* 最小高度，用于拖动 */ /* 由父容器控制 */
   }
   
   .problem-description-content.active {
     display: block; /* 激活时显示 */
   }
   
-  /* 调整原有 problem-container 内部的样式，现在它们应用于 problem-description-content */
+  /* 调整原有 problem-container 内部的样式, 现在它们应用于 problem-description-content */
   .problem-description-content h2 {
     font-size: 20px;
     margin-bottom: 12px;
@@ -335,19 +339,24 @@
     color: #7d8590;
   }
 
-  .horizontal-split-divider {
+  /* 移除左侧面板内部的水平分割线 */
+  /* .problem-description-panel > .horizontal-split-divider {
     height: 4px;
     background: #21262d;
     flex-shrink: 0;
-  }
+  } */
+
   /* ==========================================================================
      新增：音频录制与播放面板 (Audio Panel)
      对应 HTML: <div class="audio-panel"> ... </div>
      ========================================================================== */
   .audio-panel {
-    flex-shrink: 0; /* 防止缩小，保持固定高度或内容自适应 */
+    flex-shrink: 0; /* 防止缩小 */
+    height: 100px; /* 固定高度，包含 header 和 content */
     background: #0d1117;
     border-top: 1px solid #21262d; /* 与题目描述内容分隔 */
+    display: flex; /* 内部 flex 布局 */
+    flex-direction: column; /* 垂直堆叠 header 和 content */
   }
   
   /* 对应 HTML: <div class="audio-panel"> <div class="panel-header"> */
@@ -355,6 +364,7 @@
   
   /* 对应 HTML: <div class="audio-panel"> <div class="panel-content audio-controls"> */
   .audio-panel .panel-content.audio-controls {
+    flex: 1; /* 占据剩余空间 */
     display: flex;
     align-items: center;
     gap: 10px;
@@ -402,14 +412,21 @@
   }
   
   /* ==========================================================================
-     主分割线 (Main Split Divider)
-     对应 HTML: <div class="main-split-divider"> ... </div>
+     分割线样式 (Splitter Styles)
      ========================================================================== */
   .main-split-divider {
     width: 4px;
     background: #21262d;
     flex-shrink: 0;
     cursor: ew-resize; /* 左右调整大小的光标 */
+  }
+
+  /* 只有右侧面板的水平分割线需要 .horizontal-split-divider 样式 */
+  .code-test-panel > .horizontal-split-divider {
+    height: 4px;
+    background: #21262d;
+    flex-shrink: 0;
+    cursor: ns-resize; /* 垂直方向调整大小的光标 */
   }
   
   /* ==========================================================================
@@ -418,10 +435,13 @@
      ========================================================================== */
   .code-test-panel {
     flex: 1; /* 右侧面板占据剩余宽度 */
+    /* flex-basis 应该由JS控制，这里提供一个初始值 */
+    flex-basis: 60%;
     display: flex;
     flex-direction: column;
     background: #0d1117; /* 面板背景色 */
     overflow: hidden; /* 隐藏内部滚动条，由 panel-content 处理 */
+    min-width: 350px; /* 最小宽度 */
   }
   
   /* 对应 HTML: <button id="runBtn" class="header-btn run-btn"> */
@@ -448,6 +468,8 @@
      ========================================================================== */
   .editor-container {
     flex: 1; /* 占据右侧面板的剩余垂直空间 */
+    /* flex-basis 应该由JS控制，这里提供一个初始值 */
+    flex-basis: 70%;
     overflow: hidden;
     background: #0d1117;
     /* Monaco Editor 将在此处初始化并处理其自身的样式 */
@@ -458,28 +480,32 @@
     color: #e6edf3;
     font-family: monospace;
     font-size: 14px;
+    min-height: 150px; /* 最小高度，用于拖动 */
   }
   
   /* ==========================================================================
      右侧面板内部水平分割线 (Horizontal Split Divider)
      对应 HTML: <div class="horizontal-split-divider"> ... </div>
      ========================================================================== */
-  .horizontal-split-divider {
+  /* .horizontal-split-divider {
     height: 4px;
     background: #21262d;
     flex-shrink: 0;
-    cursor: ns-resize; /* 垂直方向调整大小的光标 */
-  }
+    cursor: ns-resize;
+  } */ /* This is now defined in the general splitter section */
   
   /* ==========================================================================
      运行结果区域 (Test Output Area)
      对应 HTML: <div class="test-output-area"> ... </div>
      ========================================================================== */
   .test-output-area {
-    flex: 0 0 300px; /* 底部运行结果区域固定高度，可根据需要调整或使用 flex-grow 控制比例 */
+    flex: 1; /* 底部运行结果区域占据剩余高度 */
+    /* flex-basis 应该由JS控制，这里提供一个初始值 */
+    flex-basis: 30%;
     display: flex;
     flex-direction: column;
     background: #0d1117;
+    min-height: 150px; /* 最小高度，用于拖动 */
   }
   
   /* 对应 HTML: <button id="clearOutputBtn" class="clear-output-btn"> */
@@ -508,6 +534,7 @@
     padding: 16px; /* 保持内边距以美化输出内容 */
     display: flex;
     flex-direction: column;
+    padding: 0; /* Remove padding here, output-container has it */
   }
   
   /* 对应 HTML: <div class="output-container"> */
@@ -646,6 +673,7 @@
   color: #e6edf3;
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 14px;
+  flex-shrink: 0; /* Prevent shrinking */
 }
 
 .terminal-input-area .prompt {
@@ -701,4 +729,21 @@
   flex-direction: column;
   height: calc(100% - 40px); /* Adjust based on panel-header height */
   overflow: hidden; /* Prevent internal scrollbars from messing up layout */
+  padding: 0; /* Remove padding here, output-container has it */
+}
+
+/* Ensure flex-shrink is 0 for elements that should not shrink when resizing */
+.problem-panel-tabs,
+.audio-panel .panel-header,
+.audio-panel .panel-content.audio-controls,
+.code-test-panel > .panel-header {
+  flex-shrink: 0;
+}
+
+/* Specific flex-grow for problem content areas */
+.problem-list-content,
+.problem-description-content {
+  flex-grow: 1;
+  flex-shrink: 1;
+  min-height: 100px; /* Ensure a minimum height for scrolling content */
 }
