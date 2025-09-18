@@ -1,8 +1,11 @@
 [
     {
       "id": "LinkedList1",
+      "Title": "链表1",
       "shortDescription": "LinkedList1：单指针实现双链表操作",
-      "fullDescription": "用单指针实现双链表(实现按位置查找、插入、删除三个操作即可)"
+      "fullDescription": "用单指针实现双链表(实现按位置查找、插入、删除三个操作即可)",
+      "Audio": "",
+      "Code": ""
     },
     {
       "id": "LinkedList2",

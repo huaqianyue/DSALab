@@ -34,10 +34,10 @@
         <div class="problem-description-panel">
           <!-- 新增：题目列表和题目描述的标签页头部 -->
           <div class="problem-panel-tabs">
-            <div class="problem-tab-header active" data-tab-target="problem-list">
+            <div class="problem-tab-header active" data-tab-target="problem-list" id="problemListTabHeader">
               <i class="fas fa-list-ul"></i> 题目列表
             </div>
-            <div class="problem-tab-header" data-tab-target="problem-description">
+            <div class="problem-tab-header" data-tab-target="problem-description" id="problemDescriptionTabHeader">
               <i class="fas fa-book"></i> 题目描述
             </div>
           </div>
@@ -45,21 +45,14 @@
           <!-- 新增：题目列表内容区域 -->
           <div class="problem-list-content panel-content active" data-tab-id="problem-list">
             <ul class="problem-list">
-              <li class="problem-item active" data-problem-id="1">第一题：数组求和</li>
-              <li class="problem-item" data-problem-id="2">第二题：链表反转</li>
-              <li class="problem-item" data-problem-id="3">第三题：二叉树遍历</li>
-              <li class="problem-item" data-problem-id="4">第四题：排序算法</li>
-              <li class="problem-item" data-problem-id="5">第五题：图的遍历</li>
-              <li class="problem-item" data-problem-id="6">第六题：动态规划入门</li>
-              <li class="problem-item" data-problem-id="7">第七题：字符串匹配</li>
-              <li class="problem-item" data-problem-id="8">第八题：哈希表应用</li>
+              <!-- 题目列表将由JS动态加载 -->
             </ul>
           </div>
 
           <!-- 题目描述的具体内容，现在是第二个标签页的内容 -->
-          <div class="problem-description-content panel-content" data-tab-id="problem-description">
-            <!-- 初始加载时显示一个提示，或者由JS加载第一个题目的描述 -->
+          <div class="problem-description-content panel-content" data-tab-id="problem-description" id="problemDescriptionContent">
             <p>请从左侧的“题目列表”中选择一个题目查看其描述。</p>
+            <!-- 导航按钮将由JS动态插入到此处 -->
           </div>
 
           <div class="horizontal-split-divider"></div>
@@ -102,7 +95,7 @@
           </div>
 
           <!-- 代码编辑器区域 -->
-          <div class="editor-container" data-tab-id="tab-1">
+          <div class="editor-container">
             <!-- Monaco Editor 或其他编辑器会在此处初始化 -->
           </div>
 
@@ -123,7 +116,7 @@
             <div class="panel-content">
               <!-- 修改：删除测试用例输入区域 -->
               <!-- 输出结果区域 -->
-              <div class="output-container" data-tab-id="tab-1">
+              <div class="output-container">
               </div>
             </div>
           </div>

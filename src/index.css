@@ -277,6 +277,7 @@
     font-size: 14px;
     line-height: 1.6;
     display: none; /* 默认隐藏 */
+    padding-bottom: 10px; /* Adjust if needed to prevent buttons from being too close to scrollbar */
   }
   
   .problem-description-content.active {
@@ -385,6 +386,19 @@
       flex: 1; /* 让音频播放器占据剩余空间 */
       min-width: 0; /* 防止内容溢出 */
       height: 30px; /* 调整高度 */
+      display: none; /* Default hidden */
+  }
+
+  /* Style for recording button visual feedback */
+  .btn-audio.recording {
+    background-color: #d54e53; /* Red background for recording */
+    border-color: #d54e53;
+    color: #ffffff;
+  }
+  
+  .btn-audio.recording:hover {
+    background-color: #e74c3c; /* Slightly lighter red on hover */
+    border-color: #e74c3c;
   }
   
   /* ==========================================================================
@@ -593,4 +607,30 @@
     border-bottom: 4px solid #3e3e42; /* 箭头指向上方 */
     z-index: 1001;
     pointer-events: none;
+  }
+
+  /* Style for problem navigation buttons */
+  .problem-navigation-buttons {
+    display: flex;
+    justify-content: space-between; /* Space out buttons */
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #21262d; /* Separator line */
+  }
+
+  .problem-navigation-buttons .btn-audio {
+    flex-grow: 1; /* Allow buttons to grow */
+    margin: 0 5px; /* Spacing between buttons */
+    justify-content: center; /* Center content within button */
+  }
+
+  /* Make problem description tab header not clickable initially */
+  #problemDescriptionTabHeader {
+      pointer-events: none; /* Disable direct clicks */
+      opacity: 0.7; /* Dim it slightly */
+  }
+
+  #problemDescriptionTabHeader.active {
+      pointer-events: auto; /* Enable when active (though it's activated by problem item click) */
+      opacity: 1; /* Full opacity when active */
   }

@@ -63,20 +63,37 @@ interface ThemeDefinition {
   };
 }
 
+// 定义问题数据结构
+interface Problem {
+  id: string;
+  shortDescription: string;
+  fullDescription: string;
+}
+
+// 定义每个问题的工作区数据结构
+interface ProblemWorkspaceData {
+  content: string;
+  isDirty: boolean;
+  output: string;
+  audioBlob: Blob | null;
+  audioUrl: string | null;
+  filePath: string | null;
+}
+
+
 // DSALab 应用程序的主类，负责整个前端应用的逻辑和状态
 class DSALabApp {
-  //存储所有Monaco编辑器实例的Map，键为标签页ID，值为编辑器实例
-  private editors: Map<string, monaco.editor.IStandaloneCodeEditor> = new Map();
-  //用于生成新标签页ID的计数器
-  private tabCounter = 1;
-  //当前激活的标签页ID
-  private activeTabId = 'tab-1';
-  //存储所有标签页的数据，包括标题、内容、是否修改、文件路径等。
-  private tabData: Map<string, { title: string; content: string; isDirty: boolean; file: string | null }> = new Map();
+  // 单个 Monaco Editor 实例
+  private editor: monaco.editor.IStandaloneCodeEditor | null = null;
+  // 存储所有问题数据
+  private problems: Problem[] = [];
+  // 当前激活的问题ID
+  private currentProblemId: string | null = null;
+  // 存储每个问题的工作区数据
+  private problemWorkspaceData: Map<string, ProblemWorkspaceData> = new Map();
+
   // 代码执行的最大超时时间（30秒）。
   private readonly EXECUTION_TIMEOUT = 30000; 
-  // private readonly MAX_OUTPUT_LINES = 1000; // Maximum 1000 lines of output
-  // private executionAbortController: Map<string, AbortController> = new Map();
   // 应用程序的当前设置，包含默认值。
   private settings: AppSettings = {
     theme: 'github-dark',  // 默认主题
@@ -133,10 +150,20 @@ class DSALabApp {
       lineNumbers: 'Line Numbers',
       run: 'Run',
       clear: 'Clear',
+      export: 'Export', // New translation
+      recordAudio: 'Record Audio', // New translation
+      playAudio: 'Play Audio', // New translation
+      prevProblem: 'Previous Problem', // New translation
+      nextProblem: 'Next Problem', // New translation
       // Tooltips
       runTooltip: 'Run (Ctrl+R)',
-      clearTooltip: 'Clear output (Ctrl+K)',
+      clearTooltip: 'Clear output',
       settingsTooltip: 'Settings',
+      exportTooltip: 'Export current problem code and audio', // New tooltip
+      recordAudioTooltip: 'Record audio explanation', // New tooltip
+      playAudioTooltip: 'Play recorded audio', // New tooltip
+      prevProblemTooltip: 'Go to previous problem', // New tooltip
+      nextProblemTooltip: 'Go to next problem', // New tooltip
       confirmSaveOnClose: 'Do you want to save changes to', // 关闭时确认保存的提示
     },
     zh: { // 中文翻译
@@ -149,21 +176,37 @@ class DSALabApp {
       lineNumbers: '行号',
       run: '运行',
       clear: '清空',
+      export: '导出', // New translation
+      recordAudio: '录制', // New translation
+      playAudio: '播放', // New translation
+      prevProblem: '前一题', // New translation
+      nextProblem: '后一题', // New translation
       // Tooltips
       runTooltip: '运行 (Ctrl+R)',
-      clearTooltip: '清空输出 (Ctrl+K)',
+      clearTooltip: '清空输出',
       settingsTooltip: '设置',
+      exportTooltip: '导出当前题目代码和讲解音频', // New tooltip
+      recordAudioTooltip: '录制音频讲解', // New tooltip
+      playAudioTooltip: '播放录制音频', // New tooltip
+      prevProblemTooltip: '切换到上一题', // New tooltip
+      nextProblemTooltip: '切换到下一题', // New tooltip
       confirmSaveOnClose: '是否保存', 
     }
   };
+
+  // Audio recording properties
+  private mediaRecorder: MediaRecorder | null = null;
+  private audioChunks: Blob[] = [];
+  private audioBlobUrl: string | null = null;
+  private isRecording: boolean = false;
+
+
   // 构造函数，应用程序初始化时调用
   constructor() {
     this.initializeMonacoTheme(); // 初始化 Monaco Editor 主题
-    this.initializeFirstTab();  // 初始化第一个标签页
+    this.createEditor(); // 创建单个编辑器实例
+    this.fetchProblemsAndInitializeUI();  // 获取问题并初始化UI
     this.setupEventListeners();  // 设置DOM事件监听器
-    this.setupKeyboardShortcuts();  // 设置键盘快捷键
-    // this.setupTabSystem();  // 设置标签页系统
-
   }
 
   // 初始化 Monaco Editor 的自定义主题
@@ -232,23 +275,17 @@ class DSALabApp {
       }
     });
   }
-  // 初始化第一个标签页
-  private initializeFirstTab(): void {
-    this.tabData.set('tab-1', {  // 设置第一个标签页的数据
-      title: 'Untitled-1',  // 默认标题
-      content: this.getWelcomeCode(),  // 欢迎代码作为初始内容
-      isDirty: false,  // 初始状态为未修改
-      file: null  // 初始未关联文件
-    });
-    this.createEditor('tab-1');  // 为第一个标签页创建编辑器实例
-  }
-  // 为指定标签页ID创建 Monaco Editor 实例
-  private createEditor(tabId: string): void {
-    const editorContainer = document.querySelector(`[data-tab-id="${tabId}"].editor-container`) as HTMLElement; // 获取编辑器容器
-    if (!editorContainer) return; // 如果容器不存在则返回
 
-    const editor = monaco.editor.create(editorContainer, {  // 创建 Monaco Editor 实例
-      value: this.tabData.get(tabId)?.content || '',  // 编辑器初始内容，从 tabData 获取
+  // 创建单个 Monaco Editor 实例
+  private createEditor(): void {
+    const editorContainer = document.querySelector('.editor-container') as HTMLElement; // 获取编辑器容器
+    if (!editorContainer) {
+      console.error('Editor container not found!');
+      return;
+    }
+
+    this.editor = monaco.editor.create(editorContainer, {  // 创建 Monaco Editor 实例
+      value: this.getWelcomeCode(),  // 初始内容为欢迎代码
       language: 'cpp', // 语言模式设置为 C++
       theme: this.settings.theme,  // 应用当前设置的主题
       fontSize: this.settings.fontSize,  // 应用当前设置的字体大小
@@ -286,18 +323,164 @@ class DSALabApp {
       autoSurround: 'languageDefined' // 自动环绕
     });
 
-    // 监听编辑器内容变化，更新标签页的“已修改”状态
-    editor.onDidChangeModelContent(() => {
-      const tabData = this.tabData.get(tabId);
-      if (tabData) {
-        tabData.isDirty = true;  // 设置为已修改
-        tabData.content = editor.getValue();  // 更新标签页内容
-        this.updateTabTitle(tabId);  // 更新标签页标题以显示修改状态
-       }
-     });
-
-    this.editors.set(tabId, editor);  // 将编辑器实例存储到 Map 中
+    // 监听编辑器内容变化，更新当前问题工作区的“已修改”状态
+    this.editor.onDidChangeModelContent(() => {
+      if (this.currentProblemId) {
+        const problemData = this.problemWorkspaceData.get(this.currentProblemId);
+        if (problemData) {
+          problemData.isDirty = true;  // 设置为已修改
+          problemData.content = this.editor!.getValue();  // 更新内容
+          this.updateTitle();  // 更新窗口标题以显示修改状态
+        }
+      }
+    });
   }
+
+  // 异步获取问题列表并初始化UI
+  private async fetchProblemsAndInitializeUI(): Promise<void> {
+    try {
+      const response = await fetch('https://cdn.jsdmirror.com/gh/huaqianyue/DSALab/problem.json');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      this.problems = await response.json();
+      this.renderProblemList(); // 渲染问题列表
+
+      if (this.problems.length > 0) {
+        // 默认加载第一个问题
+        this.switchToProblem(this.problems[0].id);
+      }
+    } catch (error) {
+      console.error('Failed to fetch problems:', error);
+      const problemListContent = document.querySelector('.problem-list-content') as HTMLElement;
+      if (problemListContent) {
+        problemListContent.innerHTML = `<p style="color: red;">加载题目失败: ${error instanceof Error ? error.message : String(error)}</p>`;
+      }
+    }
+  }
+
+  // 渲染问题列表
+  private renderProblemList(): void {
+    const problemListUl = document.querySelector('.problem-list') as HTMLUListElement;
+    if (!problemListUl) return;
+
+    problemListUl.innerHTML = ''; // 清空现有列表
+
+    this.problems.forEach((problem, index) => {
+      const listItem = document.createElement('li');
+      listItem.className = 'problem-item';
+      listItem.setAttribute('data-problem-id', problem.id);
+      listItem.textContent = problem.shortDescription;
+      listItem.addEventListener('click', () => {
+        this.switchToProblem(problem.id);
+      });
+      problemListUl.appendChild(listItem);
+    });
+  }
+
+  // 切换到指定问题
+  private switchToProblem(problemId: string): void {
+    if (!this.editor) return;
+
+    // 1. 保存当前问题的工作区状态
+    if (this.currentProblemId && this.problemWorkspaceData.has(this.currentProblemId)) {
+      const currentProblemData = this.problemWorkspaceData.get(this.currentProblemId)!;
+      currentProblemData.content = this.editor.getValue();
+      currentProblemData.output = document.querySelector('.output-container')?.innerHTML || '';
+      // Only save audio if chunks exist (i.e., something was recorded)
+      currentProblemData.audioBlob = this.audioChunks.length > 0 ? new Blob(this.audioChunks, { type: 'audio/webm' }) : null;
+      currentProblemData.audioUrl = this.audioBlobUrl;
+    }
+
+    // 2. 更新当前问题ID
+    this.currentProblemId = problemId;
+
+    // 3. 加载新问题的工作区状态
+    let newProblemData = this.problemWorkspaceData.get(problemId);
+    if (!newProblemData) {
+      // 如果是第一次加载此问题，初始化工作区数据
+      newProblemData = {
+        content: this.getWelcomeCode(),
+        isDirty: false,
+        output: '',
+        audioBlob: null,
+        audioUrl: null,
+        filePath: null,
+      };
+      this.problemWorkspaceData.set(problemId, newProblemData);
+    }
+
+    // 更新编辑器内容
+    this.editor.setValue(newProblemData.content);
+    // 更新输出区域内容
+    const outputContainer = document.querySelector('.output-container') as HTMLElement;
+    if (outputContainer) {
+      outputContainer.innerHTML = newProblemData.output;
+      outputContainer.scrollTop = outputContainer.scrollHeight;
+    }
+
+    // 更新音频面板
+    this.audioChunks = newProblemData.audioBlob ? [newProblemData.audioBlob] : [];
+    this.audioBlobUrl = newProblemData.audioUrl;
+    this.updateAudioPanel(newProblemData.audioBlob, newProblemData.audioUrl);
+    
+    // 4. 更新UI元素
+    this.updateProblemListSelection(problemId);
+    this.updateProblemDescription(problemId); // This will also re-attach navigation button listeners
+    this.updateNavigationButtons();
+    this.updateTitle();
+    this.activateProblemDescriptionTab(); // 激活题目描述标签页
+  }
+
+  // 更新问题列表中的选中状态
+  private updateProblemListSelection(problemId: string): void {
+    document.querySelectorAll('.problem-item').forEach(item => {
+      item.classList.remove('active');
+      if (item.getAttribute('data-problem-id') === problemId) {
+        item.classList.add('active');
+      }
+    });
+  }
+
+  // 更新题目描述区域
+  private updateProblemDescription(problemId: string): void {
+    const problem = this.problems.find(p => p.id === problemId);
+    const problemDescriptionContent = document.getElementById('problemDescriptionContent') as HTMLElement;
+    if (problem && problemDescriptionContent) {
+      problemDescriptionContent.innerHTML = `
+        <h2>${problem.shortDescription}</h2>
+        <p>${problem.fullDescription}</p>
+        <div class="problem-navigation-buttons">
+          <button id="prevProblemBtn" class="btn-audio" data-tooltip="${this.t('prevProblemTooltip')}">
+            <i class="fas fa-arrow-left"></i> ${this.t('prevProblem')}
+          </button>
+          <button id="nextProblemBtn" class="btn-audio" data-tooltip="${this.t('nextProblemTooltip')}">
+            ${this.t('nextProblem')} <i class="fas fa-arrow-right"></i>
+          </button>
+        </div>
+      `;
+      // Re-attach event listeners for navigation buttons as they are re-rendered
+      document.getElementById('prevProblemBtn')?.addEventListener('click', () => this.navigateProblem(-1));
+      document.getElementById('nextProblemBtn')?.addEventListener('click', () => this.navigateProblem(1));
+      this.updateNavigationButtons(); // Update disabled state after re-rendering
+    }
+  }
+
+  // 激活“题目描述”标签页
+  private activateProblemDescriptionTab(): void {
+    // 移除所有标签页和内容面板的 'active' 类
+    document.querySelectorAll('.problem-panel-tabs .problem-tab-header').forEach(tab => {
+      tab.classList.remove('active');
+    });
+    document.querySelectorAll('.problem-description-panel .panel-content').forEach(content => {
+      content.classList.remove('active');
+    });
+
+    // 为“题目描述”标签页和其内容面板添加 'active' 类
+    document.querySelector('[data-tab-target="problem-description"]')!.classList.add('active');
+    document.querySelector('[data-tab-id="problem-description"]')!.classList.add('active');
+  }
+
   // 设置主要的DOM事件监听器
   private setupEventListeners(): void {
     // 运行按钮事件
@@ -309,115 +492,68 @@ class DSALabApp {
     document.getElementById('clearOutputBtn')?.addEventListener('click', () => {
       this.clearOutput();  // 点击清空按钮清空输出
     });
-  }
-  // 设置键盘快捷键
-  private setupKeyboardShortcuts(): void {
-    document.addEventListener('keydown', (e) => {
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;  // 判断是否为 Mac 系统
-      const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;  // 根据系统判断使用 Command 键还是 Control 键
-      
-        // 添加这一行进行调试
-      console.log('Keydown event:', {
-        key: e.key,
-        code: e.code,
-        ctrlKey: e.ctrlKey,
-        metaKey: e.metaKey,
-        shiftKey: e.shiftKey,
-        altKey: e.altKey
+
+    // 题目列表/题目描述 标签页切换
+    document.querySelectorAll('.problem-panel-tabs .problem-tab-header').forEach(tabHeader => {
+      tabHeader.addEventListener('click', (event) => {
+        const targetTab = (event.currentTarget as HTMLElement).getAttribute('data-tab-target');
+        if (targetTab === 'problem-list') { // 只有题目列表可以主动点击切换
+          document.querySelectorAll('.problem-panel-tabs .problem-tab-header').forEach(tab => tab.classList.remove('active'));
+          document.querySelectorAll('.problem-description-panel .panel-content').forEach(content => content.classList.remove('active'));
+
+          document.querySelector(`[data-tab-target="problem-list"]`)!.classList.add('active');
+          document.querySelector(`[data-tab-id="problem-list"]`)!.classList.add('active');
+        }
+        // "题目描述"标签页的激活由点击题目列表项触发，这里不处理其点击事件
       });
-      if (cmdOrCtrl && e.key === 'r') { // Ctrl/Cmd + R 运行代码
-        e.preventDefault();  // 阻止默认行为 (如浏览器刷新)
-        this.executeCode();
-      } 
-    });
-  }
-  // 添加新的标签页
-  private addNewTab(): void {
-    this.tabCounter++; // 标签页计数器递增
-    const newTabId = `tab-${this.tabCounter}`; // 生成新的标签页ID
-    const newTabTitle = `Untitled-${this.tabCounter}`; // 生成新的默认标签页标题
-
-    // 添加标签页数据
-    this.tabData.set(newTabId, {
-      title: newTabTitle,
-      content: '', // 新标签页内容为空
-      isDirty: false, // 初始为未修改
-      file: null // 初始未关联文件
     });
 
-    // 创建标签页的DOM元素
-    const tabsContainer = document.querySelector('.tabs-list'); // 获取标签页列表容器
-    const newTab = document.createElement('div'); // 创建新的 div 元素作为标签页
-    newTab.className = 'tab'; // 添加 'tab' 类
-    newTab.setAttribute('data-tab-id', newTabId); // 设置 data-tab-id 属性
-    newTab.innerHTML = `
-      <span class="tab-title">${newTabTitle}</span>
-      <button class="tab-close" data-tooltip="${this.t('closeTabTooltip')}">
-        <i class="fas fa-times"></i>
-      </button>
-    `; // 设置标签页内容，包括标题和关闭按钮
-    tabsContainer?.appendChild(newTab); // 将新标签页添加到列表中
-
-    // 创建标签页内容的DOM元素 (编辑器和输出面板)
-    const tabsContent = document.querySelector('.tabs-content'); // 获取标签页内容容器
-    const newTabPane = document.createElement('div'); // 创建新的 div 元素作为标签页内容面板
-    newTabPane.className = 'tab-pane'; // 添加 'tab-pane' 类
-    newTabPane.setAttribute('data-tab-id', newTabId); // 设置 data-tab-id 属性
-    newTabPane.innerHTML = `
-      <div class="split-view">
-         <div class="split-panel editor-panel">
-            <div class="editor-container" data-tab-id="${newTabId}"></div>
-          </div>
-          
-          <div class="split-divider"></div>
-          
-          <div class="split-panel output-panel">
-            <div class="output-container" data-tab-id="${newTabId}"></div>
-          </div>
-       </div>
-    `; // 设置标签页内容面板的结构，包括编辑器容器和输出容器
-    tabsContent?.appendChild(newTabPane); // 将新标签页内容面板添加到容器中
-
-    // 延迟创建编辑器并切换到新标签页，确保DOM已渲染
-    setTimeout(() => {
-      this.createEditor(newTabId); // 为新标签页创建编辑器
-      this.switchToTab(newTabId); // 切换到新标签页
-    }, 100);
+    // 音频录制和播放按钮
+    document.getElementById('recordAudioBtn')?.addEventListener('click', () => this.toggleRecordAudio());
+    document.getElementById('playAudioBtn')?.addEventListener('click', () => this.playAudio());
   }
-  // 切换到指定标签页
-  private switchToTab(tabId: string): void {
-    // 移除所有标签页和内容面板的 'active' 类
-    document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-    document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
 
-    // 为选定的标签页和内容面板添加 'active' 类
-    document.querySelector(`[data-tab-id="${tabId}"].tab`)?.classList.add('active');
-    document.querySelector(`[data-tab-id="${tabId}"].tab-pane`)?.classList.add('active');
 
-    this.activeTabId = tabId; // 更新当前激活的标签页ID
 
-    // 触发编辑器重新布局，以适应可能改变的容器大小
-    setTimeout(() => {
-      const editor = this.editors.get(tabId);
-      if (editor) {
-        editor.layout(); // 重新布局编辑器
-      }
-    }, 100);
+  // 导航到上一题或下一题
+  private navigateProblem(direction: -1 | 1): void {
+    if (!this.currentProblemId) return;
 
-    this.updateTitle(); // 更新窗口标题
+    const currentIndex = this.problems.findIndex(p => p.id === this.currentProblemId);
+    if (currentIndex === -1) return;
+
+    const newIndex = currentIndex + direction;
+
+    if (newIndex >= 0 && newIndex < this.problems.length) {
+      this.switchToProblem(this.problems[newIndex].id);
+    }
   }
-  // 执行当前激活标签页中的代码
+
+  // 更新上一题/下一题按钮的状态
+  private updateNavigationButtons(): void {
+    const prevBtn = document.getElementById('prevProblemBtn') as HTMLButtonElement;
+    const nextBtn = document.getElementById('nextProblemBtn') as HTMLButtonElement;
+
+    if (!prevBtn || !nextBtn || !this.currentProblemId) return;
+
+    const currentIndex = this.problems.findIndex(p => p.id === this.currentProblemId);
+
+    prevBtn.disabled = currentIndex === 0;
+    nextBtn.disabled = currentIndex === this.problems.length - 1;
+  }
+
+  // 执行当前激活问题中的代码
   private async executeCode(): Promise<void> {
-    const editor = this.editors.get(this.activeTabId);  // 获取当前激活标签页的编辑器实例
-    if (!editor) return;  // 如果编辑器不存在则返回
+    if (!this.editor || !this.currentProblemId) return;
 
-    const code = editor.getValue();  // 获取编辑器中的代码
-    this.clearOutput(this.activeTabId);   // 清空当前标签页的输出
-    await this.executeCodeSafely(this.activeTabId, code);  // 安全地执行代码
+    const code = this.editor.getValue();  // 获取编辑器中的代码
+    this.clearOutput();   // 清空当前问题的输出
+    await this.executeCodeSafely(this.currentProblemId, code);  // 安全地执行代码
   }
-  // 向指定标签页的输出面板追加内容
-  private appendOutput(tabId: string, type: string, text: string, timestamp: Date): void {
-    const outputContainer = document.querySelector(`[data-tab-id="${tabId}"].output-container`) as HTMLElement;  // 获取输出容器
+
+  // 向输出面板追加内容
+  private appendOutput(type: string, text: string): void {
+    const outputContainer = document.querySelector('.output-container') as HTMLElement;  // 获取输出容器
     if (!outputContainer) return;   // 如果容器不存在则返回
 
     const outputLine = document.createElement('div');  // 创建新的 div 元素作为输出行
@@ -426,85 +562,86 @@ class DSALabApp {
     outputLine.innerHTML = text.replace(/\n/g, '<br>'); // 将换行符转换为 <br> 标签以保留格式
     outputContainer.appendChild(outputLine);  // 将输出行添加到容器中
     outputContainer.scrollTop = outputContainer.scrollHeight;  // 滚动到最新输出
+
+    // 同时更新工作区数据
+    if (this.currentProblemId) {
+      const problemData = this.problemWorkspaceData.get(this.currentProblemId);
+      if (problemData) {
+        problemData.output = outputContainer.innerHTML; // 保存完整的HTML内容
+      }
+    }
   }
-  // 清空指定标签页（或当前激活标签页）的输出面板
-  private clearOutput(tabId?: string): void {
-    const targetTabId = tabId || this.activeTabId;  // 确定目标标签页ID
-    const outputContainer = document.querySelector(`[data-tab-id="${targetTabId}"].output-container`) as HTMLElement;  // 获取输出容器
+
+  // 清空当前问题的输出面板
+  private clearOutput(): void {
+    const outputContainer = document.querySelector('.output-container') as HTMLElement;  // 获取输出容器
     if (outputContainer) {
       outputContainer.innerHTML = '';  // 清空容器内容
     }
-  }
-
-
-  private updateTabTitle(tabId: string): void {
-    const tabData = this.tabData.get(tabId);
-    if (!tabData) return;
-
-    const tabElement = document.querySelector(`[data-tab-id="${tabId}"] .tab-title`) as HTMLElement;
-    if (tabElement) {
-      tabElement.textContent = tabData.title + (tabData.isDirty ? ' •' : '');
-    }
-
-    if (tabId === this.activeTabId) {
-      this.updateTitle();
+    // 同时更新工作区数据
+    if (this.currentProblemId) {
+      const problemData = this.problemWorkspaceData.get(this.currentProblemId);
+      if (problemData) {
+        problemData.output = '';
+      }
     }
   }
 
+  // 更新窗口标题
   private updateTitle(): void {
-    const tabData = this.tabData.get(this.activeTabId);
-    if (tabData) {
-      const title = `${tabData.title}${tabData.isDirty ? ' •' : ''} - DSALab`;
+    if (!this.currentProblemId) {
+      document.title = 'DSALab';
+      return;
+    }
+    const problem = this.problems.find(p => p.id === this.currentProblemId);
+    const problemData = this.problemWorkspaceData.get(this.currentProblemId);
+
+    if (problem && problemData) {
+      const title = `${problem.shortDescription}${problemData.isDirty ? ' •' : ''} - DSALab`;
       document.title = title;
+    } else {
+      document.title = 'DSALab';
     }
   }
 
-
-
-  private async executeCodeSafely(tabId: string, code: string): Promise<void> {
-    const outputContainer = document.querySelector(`[data-tab-id="${tabId}"].output-container`) as HTMLElement;
-    if (!outputContainer) return;
-
-    // Clear previous output
-    this.clearOutput(tabId);
-    this.appendOutput(tabId, 'info', '正在编译并运行C++代码...', new Date());
+  private async executeCodeSafely(problemId: string, code: string): Promise<void> {
+    // Clear previous output is already called by executeCode()
+    this.appendOutput('info', '正在编译并运行C++代码...');
 
     try {
       // Call main process to compile and run C++
       const result = await window.electron.compileAndRunCpp(code, this.EXECUTION_TIMEOUT);
 
       if (result.error) {
-        this.appendFriendlyError(tabId, new Error(result.error));
+        this.appendFriendlyError(new Error(result.error));
       }
       if (result.output) {
-        this.clearOutput(tabId);
-        this.appendOutput(tabId, 'info', '运行结果：', new Date());
-        this.appendOutput(tabId, 'log', result.output, new Date());
+        // Only clear the "正在编译并运行C++代码..." message if there's actual output
+        const outputContainer = document.querySelector('.output-container') as HTMLElement;
+        if (outputContainer && outputContainer.lastElementChild?.textContent?.includes('正在编译并运行C++代码...')) {
+          outputContainer.removeChild(outputContainer.lastElementChild);
+        }
+        this.appendOutput('info', '运行结果：');
+        this.appendOutput('log', result.output);
       }
       if (result.success && !result.error && !result.output) {
-        this.appendOutput(tabId, 'result', '代码执行完成，无输出。', new Date());
+        // Only append if no error and no output
+        this.appendOutput('result', '代码执行完成，无输出。');
       }
       
     } catch (error: any) {
-      this.appendFriendlyError(tabId, error);
+      this.appendFriendlyError(error);
     }
   }
 
-  private appendSecurityError(tabId: string, message: string): void {
-    const outputContainer = document.querySelector(`[data-tab-id="${tabId}"].output-container`) as HTMLElement;
+  private appendFriendlyError(error: Error): void {
+    const outputContainer = document.querySelector('.output-container') as HTMLElement;
     if (!outputContainer) return;
 
-    const errorLine = document.createElement('div');
-    errorLine.className = 'output-security-error';
-    
-    errorLine.innerHTML = `🛡️ ${message}`;
-    outputContainer.appendChild(errorLine);
-    outputContainer.scrollTop = outputContainer.scrollHeight;
-  }
-
-  private appendFriendlyError(tabId: string, error: Error): void {
-    const outputContainer = document.querySelector(`[data-tab-id="${tabId}"].output-container`) as HTMLElement;
-    if (!outputContainer) return;
+    // Clear "正在编译并运行C++代码..." if it's the last message
+    if (outputContainer.lastElementChild?.textContent?.includes('正在编译并运行C++代码...')) {
+      outputContainer.removeChild(outputContainer.lastElementChild);
+    }
 
     const errorLine = document.createElement('div');
     errorLine.className = 'output-error-friendly';
@@ -527,67 +664,124 @@ class DSALabApp {
     errorLine.innerHTML = friendlyMessage;
     outputContainer.appendChild(errorLine);
     outputContainer.scrollTop = outputContainer.scrollHeight;
+
+    // 同时更新工作区数据
+    if (this.currentProblemId) {
+      const problemData = this.problemWorkspaceData.get(this.currentProblemId);
+      if (problemData) {
+        problemData.output = outputContainer.innerHTML;
+      }
+    }
   }
 
-
-
+  // 国际化翻译函数
   private t(key: string): string {
     const lang = this.settings.language as 'en' | 'zh';
     return this.translations[lang][key as keyof typeof this.translations.en] || key;
   }
 
+  // 切换录音状态
+  private async toggleRecordAudio(): Promise<void> {
+    const recordBtn = document.getElementById('recordAudioBtn') as HTMLButtonElement;
+    const playBtn = document.getElementById('playAudioBtn') as HTMLButtonElement;
+    const audioPlayback = document.getElementById('audioPlayback') as HTMLAudioElement;
 
-  
+    if (!recordBtn || !playBtn || !audioPlayback) return;
 
-  
+    if (!this.isRecording) {
+      // Start recording
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        this.mediaRecorder = new MediaRecorder(stream);
+        this.audioChunks = [];
 
-  
+        this.mediaRecorder.ondataavailable = (event) => {
+          this.audioChunks.push(event.data);
+        };
+
+        this.mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+          if (this.audioBlobUrl) {
+            URL.revokeObjectURL(this.audioBlobUrl); // Revoke previous URL to prevent memory leaks
+          }
+          this.audioBlobUrl = URL.createObjectURL(audioBlob);
+          audioPlayback.src = this.audioBlobUrl;
+          playBtn.disabled = false;
+          audioPlayback.style.display = 'block';
+
+          // Save to current problem's workspace
+          if (this.currentProblemId) {
+            const problemData = this.problemWorkspaceData.get(this.currentProblemId);
+            if (problemData) {
+              problemData.audioBlob = audioBlob;
+              problemData.audioUrl = this.audioBlobUrl;
+            }
+          }
+        };
+
+        this.mediaRecorder.start();
+        this.isRecording = true;
+        recordBtn.innerHTML = `<i class="fas fa-stop"></i> 停止`;
+        recordBtn.classList.add('recording'); // Add a class for visual feedback
+        playBtn.disabled = true; // Disable play during recording
+        audioPlayback.style.display = 'none'; // Hide audio player during recording
+        audioPlayback.src = ''; // Clear source
+        this.appendOutput('info', '开始录制音频...');
+      } catch (err) {
+        console.error('无法访问麦克风:', err);
+        this.appendOutput('error', `无法录制音频: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    } else {
+      // Stop recording
+      this.mediaRecorder?.stop();
+      this.mediaRecorder?.stream.getTracks().forEach(track => track.stop()); // Stop microphone access
+      this.isRecording = false;
+      recordBtn.innerHTML = `<i class="fas fa-microphone"></i> 录制`;
+      recordBtn.classList.remove('recording');
+      this.appendOutput('info', '录制结束。');
+    }
+  }
+
+  // 播放录音
+  private playAudio(): void {
+    const audioPlayback = document.getElementById('audioPlayback') as HTMLAudioElement;
+    if (audioPlayback && audioPlayback.src) {
+      audioPlayback.play().catch(e => console.error('播放音频失败:', e));
+    }
+  }
+
+  // 更新音频面板的UI状态
+  private updateAudioPanel(audioBlob: Blob | null, audioUrl: string | null): void {
+    const playBtn = document.getElementById('playAudioBtn') as HTMLButtonElement;
+    const audioPlayback = document.getElementById('audioPlayback') as HTMLAudioElement;
+    const recordBtn = document.getElementById('recordAudioBtn') as HTMLButtonElement;
+
+    if (!playBtn || !audioPlayback || !recordBtn) return;
+
+    if (audioBlob && audioUrl) {
+      audioPlayback.src = audioUrl;
+      playBtn.disabled = false;
+      audioPlayback.style.display = 'block';
+    } else {
+      audioPlayback.src = '';
+      playBtn.disabled = true;
+      audioPlayback.style.display = 'none';
+    }
+
+    // Reset recording button state
+    this.isRecording = false;
+    recordBtn.innerHTML = `<i class="fas fa-microphone"></i> 录制`;
+    recordBtn.classList.remove('recording');
+  }
+
   private getWelcomeCode(): string {
     return `// 欢迎来到 DSALab! 🚀
 
 #include <iostream>
-#include <vector>
 #include <string>
 
 int main() {
-    // 基本 C++ 示例
     std::cout << "Hello DSALab!" << std::endl;
-
-    // 变量和数据类型
-    int age = 20;
-    std::string name = "张三";
-    bool isStudent = true;
-
-    std::cout << "姓名: " << name << std::endl;
-    std::cout << "年龄: " << age << std::endl;
-    std::cout << "是否学生: " << (isStudent ? "是" : "否") << std::endl;
-
-    // 循环
-    std::cout << "从 1 到 5 的数字:" << std::endl;
-    for (int i = 1; i <= 5; ++i) {
-        std::cout << i << " ";
-    }
-    std::cout << std::endl;
-
-    // 向量 (动态数组)
-    std::vector<int> numbers = {10, 20, 30, 40, 50};
-    std::cout << "向量元素:" << std::endl;
-    for (int num : numbers) {
-        std::cout << num << " ";
-    }
-    std::cout << std::endl;
-
-    // 函数示例
-    auto add = [](int a, int b) {
-        return a + b;
-    };
-    std::cout << "10 + 20 = " << add(10, 20) << std::endl;
-
-    // 按 Ctrl/Cmd + R 手动执行！
-    // 按 Ctrl/Cmd + T 新建标签页！
-    // 按 Ctrl/Cmd + S 保存！
-    // 按 Ctrl/Cmd + , 打开设置！
-
     return 0;
 }
 `;
