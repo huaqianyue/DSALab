@@ -634,3 +634,71 @@
       pointer-events: auto; /* Enable when active (though it's activated by problem item click) */
       opacity: 1; /* Full opacity when active */
   }
+  /* ... 现有样式 ... */
+
+/* Terminal Input Area */
+.terminal-input-area {
+  display: flex;
+  align-items: center;
+  padding: 5px;
+  background-color: #1e1e1e; /* 匹配深色背景 */
+  border-top: 1px solid #333;
+  color: #e6edf3;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 14px;
+}
+
+.terminal-input-area .prompt {
+  color: #79c0ff; /* 蓝色提示符 */
+  margin-right: 5px;
+}
+
+.terminal-input {
+  flex-grow: 1;
+  background-color: transparent;
+  border: none;
+  outline: none;
+  color: #e6edf3; /* 默认文本颜色 */
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 14px;
+  padding: 2px 0;
+}
+
+.terminal-input:focus {
+  border: none;
+  outline: none;
+}
+
+.terminal-input:disabled {
+  color: #6e7681; /* 禁用时的文本颜色 */
+  cursor: not-allowed;
+}
+
+/* Output types for styling */
+.output-info { color: #79c0ff; } /* Light blue for info messages */
+.output-log { color: #e6edf3; } /* Default text color for program output */
+.output-error { color: #ff7b72; } /* Red for error messages */
+.output-error-friendly { color: #ff7b72; font-weight: bold; } /* Red, bold for friendly error messages */
+.output-result { color: #7ee787; } /* Green for success/result messages */
+.output-user-input { color: #a5d6ff; } /* Lighter blue for user input */
+
+/* Make sure output container can scroll */
+.output-container {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 10px;
+  background-color: #0d1117; /* Match editor background */
+  color: #e6edf3;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 14px;
+  white-space: pre-wrap; /* Preserve whitespace and wrap text */
+  word-wrap: break-word; /* Break long words */
+}
+
+/* Adjust .test-output-area .panel-content to use flexbox */
+.test-output-area .panel-content {
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 40px); /* Adjust based on panel-header height */
+  overflow: hidden; /* Prevent internal scrollbars from messing up layout */
+}

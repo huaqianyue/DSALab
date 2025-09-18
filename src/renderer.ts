@@ -33,6 +33,16 @@ declare global {
        * @returns 一个 Promise，包含保存文件的路径，如果用户取消则返回 null。
        */
       showSaveDialog: (currentFilePath: string | null, defaultFileName: string, content: string) => Promise<string | null>;
+      /**
+       * 监听主进程发送的C++程序输出块。
+       * @param callback 接收输出块的回调函数。
+       */
+      onCppOutputChunk: (callback: (chunk: { type: string; data: string }) => void) => void;
+      /**
+       * 向主进程发送用户输入。
+       * @param input 用户输入的字符串。
+       */
+      sendUserInput: (input: string) => void;
     };
   }
 }
@@ -200,6 +210,10 @@ class DSALabApp {
   private audioBlobUrl: string | null = null;
   private isRecording: boolean = false;
 
+  // New: Terminal input properties
+  private terminalInput: HTMLInputElement | null = null;
+  private isProgramRunning: boolean = false; // 跟踪程序是否正在运行
+
 
   // 构造函数，应用程序初始化时调用
   constructor() {
@@ -207,6 +221,8 @@ class DSALabApp {
     this.createEditor(); // 创建单个编辑器实例
     this.fetchProblemsAndInitializeUI();  // 获取问题并初始化UI
     this.setupEventListeners();  // 设置DOM事件监听器
+    this.setupTerminalInput(); // 新增：设置终端输入
+    this.setupIpcListeners(); // 新增：设置IPC监听器
   }
 
   // 初始化 Monaco Editor 的自定义主题
@@ -513,7 +529,28 @@ class DSALabApp {
     document.getElementById('playAudioBtn')?.addEventListener('click', () => this.playAudio());
   }
 
+  // 新增：设置终端输入框的事件监听
+  private setupTerminalInput(): void {
+    this.terminalInput = document.getElementById('terminalInput') as HTMLInputElement;
+    if (this.terminalInput) {
+      this.terminalInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && this.isProgramRunning) {
+          const input = this.terminalInput!.value;
+          this.appendOutput('user-input', `$&gt; ${input}`); // 在终端显示用户输入
+          window.electron.sendUserInput(input); // 发送输入到主进程
+          this.terminalInput!.value = ''; // 清空输入框
+          event.preventDefault(); // 阻止默认的回车行为（如表单提交）
+        }
+      });
+    }
+  }
 
+  // 新增：设置IPC监听器，接收主进程的实时输出
+  private setupIpcListeners(): void {
+    window.electron.onCppOutputChunk((chunk) => {
+      this.appendOutput(chunk.type, chunk.data);
+    });
+  }
 
   // 导航到上一题或下一题
   private navigateProblem(direction: -1 | 1): void {
@@ -557,9 +594,10 @@ class DSALabApp {
     if (!outputContainer) return;   // 如果容器不存在则返回
 
     const outputLine = document.createElement('div');  // 创建新的 div 元素作为输出行
-    outputLine.className = `output-${type}`;  // 添加对应类型的类名 (如 output-info, output-log, output-error)
+    outputLine.className = `output-${type}`;  // 添加对应类型的类名 (如 output-info, output-log, output-error, output-user-input)
     
-    outputLine.innerHTML = text.replace(/\n/g, '<br>'); // 将换行符转换为 <br> 标签以保留格式
+    // 对于用户输入，直接显示文本；对于其他类型，将换行符转换为 <br> 标签以保留格式
+    outputLine.innerHTML = type === 'user-input' ? text : text.replace(/\n/g, '<br>');
     outputContainer.appendChild(outputLine);  // 将输出行添加到容器中
     outputContainer.scrollTop = outputContainer.scrollHeight;  // 滚动到最新输出
 
@@ -577,6 +615,9 @@ class DSALabApp {
     const outputContainer = document.querySelector('.output-container') as HTMLElement;  // 获取输出容器
     if (outputContainer) {
       outputContainer.innerHTML = '';  // 清空容器内容
+    }
+    if (this.terminalInput) {
+      this.terminalInput.value = ''; // 清空输入框内容
     }
     // 同时更新工作区数据
     if (this.currentProblemId) {
@@ -605,32 +646,35 @@ class DSALabApp {
   }
 
   private async executeCodeSafely(problemId: string, code: string): Promise<void> {
-    // Clear previous output is already called by executeCode()
-    this.appendOutput('info', '正在编译并运行C++代码...');
+    // 启动程序前，设置程序运行状态，并启用输入框
+    this.isProgramRunning = true;
+    if (this.terminalInput) {
+      this.terminalInput.disabled = false;
+      this.terminalInput.focus(); // 自动聚焦到输入框
+    }
 
     try {
-      // Call main process to compile and run C++
+      // 调用主进程编译并运行 C++ 代码。
+      // 主进程会通过 'cpp-output-chunk' IPC 通道实时发送输出和错误。
+      // 此处的 await 仅等待整个 C++ 程序的生命周期结束（包括编译和执行）。
       const result = await window.electron.compileAndRunCpp(code, this.EXECUTION_TIMEOUT);
 
-      if (result.error) {
-        this.appendFriendlyError(new Error(result.error));
-      }
-      if (result.output) {
-        // Only clear the "正在编译并运行C++代码..." message if there's actual output
-        const outputContainer = document.querySelector('.output-container') as HTMLElement;
-        if (outputContainer && outputContainer.lastElementChild?.textContent?.includes('正在编译并运行C++代码...')) {
-          outputContainer.removeChild(outputContainer.lastElementChild);
-        }
-        this.appendOutput('info', '运行结果：');
-        this.appendOutput('log', result.output);
-      }
-      if (result.success && !result.error && !result.output) {
-        // Only append if no error and no output
-        this.appendOutput('result', '代码执行完成，无输出。');
+      // 程序执行结束后，根据最终结果更新状态
+      if (!result.success && !result.error && !result.output) {
+          // 如果主进程没有发送任何特殊的结束消息，这里可以添加一个通用结束提示
+          // 但通常主进程会发送错误或成功消息
       }
       
     } catch (error: any) {
+      // 捕获 IPC 调用本身的错误，而不是C++程序内部的错误
       this.appendFriendlyError(error);
+    } finally {
+      // 程序执行结束（无论成功失败或超时），禁用输入框
+      this.isProgramRunning = false;
+      if (this.terminalInput) {
+        this.terminalInput.disabled = true;
+        this.terminalInput.value = ''; // 清空输入框中可能残留的文本
+      }
     }
   }
 
@@ -638,7 +682,8 @@ class DSALabApp {
     const outputContainer = document.querySelector('.output-container') as HTMLElement;
     if (!outputContainer) return;
 
-    // Clear "正在编译并运行C++代码..." if it's the last message
+    // 清除 "正在编译并运行C++代码..." 如果它是最后一条消息
+    // （在实时输出模式下，这条可能由主进程发送，但为了健壮性保留）
     if (outputContainer.lastElementChild?.textContent?.includes('正在编译并运行C++代码...')) {
       outputContainer.removeChild(outputContainer.lastElementChild);
     }
@@ -782,6 +827,11 @@ class DSALabApp {
 
 int main() {
     std::cout << "Hello DSALab!" << std::endl;
+    std::cout << "请输入你的名字: ";
+    std::string name;
+    std::cin >> name;
+    std::cout << "你好, " << name << "!" << std::endl;
+    std::cout << "再见!" << std::endl;
     return 0;
 }
 `;
