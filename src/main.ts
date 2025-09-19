@@ -577,7 +577,7 @@ const LOCAL_PROBLEMS_JSON_PATH = path.join(app.getPath('userData'), 'DSALab', 'p
 // 定义用户工作区根目录的路径
 const USER_WORKSPACES_ROOT = path.join(app.getPath('documents'), 'DSALab Workspaces');
 // CDN 上的原始 problems.json URL
-const CDN_PROBLEMS_URL = 'https://cdn.jsdmirror.cn/gh/huaqianyue/DSALab@main/problem.json';
+const CDN_PROBLEMS_URL = 'https://cdn.jsdelivr.net/gh/huaqianyue/DSALab@refs/heads/main/problem.json';
 
 interface Problem {
   id: string;
