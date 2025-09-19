@@ -63,7 +63,7 @@
   }
   
   /* 对应 HTML: <input type="text" id="userNameInput" class="user-input">, <input type="text" id="studentIdInput" class="user-input"> */
-  .global-header-bar .user-info .user-input {
+  .global-header-bar .user-info .userNameInput {
     background: #21262d;
     border: 1px solid #30363d;
     border-radius: 4px;
@@ -71,6 +71,16 @@
     padding: 4px 8px;
     font-size: 12px;
     width: 80px; /* 适当宽度 */
+    transition: border-color 0.2s ease;
+  }
+  .global-header-bar .user-info .studentIdInput {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    color: #e6edf3;
+    padding: 4px 8px;
+    font-size: 12px;
+    width: 120px; /* 适当宽度 */
     transition: border-color 0.2s ease;
   }
   

@@ -22,7 +22,7 @@
     "lint:fix": "eslint --ext .ts,.tsx . --fix",
     "clean": "rm -rf out dist .vite"
   },
-  "keywords": [ 
+  "keywords": [
     "cpp",
     "c++",
     "dsa",
@@ -35,7 +35,7 @@
     "education",
     "open-source"
   ],
-  "author": { 
+  "author": {
     "name": "Wang Xingyu",
     "email": "WMX_0121@outlook.com"
   },
@@ -51,6 +51,7 @@
     "@electron-forge/plugin-fuses": "^7.8.3",
     "@electron-forge/plugin-vite": "^7.8.3",
     "@electron/fuses": "^1.8.0",
+    "@types/archiver": "^6.0.3",
     "@types/electron-squirrel-startup": "^1.0.2",
     "@types/xterm": "^2.0.3",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
@@ -66,6 +67,7 @@
     "@ant-design/icons": "^6.0.1",
     "@monaco-editor/react": "^4.7.0",
     "antd": "^5.27.3",
+    "archiver": "^7.0.1",
     "electron-squirrel-startup": "^1.0.1",
     "monaco-editor": "^0.52.2",
     "vite-plugin-monaco-editor": "^1.1.0",
