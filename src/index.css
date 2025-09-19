@@ -9,7 +9,7 @@
   }
   
   body {
-    font-family: -apple-system, BlinkMacMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     background: #000000;
     color: #e6edf3;
     overflow: hidden; /* 防止整体滚动，由内部面板处理 */
@@ -49,7 +49,7 @@
   
   /* 调整 header-left 的 gap，因为 user-info 现在是其一部分 */
   .global-header-bar .header-left {
-    gap: 12px; /* 保持 user-info 和按钮之间的间距 */
+    gap: 8px; /* 按钮之间更紧凑的间距 */
   }
 
   /* 对应 HTML: <div class="user-info"> */
@@ -93,26 +93,35 @@
     border-color: #1f6feb;
   }
   
-  /* 对应 HTML: <button class="header-btn"> */
-  .global-header-bar .header-btn {
-    background: transparent;
-    border: none;
-    color: #7d8590;
-    font-size: 18px; /* 图标大小 */
-    cursor: pointer;
-    padding: 6px;
-    border-radius: 44px;
-    transition: all 0.2s ease;
-    -webkit-app-region: no-drag; /* 按钮不应拖动窗口 */
-  }
+  /* 移除 .global-header-bar .header-btn 的通用样式，现在由 .action-button 和 .btn-audio 处理 */
+  /* .global-header-bar .header-btn { ... } */
+  /* .global-header-bar .header-btn:hover { ... } */
   
-  .global-header-bar .header-btn:hover {
+  /* 新增：通用动作按钮样式 (用于刷新、导入、保存、导出、清空、运行) */
+  .action-button {
     background: #21262d;
+    border: 1px solid #30363d;
+    color: #e6edf3; /* Default text/icon color for action buttons */
+    padding: 6px 10px;
+    border-radius: 3px; /* Square corners */
+    font-size: 14px; /* Text font size */
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    -webkit-app-region: no-drag; /* Important for Electron */
+  }
+
+  .action-button:hover {
+    background: #30363d;
+    border-color: #444c56;
     color: #e6edf3;
   }
-  
+
   /* 禁用按钮样式 (通用) */
-  .global-header-bar .header-btn:disabled,
+  /* .global-header-bar .header-btn:disabled, */ /* 移除，由 .action-button:disabled 覆盖 */
+  .action-button:disabled,
   .btn-audio:disabled { /* 扩展到新的音频按钮 */
     color: #444c56; /* 更暗的颜色 */
     cursor: not-allowed;
@@ -120,7 +129,8 @@
     border-color: transparent; /* 禁用时边框也透明 */
   }
   
-  .global-header-bar .header-btn:disabled:hover,
+  /* .global-header-bar .header-btn:disabled:hover, */ /* 移除，由 .action-button:disabled:hover 覆盖 */
+  .action-button:disabled:hover,
   .btn-audio:disabled:hover { /* 扩展到新的音频按钮 */
     background: transparent;
     border-color: transparent;
@@ -484,22 +494,16 @@
     min-width: 350px; /* 最小宽度 */
   }
   
-  /* 对应 HTML: <button id="runBtn" class="header-btn run-btn"> */
+  /* 运行按钮的特定样式，基于 .action-button */
   .run-btn {
-    color: #4ec9b0;
-    background: #21262d; /* 添加背景色，使其更像一个按钮 */
-    border: 1px solid #30363d;
-    padding: 6px 10px; /* 调整内边距 */
-    font-size: 14px; /* 调整字体大小 */
-    display: flex; /* 让图标和文字横向排列 */
-    align-items: center;
-    gap: 6px; /* 图标和文字间距 */
+    color: #4ec9b0; /* 运行按钮的绿色文本/图标 */
+    /* 继承 background, border, padding, font-size, display, align-items, gap, border-radius from .action-button */
   }
   
   .run-btn:hover {
-    background: #0e4f3c;
-    color: #4ec9b0;
-    border-color: #4ec9b0;
+    background: #0e4f3c; /* 运行按钮悬停时的深绿色背景 */
+    border-color: #4ec9b0; /* 运行按钮悬停时的绿色边框 */
+    color: #4ec9b0; /* 运行按钮悬停时保持绿色文本/图标 */
   }
   
   /* ==========================================================================
@@ -548,24 +552,8 @@
     min-height: 150px; /* 最小高度，用于拖动 */
   }
   
-  /* 对应 HTML: <button id="clearOutputBtn" class="clear-output-btn"> */
-  .clear-output-btn {
-    
-    background: transparent;
-    border-radius: 3px;
-    color: #e6edf3;
-    border: 1px solid #30363d;
-    padding: 6px 10px; /* 调整内边距 */
-    font-size: 14px; /* 调整字体大小 */
-    display: flex; /* 让图标和文字横向排列 */
-    align-items: center;
-    gap: 6px; /* 图标和文字间距 */
-  }
-  
-  .clear-output-btn:hover {
-    background: #21262d;
-    color: #e6edf3;
-  }
+  /* 清空输出按钮现在使用 .action-button 样式 */
+  /* .clear-output-btn { ... } */
   
   /* 对应 HTML: <div class="test-output-area"> <div class="panel-content"> */
   .test-output-area .panel-content {
@@ -597,7 +585,8 @@
   .problem-list-content::-webkit-scrollbar, /* 新增 */
   .problem-description-content::-webkit-scrollbar, /* 新增 */
   .audio-panel .panel-content::-webkit-scrollbar,
-  .test-output-area .panel-content::-webkit-scrollbar {
+  .test-output-area .panel-content::-webkit-scrollbar,
+  .export-problem-list-container::-webkit-scrollbar { /* 新增导出列表滚动条 */
     width: 8px;
   }
   
@@ -605,7 +594,8 @@
   .problem-list-content::-webkit-scrollbar-track, /* 新增 */
   .problem-description-content::-webkit-scrollbar-track, /* 新增 */
   .audio-panel .panel-content::-webkit-scrollbar-track,
-  .test-output-area .panel-content::-webkit-scrollbar-track {
+  .test-output-area .panel-content::-webkit-scrollbar-track,
+  .export-problem-list-container::-webkit-scrollbar-track { /* 新增导出列表滚动条 */
     background: #0d1117;
   }
   
@@ -613,7 +603,8 @@
   .problem-list-content::-webkit-scrollbar-thumb, /* 新增 */
   .problem-description-content::-webkit-scrollbar-thumb, /* 新增 */
   .audio-panel .panel-content::-webkit-scrollbar-thumb,
-  .test-output-area .panel-content::-webkit-scrollbar-thumb {
+  .test-output-area .panel-content::-webkit-scrollbar-thumb,
+  .export-problem-list-container::-webkit-scrollbar-thumb { /* 新增导出列表滚动条 */
     background: #21262d;
     border-radius: 4px;
   }
@@ -622,7 +613,8 @@
   .problem-list-content::-webkit-scrollbar-thumb:hover, /* 新增 */
   .problem-description-content::-webkit-scrollbar-thumb:hover, /* 新增 */
   .audio-panel .panel-content::-webkit-scrollbar-thumb:hover,
-  .test-output-area .panel-content::-webkit-scrollbar-thumb:hover {
+  .test-output-area .panel-content::-webkit-scrollbar-thumb:hover,
+  .export-problem-list-container::-webkit-scrollbar-thumb:hover { /* 新增导出列表滚动条 */
     background: #30363d;
   }
   
@@ -647,22 +639,19 @@
   }
   
   /* 为全局顶部栏按钮和输入框调整工具提示位置 */
-  .global-header-bar .header-btn[data-tooltip]:hover::after,
+  /* 现在这些按钮都使用 .action-button 或 .btn-audio */
+  .action-button[data-tooltip]:hover::after,
   .global-header-bar .user-input[data-tooltip]:hover::after,
   .btn-audio[data-tooltip]:hover::after,
-  .run-btn[data-tooltip]:hover::after,
-  .clear-output-btn[data-tooltip]:hover::after, /* 添加 clear-output-btn */
   .problem-item .problem-icon[data-tooltip]:hover::after { /* 新增图标的tooltip */
     top: calc(100% + 8px); /* 位于按钮下方 */
     left: 50%;
     transform: translateX(-50%);
   }
   
-  .global-header-bar .header-btn[data-tooltip]:hover::before,
+  .action-button[data-tooltip]:hover::before,
   .global-header-bar .user-input[data-tooltip]:hover::before,
   .btn-audio[data-tooltip]:hover::before,
-  .run-btn[data-tooltip]:hover::before,
-  .clear-output-btn[data-tooltip]:hover::before, /* 添加 clear-output-btn */
   .problem-item .problem-icon[data-tooltip]:hover::before { /* 新增图标的tooltip */
     content: '';
     position: absolute;
@@ -788,4 +777,158 @@
   flex-grow: 1;
   flex-shrink: 1;
   min-height: 100px; /* Ensure a minimum height for scrolling content */
+}
+
+/* Modal styles */
+.modal {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-content {
+  background-color: #1e1e1e;
+  margin: auto;
+  padding: 0;
+  border: 1px solid #333;
+  border-radius: 8px;
+  width: 80%;
+  max-width: 600px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh; /* Limit modal height */
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #333;
+  color: #e6edf3;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.close-button {
+  color: #aaa;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.close-button:hover,
+.close-button:focus {
+  color: #e6edf3;
+  text-decoration: none;
+}
+
+.modal-body {
+  padding: 20px;
+  flex-grow: 1;
+  overflow-y: auto; /* Allow body to scroll */
+  color: #e6edf3;
+  font-size: 14px;
+}
+
+.modal-body p {
+  margin-bottom: 15px;
+}
+
+.export-problem-list-container {
+  max-height: 300px; /* Fixed height for the scrollable list */
+  overflow-y: auto;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 5px;
+  background-color: #0d1117;
+}
+
+#exportProblemList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.export-problem-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid #21262d;
+}
+
+.export-problem-item:last-child {
+  border-bottom: none;
+}
+
+.export-problem-item label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  flex-grow: 1;
+  color: #e6edf3;
+}
+
+.export-problem-item input[type="checkbox"] {
+  margin-right: 10px;
+  width: 16px;
+  height: 16px;
+  accent-color: #1f6feb; /* Highlight color for checkbox */
+}
+
+.export-problem-item.active-problem {
+  background-color: #21262d;
+  border-radius: 4px;
+}
+
+.export-problem-item.disabled-problem {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.export-problem-item.disabled-problem label {
+  cursor: not-allowed;
+}
+
+.export-problem-item.disabled-problem input[type="checkbox"] {
+  cursor: not-allowed;
+}
+
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 15px 20px;
+  border-top: 1px solid #333;
+  gap: 10px;
+}
+
+.modal-footer .btn-audio {
+  padding: 8px 15px;
+}
+
+/* Loading spinner for buttons */
+.action-button.loading i.fas.fa-sync-alt {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }

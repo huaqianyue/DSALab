@@ -11,20 +11,30 @@
       <!-- 全局顶部导航栏 (Global Header Bar) -->
       <header class="global-header-bar">
         <div class="header-left">
-          <!-- 修改：学生信息改为可编辑输入框，横向排列，并移动到左侧 -->
-          <div class="user-info">
-            <input type="text" id="userNameInput" class="userNameInput" placeholder="输入姓名" data-tooltip="姓名">
-            <input type="text" id="studentIdInput" class="studentIdInput" placeholder="输入学号" data-tooltip="学号">
-          </div>
+          <!-- 新增：刷新、导入、保存按钮 -->
+          <button id="refreshBtn" class="action-button" data-tooltip="刷新题目列表">
+            <i class="fas fa-sync-alt"></i> 刷新
+          </button>
+          <button id="importBtn" class="action-button" data-tooltip="导入题目列表">
+            <i class="fas fa-file-import"></i> 导入
+          </button>
+          <button id="saveBtn" class="action-button" data-tooltip="保存当前题目 (Ctrl+S)">
+            <i class="fas fa-save"></i> 保存
+          </button>
+          <!-- 导出按钮 (移动到保存按钮之后) -->
+          <button id="exportBtn" class="action-button" data-tooltip="导出">
+            <i class="fas fa-download"></i> 导出
+          </button>
         </div>
         <div class="header-center">
           <!-- 运行按钮已移动到代码编辑器面板头部 -->
         </div>
         <div class="header-right">
-          <!-- 导出按钮 (在设置按钮之前) -->
-          <button id="exportBtn" class="header-btn" data-tooltip="导出">
-            <i class="fas fa-download"></i>
-          </button>
+          <!-- 修改：学生信息改为可编辑输入框，横向排列，并移动到右侧 -->
+          <div class="user-info">
+            <input type="text" id="userNameInput" class="userNameInput" placeholder="输入姓名" data-tooltip="姓名">
+            <input type="text" id="studentIdInput" class="studentIdInput" placeholder="输入学号" data-tooltip="学号">
+          </div>
         </div>
       </header>
 
@@ -90,7 +100,7 @@
             <div class="panel-actions">
               <!-- 修改：运行按钮移动到此处，并删除语言选择和默认模式 -->
                
-              <button id="runBtn" class="header-btn run-btn" data-tooltip="运行 (Ctrl+R)">
+              <button id="runBtn" class="action-button run-btn" data-tooltip="运行 (Ctrl+R)">
                 <i class="fas fa-play"></i> 运行
               </button>
             </div>
@@ -111,8 +121,8 @@
               <div class="panel-title">
                 <i class="fas fa-terminal"></i> 终端
               </div>
-              <button id="clearOutputBtn" class="clear-output-btn" data-tooltip="清空输出">
-                <i class="fas fa-trash"></i>清除
+              <button id="clearOutputBtn" class="action-button" data-tooltip="清空输出">
+                <i class="fas fa-trash"></i> 清除
               </button>
             </div>
             <div class="panel-content">
@@ -127,6 +137,28 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 导出题目弹窗 -->
+    <div id="exportModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>导出题目</h2>
+          <span class="close-button">&times;</span>
+        </div>
+        <div class="modal-body">
+          <p>请选择要导出的题目：</p>
+          <div class="export-problem-list-container">
+            <ul id="exportProblemList" class="problem-list">
+              <!-- 导出题目列表将由JS动态加载 -->
+            </ul>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="cancelExportBtn" class="btn-audio">取消</button>
+          <button id="confirmExportBtn" class="btn-audio">导出</button>
         </div>
       </div>
     </div>

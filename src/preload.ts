@@ -67,42 +67,46 @@ interface AppSettings {
   lastOpenedProblemId: string | null;
 }
 
+// 新增：Problem 接口 (保持与 main.ts 和 renderer.ts 一致)
+interface Problem {
+  id: string;
+  Title: string;
+  shortDescription: string;
+  fullDescription: string;
+  Audio: string; // 'audio.webm' if present, '' if not
+  Code: string;  // 'code.cpp' if present, '' if not
+}
+
 // ----------------------------------------------------
 // 修改：contextBridge.exposeInMainWorld
 // ----------------------------------------------------
 contextBridge.exposeInMainWorld('electron', {
-  compileAndRunCpp: (problemId: string, code: string, timeout: number) => ipcRenderer.invoke('compile-and-run-cpp', problemId, code, timeout), // Added problemId
-  showOpenDialog: () => ipcRenderer.invoke('show-open-dialog'),
+  compileAndRunCpp: (problemId: string, code: string, timeout: number) => ipcRenderer.invoke('compile-and-run-cpp', problemId, code, timeout),
+  showOpenDialog: (filters?: Electron.FileFilter[]) => ipcRenderer.invoke('show-open-dialog', filters), // Added filters parameter
   showSaveDialog: (currentFilePath: string | null, defaultFileName: string, content: string) => ipcRenderer.invoke('show-save-dialog', currentFilePath, defaultFileName, content),
   onCppOutputChunk: (callback: (chunk: { type: string; data: string }) => void) => {
     ipcRenderer.removeAllListeners('cpp-output-chunk');
     ipcRenderer.on('cpp-output-chunk', (_event, chunk) => callback(chunk));
   },
-  sendUserInput: (problemId: string, input: string) => { // Added problemId
+  sendUserInput: (problemId: string, input: string) => {
     ipcRenderer.send('send-user-input', problemId, input);
   },
 
   // --- 新增的持久化相关 IPC 方法 ---
   getProblemsFromLocal: () => ipcRenderer.invoke('get-problems-from-local'),
-  saveProblemsToLocal: (problems: any[]) => ipcRenderer.invoke('save-problems-to-local', problems),
+  saveProblemsToLocal: (problems: Problem[]) => ipcRenderer.invoke('save-problems-to-local', problems),
   readProblemCode: (problemId: string) => ipcRenderer.invoke('read-problem-code', problemId),
   readProblemAudio: (problemId: string) => ipcRenderer.invoke('read-problem-audio', problemId),
-  /**
-   * 保存指定问题的代码和音频文件。
-   * @param problemId 题目ID。
-   * @param codeContent 代码内容。
-   * @param audioData 音频数据（ArrayBuffer 或 null）。
-   * @returns Promise<boolean> 保存是否成功。
-   */
   saveProblemWorkspace: (problemId: string, codeContent: string, audioData: ArrayBuffer | null) => ipcRenderer.invoke('save-problem-workspace', problemId, codeContent, audioData),
-
   onBeforeQuit: (callback: () => Promise<void>) => {
     ipcRenderer.removeAllListeners('app-before-quit');
     ipcRenderer.on('app-before-quit', async (event) => {
-      await callback(); // 等待渲染进程完成保存
-      event.sender.send('app-quit-acknowledged'); // 通知主进程可以退出
+      await callback();
+      event.sender.send('app-quit-acknowledged');
     });
   },
+  // 新增：用于在渲染进程中发送 app-quit-acknowledged 消息
+  sendAppQuitAcknowledged: () => ipcRenderer.send('app-quit-acknowledged'),
 
   // --- 新增：历史记录 IPC 方法 ---
   recordHistoryEvent: (event: HistoryEvent) => ipcRenderer.send('record-history-event', event),
@@ -110,4 +114,13 @@ contextBridge.exposeInMainWorld('electron', {
   // --- 新增：应用设置 IPC 方法 ---
   loadAppSettings: (): Promise<AppSettings> => ipcRenderer.invoke('load-app-settings'),
   saveAppSettings: (settings: AppSettings): Promise<boolean> => ipcRenderer.invoke('save-app-settings', settings),
+
+  // --- 新增：刷新问题列表 IPC 方法 ---
+  refreshProblems: (): Promise<Problem[]> => ipcRenderer.invoke('refresh-problems'),
+
+  // --- 新增：导入问题列表 IPC 方法 ---
+  importProblems: (jsonContent: string): Promise<{ success: boolean; problems?: Problem[]; invalidCount?: number; error?: string }> => ipcRenderer.invoke('import-problems', jsonContent),
+
+  // --- 新增：导出问题到ZIP IPC 方法 ---
+  exportProblemsToZip: (problemIds: string[], defaultFileName: string) => ipcRenderer.invoke('export-problems-to-zip', problemIds, defaultFileName),
 });

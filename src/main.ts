@@ -3,9 +3,10 @@ import { app, BrowserWindow, Menu, ipcMain, dialog } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { exec, spawn, ChildProcessWithoutNullStreams } from 'node:child_process';
-import { promises as fs } from 'node:fs';
+import { promises as fs } from 'node:fs'; // 导入 promise-based fs
+import { createWriteStream } from 'node:fs'; // 专门导入 createWriteStream
 import { Buffer } from 'node:buffer';
-
+import archiver from 'archiver'; // 新增导入 archiver
 
 if (started) {
   app.quit();
@@ -528,14 +529,13 @@ ipcMain.on('send-user-input', (event, problemId: string, input: string) => { // 
 });
 
 // --- File Operations for renderer (using dialog) ---
-ipcMain.handle('show-open-dialog', async (event) => {
+ipcMain.handle('show-open-dialog', async (event, filters?: Electron.FileFilter[]) => { // 增加了 filters 参数
   const window = BrowserWindow.fromWebContents(event.sender);
   if (!window) return null;
 
   const result = await dialog.showOpenDialog(window, {
     properties: ['openFile'],
-    filters: [
-      { name: 'C++ Files', extensions: ['cpp', 'cxx', 'cc', 'c'] },
+    filters: filters || [
       { name: 'All Files', extensions: ['*'] }
     ]
   });
@@ -602,29 +602,32 @@ interface AppSettings {
  * 初始化或加载本地的 problems.json 文件。
  * 每次打开应用时，都从网络中加载json，并合并到本地的json中。
  * 处理新增、更新，并保留本地对 Audio 和 Code 路径的修改。
+ * @param forceRefresh 强制从CDN刷新，不读取本地文件
  */
-async function initializeLocalProblems(): Promise<Problem[]> {
+async function initializeLocalProblems(forceRefresh: boolean = false): Promise<Problem[]> {
   await fs.mkdir(path.dirname(LOCAL_PROBLEMS_JSON_PATH), { recursive: true });
   await fs.mkdir(USER_WORKSPACES_ROOT, { recursive: true });
 
   let localProblems: Problem[] = [];
   const localProblemsMap = new Map<string, Problem>();
 
-  // 1. 尝试加载本地的 problems.json
-  try {
-    const localProblemsContent = await fs.readFile(LOCAL_PROBLEMS_JSON_PATH, 'utf-8');
-    localProblems = JSON.parse(localProblemsContent);
-    localProblems.forEach(p => localProblemsMap.set(p.id, p));
-    console.log('Loaded existing local problems.');
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
-      console.log('Local problems.json not found, will create from CDN if available.');
-    } else {
-      console.error('Failed to read local problems.json:', error);
-      dialog.showErrorBox('加载题目失败', `无法读取本地题目列表文件。\n错误: ${error.message}`);
-      // 如果读取本地文件失败，但不是文件不存在，我们仍然尝试从 CDN 加载
+  // 1. 尝试加载本地的 problems.json (如果不是强制刷新)
+  if (!forceRefresh) {
+    try {
+      const localProblemsContent = await fs.readFile(LOCAL_PROBLEMS_JSON_PATH, 'utf-8');
+      localProblems = JSON.parse(localProblemsContent);
+      localProblems.forEach(p => localProblemsMap.set(p.id, p));
+      console.log('Loaded existing local problems.');
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        console.log('Local problems.json not found, will create from CDN if available.');
+      } else {
+        console.error('Failed to read local problems.json:', error);
+        dialog.showErrorBox('加载题目失败', `无法读取本地题目列表文件。\n错误: ${error.message}`);
+      }
     }
   }
+
 
   let cdnProblems: Problem[] = [];
   // 2. 始终尝试从 CDN 获取最新的 problems.json
@@ -700,6 +703,88 @@ async function initializeLocalProblems(): Promise<Problem[]> {
 ipcMain.handle('get-problems-from-local', async () => {
   return await initializeLocalProblems();
 });
+
+// IPC 处理：刷新问题列表 (强制从CDN刷新)
+ipcMain.handle('refresh-problems', async () => {
+  return await initializeLocalProblems(true); // 强制刷新
+});
+
+// Helper function to validate problem structure
+function isValidProblem(obj: any): obj is Problem {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    typeof obj.id === 'string' &&
+    typeof obj.Title === 'string' &&
+    typeof obj.shortDescription === 'string' &&
+    typeof obj.fullDescription === 'string' &&
+    typeof obj.Audio === 'string' &&
+    typeof obj.Code === 'string'
+  );
+}
+
+// IPC 处理：导入问题列表
+ipcMain.handle('import-problems', async (event, jsonContent: string) => {
+  try {
+    const importedRaw: any = JSON.parse(jsonContent);
+    if (!Array.isArray(importedRaw)) {
+      throw new Error('Imported JSON is not an array.');
+    }
+
+    const validImportedProblems: Problem[] = [];
+    let invalidProblemCount = 0;
+
+    for (const item of importedRaw) {
+      if (isValidProblem(item)) {
+        // For imported problems, clear Audio/Code paths as they are external
+        // This ensures imported problems don't point to non-existent local files
+        validImportedProblems.push({ ...item, Audio: '', Code: '' });
+      } else {
+        invalidProblemCount++;
+      }
+    }
+
+    if (validImportedProblems.length === 0 && importedRaw.length > 0) {
+        throw new Error('No valid problems found in the imported JSON file.');
+    }
+
+    // Get current local problems (this will also fetch from CDN and merge if needed)
+    const currentLocalProblems = await initializeLocalProblems();
+    const currentLocalProblemsMap = new Map<string, Problem>();
+    currentLocalProblems.forEach(p => currentLocalProblemsMap.set(p.id, p));
+
+    const mergedProblems: Problem[] = [...currentLocalProblems]; // Start with existing problems
+
+    for (const importedProblem of validImportedProblems) {
+      const existingProblemIndex = mergedProblems.findIndex(p => p.id === importedProblem.id);
+      if (existingProblemIndex !== -1) {
+        // Update existing problem, but preserve local Audio/Code paths
+        const localProblem = mergedProblems[existingProblemIndex];
+        mergedProblems[existingProblemIndex] = {
+          id: importedProblem.id,
+          Title: importedProblem.Title,
+          shortDescription: importedProblem.shortDescription,
+          fullDescription: importedProblem.fullDescription,
+          Audio: localProblem.Audio, // Preserve local audio path
+          Code: localProblem.Code    // Preserve local code path
+        };
+      } else {
+        // Add new problem
+        mergedProblems.push(importedProblem);
+      }
+    }
+
+    // Save the merged list
+    await fs.writeFile(LOCAL_PROBLEMS_JSON_PATH, JSON.stringify(mergedProblems, null, 2), 'utf-8');
+    console.log(`Imported problems merged and saved. ${validImportedProblems.length} valid problems added/updated, ${invalidProblemCount} invalid problems skipped.`);
+    return { success: true, problems: mergedProblems, invalidCount: invalidProblemCount };
+
+  } catch (error: any) {
+    console.error('Failed to import problems:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 
 // IPC 处理：保存本地问题列表
 ipcMain.handle('save-problems-to-local', async (event, problems: Problem[]) => {
@@ -812,6 +897,85 @@ ipcMain.handle('save-app-settings', async (event, settings: AppSettings): Promis
   } catch (error: any) {
     console.error('Failed to save app settings:', error);
     return false;
+  }
+});
+
+// 新增：导出问题到ZIP文件
+ipcMain.handle('export-problems-to-zip', async (event, problemIds: string[], defaultFileName: string) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window) return { success: false, message: 'No active window.' };
+
+  try {
+    const saveResult = await dialog.showSaveDialog(window, {
+      defaultPath: defaultFileName,
+      filters: [
+        { name: 'Zip Archives', extensions: ['zip'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (saveResult.canceled || !saveResult.filePath) {
+      return { success: false, message: 'Export cancelled by user.' };
+    }
+
+    const output = createWriteStream(saveResult.filePath); // 使用导入的 createWriteStream
+    const archive = archiver('zip', {
+      zlib: { level: 9 } // Sets the compression level.
+    });
+
+    archive.on('warning', function(err) {
+      if (err.code === 'ENOENT') {
+        console.warn('Archiver warning (file not found):', err.path);
+      } else {
+        console.error('Archiver warning:', err);
+      }
+    });
+
+    archive.on('error', function(err) {
+      throw err; // Re-throw to be caught by the outer try-catch
+    });
+
+    archive.pipe(output);
+
+    for (const problemId of problemIds) {
+      const problemWorkspaceDir = path.join(USER_WORKSPACES_ROOT, problemId);
+      const codeFilePath = path.join(problemWorkspaceDir, 'code.cpp');
+      const audioFilePath = path.join(problemWorkspaceDir, 'audio.webm');
+      const historyFilePath = path.join(problemWorkspaceDir, 'history.json');
+
+      // Add code.cpp if it exists
+      try {
+        await fs.access(codeFilePath); // Check if file exists
+        archive.file(codeFilePath, { name: `${problemId}/code.cpp` });
+      } catch (e) {
+        // File does not exist, ignore or log
+        console.log(`Code file not found for ${problemId}, skipping.`);
+      }
+
+      // Add audio.webm if it exists
+      try {
+        await fs.access(audioFilePath);
+        archive.file(audioFilePath, { name: `${problemId}/audio.webm` });
+      } catch (e) {
+        console.log(`Audio file not found for ${problemId}, skipping.`);
+      }
+
+      // Add history.json if it exists
+      try {
+        await fs.access(historyFilePath);
+        archive.file(historyFilePath, { name: `${problemId}/history.json` });
+      } catch (e) {
+        console.log(`History file not found for ${problemId}, skipping.`);
+      }
+    }
+
+    await archive.finalize();
+
+    return { success: true, filePath: saveResult.filePath };
+
+  } catch (error: any) {
+    console.error('Failed to export problems to zip:', error);
+    return { success: false, message: error.message };
   }
 });
 

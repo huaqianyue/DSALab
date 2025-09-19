@@ -83,9 +83,10 @@ declare global {
       compileAndRunCpp: (problemId: string, code: string, timeout: number) => Promise<{ success: boolean; output: string; error: string }>;
       /**
        * 调用主进程显示一个打开文件对话框。
+       * @param filters 可选的文件过滤器。
        * @returns 一个 Promise，包含选定文件的路径和内容，如果用户取消则返回 null。
        */
-      showOpenDialog: () => Promise<{ filePath: string; content: string } | null>;
+      showOpenDialog: (filters?: Electron.FileFilter[]) => Promise<{ filePath: string; content: string } | null>;
       /**
        * 调用主进程显示一个保存文件对话框。
        * @param currentFilePath 当前文件的路径，用于作为保存对话框的默认路径。
@@ -113,6 +114,7 @@ declare global {
       readProblemAudio: (problemId: string) => Promise<ArrayBuffer | null>;
       saveProblemWorkspace: (problemId: string, codeContent: string, audioData: ArrayBuffer | null) => Promise<boolean>;
       onBeforeQuit: (callback: () => Promise<void>) => void;
+      sendAppQuitAcknowledged: () => void; // 新增
 
       // --- 新增：历史记录 IPC 方法 ---
       recordHistoryEvent: (event: HistoryEvent) => void;
@@ -120,6 +122,15 @@ declare global {
       // --- 新增：应用设置 IPC 方法 ---
       loadAppSettings: () => Promise<AppSettings>;
       saveAppSettings: (settings: AppSettings) => Promise<boolean>;
+
+      // --- 新增：刷新问题列表 IPC 方法 ---
+      refreshProblems: () => Promise<Problem[]>;
+
+      // --- 新增：导入问题列表 IPC 方法 ---
+      importProblems: (jsonContent: string) => Promise<{ success: boolean; problems?: Problem[]; invalidCount?: number; error?: string }>;
+
+      // --- 新增：导出问题到ZIP IPC 方法 ---
+      exportProblemsToZip: (problemIds: string[], defaultFileName: string) => Promise<{ success: boolean; filePath?: string; message?: string }>;
     };
   }
 }
@@ -227,6 +238,9 @@ class DSALabApp {
       run: 'Run',
       clear: 'Clear',
       export: 'Export',
+      refresh: 'Refresh', // 新增
+      import: 'Import',   // 新增
+      save: 'Save',       // 新增
       recordAudio: 'Record Audio',
       playAudio: 'Play Audio',
       prevProblem: 'Previous Problem',
@@ -235,6 +249,9 @@ class DSALabApp {
       runTooltip: 'Run (Ctrl+R)',
       clearTooltip: 'Clear output',
       exportTooltip: 'Export current problem code and audio',
+      refreshTooltip: 'Refresh problem list from online', // 新增
+      importTooltip: 'Import problem list from JSON file', // 新增
+      saveTooltip: 'Save current problem (Ctrl+S)', // 新增
       recordAudioTooltip: 'Record audio explanation',
       playAudioTooltip: 'Play recorded audio',
       prevProblemTooltip: 'Go to previous problem',
@@ -261,11 +278,25 @@ class DSALabApp {
       savingData: 'Saving current problem data...',
       dataSaved: 'Current problem data saved.',
       saveFailed: 'Failed to save current problem data:',
+      exportProblems: 'Export Problems', // 新增
+      selectProblemsToExport: 'Please select problems to export:', // 新增
+      exportCancelled: 'Export cancelled.', // 新增
+      exportSuccess: 'Problems exported successfully to:', // 新增
+      exportFailed: 'Failed to export problems:', // 新增
+      missingCodeAudio: 'Missing Code or Audio', // 新增
+      importSuccess: 'Problems imported successfully. {count} valid problems added/updated. {invalidCount} invalid problems skipped.', // 新增
+      importFailed: 'Failed to import problems:', // 新增
+      importInvalidFormat: 'Invalid JSON format or structure.', // 新增
+      refreshSuccess: 'Problem list refreshed successfully.', // 新增
+      refreshFailed: 'Failed to refresh problem list:', // 新增
     },
     zh: { // 中文翻译
       run: '运行',
       clear: '清空',
       export: '导出',
+      refresh: '刷新', // 新增
+      import: '导入',   // 新增
+      save: '保存',       // 新增
       recordAudio: '录制',
       playAudio: '播放',
       prevProblem: '前一题',
@@ -274,6 +305,9 @@ class DSALabApp {
       runTooltip: '运行 (Ctrl+R)',
       clearTooltip: '清空输出',
       exportTooltip: '导出当前题目代码和讲解音频',
+      refreshTooltip: '从在线刷新题目列表', // 新增
+      importTooltip: '从JSON文件导入题目列表', // 新增
+      saveTooltip: '保存当前题目 (Ctrl+S)', // 新增
       recordAudioTooltip: '录制音频讲解',
       playAudioTooltip: '播放录制音频',
       prevProblemTooltip: '切换到上一题',
@@ -300,6 +334,17 @@ class DSALabApp {
       savingData: '正在保存当前题目数据...',
       dataSaved: '当前题目数据已保存。',
       saveFailed: '保存当前题目数据失败:',
+      exportProblems: '导出题目', // 新增
+      selectProblemsToExport: '请选择要导出的题目：', // 新增
+      exportCancelled: '导出已取消。', // 新增
+      exportSuccess: '题目已成功导出到：', // 新增
+      exportFailed: '导出题目失败：', // 新增
+      missingCodeAudio: '缺少代码或音频', // 新增
+      importSuccess: '题目导入成功。新增/更新 {count} 个有效题目，跳过 {invalidCount} 个无效题目。', // 新增
+      importFailed: '导入题目失败：', // 新增
+      importInvalidFormat: 'JSON格式或结构无效。', // 新增
+      refreshSuccess: '题目列表刷新成功。', // 新增
+      refreshFailed: '刷新题目列表失败：', // 新增
     }
   };
 
@@ -332,6 +377,13 @@ class DSALabApp {
     lastOpenedProblemId: null,
   };
 
+  // 导出弹窗相关DOM元素
+  private exportModal: HTMLElement | null = null;
+  private exportProblemList: HTMLUListElement | null = null;
+  private cancelExportBtn: HTMLButtonElement | null = null;
+  private confirmExportBtn: HTMLButtonElement | null = null;
+  private closeExportModalBtn: HTMLElement | null = null;
+
 
   // 构造函数，应用程序初始化时调用
   constructor() {
@@ -344,6 +396,8 @@ class DSALabApp {
       this.setupTerminalInput(); // 设置终端输入
       this.setupIpcListeners(); // 设置IPC监听器
       this.setupSplitters(); // 设置分割线拖动功能
+      this.setupKeyboardShortcuts(); // 新增：设置键盘快捷键
+      this.setupExportModal(); // 新增：设置导出弹窗
     });
   }
 
@@ -476,6 +530,7 @@ class DSALabApp {
         problemData.isDirty = true;  // 设置为已修改
         problemData.content = this.editor!.getValue();  // 更新内存中的内容
         this.updateTitle();  // 更新窗口标题以显示修改状态
+        this.updateSaveButtonState(); // 更新保存按钮状态
       }
 
       // 记录代码编辑历史
@@ -567,6 +622,18 @@ class DSALabApp {
       this.editor?.setValue(this.t('selectProblemEditor')); // 编辑器显示提示
       this.toggleAudioPanelVisibility(false); // 隐藏音频面板
       this.activateProblemListTab(); // 激活题目列表标签页
+
+      // 如果有上次打开的题目，尝试切换过去
+      if (this.appSettings.lastOpenedProblemId) {
+        const lastProblem = this.problems.find(p => p.id === this.appSettings.lastOpenedProblemId);
+        if (lastProblem) {
+          await this.switchToProblem(lastProblem.id);
+        } else {
+          this.appSettings.lastOpenedProblemId = null; // 上次打开的题目不存在了
+          await this.saveAppSettings();
+        }
+      }
+      this.updateSaveButtonState(); // 初始化保存按钮状态
     } catch (error) {
       console.error(this.t('loadingProblemsFailed'), error);
       const problemListContent = document.querySelector('.problem-list-content') as HTMLElement;
@@ -579,6 +646,7 @@ class DSALabApp {
       }
       this.editor?.setValue(`${this.t('loadingProblemsFailed')} ${error instanceof Error ? error.message : String(error)}`);
       this.toggleAudioPanelVisibility(false); // 隐藏音频面板
+      this.updateSaveButtonState(); // 初始化保存按钮状态
     }
   }
 
@@ -696,6 +764,7 @@ class DSALabApp {
     this.updateNavigationButtons();
     this.updateTitle();
     this.activateProblemDescriptionTab(); // 激活题目描述标签页
+    this.updateSaveButtonState(); // 更新保存按钮状态
 
     // 记录 problem_loaded 事件 (针对新加载的问题)
     if (isProblemLoadedFirstTime) {
@@ -760,6 +829,7 @@ class DSALabApp {
         this.appendOutput('error', `${this.t('saveFailed')} ${this.currentProblemId}`);
       }
     }
+    this.updateSaveButtonState(); // 更新保存按钮状态
   }
 
   // 更新问题列表中的选中状态
@@ -871,6 +941,31 @@ class DSALabApp {
         this.saveAppSettings();
       });
     }
+
+    // 新增：刷新按钮
+    document.getElementById('refreshBtn')?.addEventListener('click', () => this.handleRefreshProblems());
+    // 新增：导入按钮
+    document.getElementById('importBtn')?.addEventListener('click', () => this.handleImportProblems());
+    // 新增：保存按钮
+    document.getElementById('saveBtn')?.addEventListener('click', () => this.saveCurrentProblemToDisk());
+    // 新增：导出按钮
+    document.getElementById('exportBtn')?.addEventListener('click', () => this.openExportModal());
+  }
+
+  // 新增：设置键盘快捷键
+  private setupKeyboardShortcuts(): void {
+    document.addEventListener('keydown', async (event) => {
+      // Ctrl+S / Cmd+S for Save
+      if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+        event.preventDefault();
+        await this.saveCurrentProblemToDisk();
+      }
+      // Ctrl+R / Cmd+R for Run
+      if ((event.ctrlKey || event.metaKey) && event.key === 'r') {
+        event.preventDefault();
+        await this.executeCode();
+      }
+    });
   }
 
   // 设置终端输入框的事件监听
@@ -902,6 +997,8 @@ class DSALabApp {
       await this.saveCurrentProblemToDisk(); // 保存当前问题
       await this.saveAppSettings(); // 保存应用设置
       console.log('Renderer process: Finished saving, acknowledging quit.');
+      // 通知主进程可以退出
+      window.electron.sendAppQuitAcknowledged(); // 使用 window.electron 暴露的方法
     });
   }
 
@@ -930,6 +1027,24 @@ class DSALabApp {
 
     prevBtn.disabled = currentIndex === 0;
     nextBtn.disabled = currentIndex === this.problems.length - 1;
+  }
+
+  // 更新保存按钮状态
+  private updateSaveButtonState(): void {
+    const saveBtn = document.getElementById('saveBtn') as HTMLButtonElement;
+    if (!saveBtn) return;
+
+    if (!this.currentProblemId) {
+      saveBtn.disabled = true;
+      return;
+    }
+
+    const problemData = this.problemWorkspaceData.get(this.currentProblemId);
+    if (problemData && (problemData.isDirty || problemData.audioModified)) {
+      saveBtn.disabled = false;
+    } else {
+      saveBtn.disabled = true;
+    }
   }
 
   // 执行当前激活问题中的代码
@@ -1076,9 +1191,15 @@ class DSALabApp {
   }
 
   // 国际化翻译函数
-  private t(key: keyof typeof this.translations.en): string {
+  private t(key: keyof typeof this.translations.en, replacements?: { [key: string]: string | number }): string {
     const lang = this.currentLanguage as 'en' | 'zh';
-    return this.translations[lang][key] || key;
+    let text = this.translations[lang][key] || key;
+    if (replacements) {
+      for (const rKey in replacements) {
+        text = text.replace(`{${rKey}}`, String(replacements[rKey]));
+      }
+    }
+    return text;
   }
 
   // 切换录音状态
@@ -1116,6 +1237,7 @@ class DSALabApp {
           problemData.audioUrl = this.audioBlobUrl;
           problemData.audioModified = true; // 标记音频已修改
           this.updateTitle();
+          this.updateSaveButtonState(); // 更新保存按钮状态
 
           // 记录 audio_record_stop 事件
           this.recordHistoryEvent({
@@ -1345,6 +1467,229 @@ int main() {
 }
 `;
   }
+
+  // --- 新增：刷新题目列表功能 ---
+  private async handleRefreshProblems(): Promise<void> {
+    const refreshBtn = document.getElementById('refreshBtn') as HTMLButtonElement;
+    if (refreshBtn) {
+      refreshBtn.disabled = true;
+      refreshBtn.classList.add('loading'); // 添加加载动画类
+    }
+
+    try {
+      // 提示用户保存当前题目（如果已修改）
+      if (this.currentProblemId) {
+        await this.saveCurrentProblemToDisk();
+      }
+
+      this.problems = await window.electron.refreshProblems();
+      this.renderProblemList();
+      this.appendOutput('info', this.t('refreshSuccess'));
+
+      // 刷新后尝试重新激活上次打开的题目或当前题目
+      if (this.currentProblemId) {
+        const problemExists = this.problems.some(p => p.id === this.currentProblemId);
+        if (problemExists) {
+          await this.switchToProblem(this.currentProblemId);
+        } else {
+          // 当前题目已不存在，重置状态
+          this.currentProblemId = null;
+          this.appSettings.lastOpenedProblemId = null;
+          await this.saveAppSettings();
+          this.editor?.setValue(this.t('selectProblemEditor'));
+          this.clearOutput();
+          this.toggleAudioPanelVisibility(false);
+          this.updateTitle();
+          this.updateSaveButtonState();
+          this.activateProblemListTab();
+        }
+      } else if (this.appSettings.lastOpenedProblemId) {
+        const lastProblem = this.problems.find(p => p.id === this.appSettings.lastOpenedProblemId);
+        if (lastProblem) {
+          await this.switchToProblem(lastProblem.id);
+        }
+      } else {
+        this.editor?.setValue(this.t('selectProblemEditor'));
+        this.clearOutput();
+        this.toggleAudioPanelVisibility(false);
+        this.updateTitle();
+        this.updateSaveButtonState();
+        this.activateProblemListTab();
+      }
+
+    } catch (error) {
+      console.error(this.t('refreshFailed'), error);
+      this.appendOutput('error', `${this.t('refreshFailed')} ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      if (refreshBtn) {
+        refreshBtn.disabled = false;
+        refreshBtn.classList.remove('loading');
+      }
+    }
+  }
+
+  // --- 新增：导入题目列表功能 ---
+  private async handleImportProblems(): Promise<void> {
+    // 提示用户保存当前题目（如果已修改）
+    if (this.currentProblemId) {
+      await this.saveCurrentProblemToDisk();
+    }
+
+    try {
+      const result = await window.electron.showOpenDialog([
+        { name: 'JSON Files', extensions: ['json'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]);
+
+      if (result && result.content) {
+        const importResult = await window.electron.importProblems(result.content);
+
+        if (importResult.success && importResult.problems) {
+          this.problems = importResult.problems;
+          this.renderProblemList();
+          this.appendOutput('info', this.t('importSuccess', { count: importResult.problems.length - (importResult.invalidCount || 0), invalidCount: importResult.invalidCount || 0 }));
+          // 导入成功后，尝试重新激活上次打开的题目或当前题目
+          if (this.currentProblemId) {
+            const problemExists = this.problems.some(p => p.id === this.currentProblemId);
+            if (problemExists) {
+              await this.switchToProblem(this.currentProblemId);
+            } else {
+              // 当前题目已不存在，重置状态
+              this.currentProblemId = null;
+              this.appSettings.lastOpenedProblemId = null;
+              await this.saveAppSettings();
+              this.editor?.setValue(this.t('selectProblemEditor'));
+              this.clearOutput();
+              this.toggleAudioPanelVisibility(false);
+              this.updateTitle();
+              this.updateSaveButtonState();
+              this.activateProblemListTab();
+            }
+          } else if (this.appSettings.lastOpenedProblemId) {
+            const lastProblem = this.problems.find(p => p.id === this.appSettings.lastOpenedProblemId);
+            if (lastProblem) {
+              await this.switchToProblem(lastProblem.id);
+            }
+          } else {
+            this.editor?.setValue(this.t('selectProblemEditor'));
+            this.clearOutput();
+            this.toggleAudioPanelVisibility(false);
+            this.updateTitle();
+            this.updateSaveButtonState();
+            this.activateProblemListTab();
+          }
+        } else {
+          this.appendOutput('error', `${this.t('importFailed')} ${importResult.error || this.t('importInvalidFormat')}`);
+        }
+      } else {
+        this.appendOutput('info', '导入已取消。');
+      }
+    } catch (error) {
+      console.error(this.t('importFailed'), error);
+      this.appendOutput('error', `${this.t('importFailed')} ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  // --- 新增：导出题目到ZIP功能 (弹窗及逻辑) ---
+  private setupExportModal(): void {
+    this.exportModal = document.getElementById('exportModal');
+    this.exportProblemList = document.getElementById('exportProblemList') as HTMLUListElement;
+    this.cancelExportBtn = document.getElementById('cancelExportBtn') as HTMLButtonElement;
+    this.confirmExportBtn = document.getElementById('confirmExportBtn') as HTMLButtonElement;
+    this.closeExportModalBtn = this.exportModal?.querySelector('.close-button') as HTMLElement;
+
+    this.cancelExportBtn?.addEventListener('click', () => this.closeExportModal());
+    this.closeExportModalBtn?.addEventListener('click', () => this.closeExportModal());
+    this.confirmExportBtn?.addEventListener('click', () => this.handleConfirmExport());
+
+    // Close modal if clicking outside content
+    this.exportModal?.addEventListener('click', (e) => {
+      if (e.target === this.exportModal) {
+        this.closeExportModal();
+      }
+    });
+  }
+
+  private openExportModal(): void {
+    if (!this.exportModal || !this.exportProblemList) return;
+
+    // 提示用户保存当前题目（如果已修改）
+    if (this.currentProblemId) {
+      this.saveCurrentProblemToDisk(); // 不等待，异步保存
+    }
+
+    this.exportProblemList.innerHTML = ''; // Clear previous list
+
+    this.problems.forEach(problem => {
+      const listItem = document.createElement('li');
+      listItem.className = 'export-problem-item';
+      listItem.setAttribute('data-problem-id', problem.id);
+
+      const hasCode = problem.Code !== '';
+      const hasAudio = problem.Audio !== '';
+      const canExport = hasCode && hasAudio;
+
+      let tooltipText = '';
+      if (!canExport) {
+        tooltipText = this.t('missingCodeAudio');
+        if (!hasCode) tooltipText += ' (缺少代码)';
+        if (!hasAudio) tooltipText += ' (缺少音频)';
+        listItem.classList.add('disabled-problem');
+      }
+
+      listItem.innerHTML = `
+        <label data-tooltip="${tooltipText}">
+          <input type="checkbox" data-problem-id="${problem.id}" ${!canExport ? 'disabled' : ''} ${problem.id === this.currentProblemId ? 'checked' : ''}>
+          <span>${problem.shortDescription}</span>
+        </label>
+      `;
+
+      if (problem.id === this.currentProblemId) {
+        listItem.classList.add('active-problem');
+      }
+
+      this.exportProblemList?.appendChild(listItem);
+    });
+
+    this.exportModal.classList.remove('hidden');
+  }
+
+  private closeExportModal(): void {
+    this.exportModal?.classList.add('hidden');
+  }
+
+  private async handleConfirmExport(): Promise<void> {
+    if (!this.exportProblemList) return;
+
+    const selectedProblemIds: string[] = [];
+    this.exportProblemList.querySelectorAll('input[type="checkbox"]:checked:not(:disabled)').forEach(checkbox => {
+      selectedProblemIds.push((checkbox as HTMLInputElement).dataset.problemId!);
+    });
+
+    if (selectedProblemIds.length === 0) {
+      this.appendOutput('info', '请选择至少一个题目进行导出。');
+      return;
+    }
+
+    this.closeExportModal();
+    this.appendOutput('info', '正在准备导出...');
+
+    try {
+      const date = new Date();
+      const defaultFileName = `DSALab_Export_${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}.zip`;
+
+      const result = await window.electron.exportProblemsToZip(selectedProblemIds, defaultFileName);
+
+      if (result.success && result.filePath) {
+        this.appendOutput('result', `${this.t('exportSuccess')} ${result.filePath}`);
+      } else {
+        this.appendOutput('error', `${this.t('exportFailed')} ${result.message || '未知错误'}`);
+      }
+    } catch (error) {
+      console.error(this.t('exportFailed'), error);
+      this.appendOutput('error', `${this.t('exportFailed')} ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 }
 
 // Initialize the application when DOM is loaded
@@ -1353,5 +1698,3 @@ if (document.readyState === 'loading') {
 } else {
   new DSALabApp();
 }
-
-
