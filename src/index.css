@@ -258,7 +258,11 @@
     border-radius: 4px;
     transition: background-color 0.2s ease, color 0.2s ease;
     color: #7d8590;
+    display: flex; /* 使得图标和文本在同一行 */
+    align-items: center;
+    justify-content: space-between; /* 文本和图标分开两边 */
   }
+  
   
   .problem-item:hover {
     background-color: #21262d;
@@ -269,6 +273,27 @@
     background-color: #1f6feb; /* 激活的题目背景色 */
     color: #ffffff;
     font-weight: 600;
+  }
+
+  /* 新增：包裹图标的容器样式 */
+  .problem-action-icons {
+    display: flex; /* 让图标在容器内横向排列 */
+    align-items: center;
+    gap: 8px; /* 控制图标之间的间距 */
+  }
+  /* 题目列表中的图标样式 */
+  .problem-item .problem-icon {
+    margin-left: 8px; /* 图标与文本的间距 */
+    font-size: 0.9em;
+    opacity: 0.8;
+  }
+
+  .problem-item .code-icon {
+    color: #7aa6da; /* 蓝色 */
+  }
+
+  .problem-item .audio-icon {
+    color: #e78c45; /* 橙色 */
   }
   
   /* 题目描述内容区域 (原 problem-container，现在重命名并添加 panel-content 类) */
@@ -357,6 +382,11 @@
     border-top: 1px solid #21262d; /* 与题目描述内容分隔 */
     display: flex; /* 内部 flex 布局 */
     flex-direction: column; /* 垂直堆叠 header 和 content */
+  }
+
+  /* 新增：音频面板隐藏时的样式 */
+  .audio-panel.hidden {
+    display: none;
   }
   
   /* 对应 HTML: <div class="audio-panel"> <div class="panel-header"> */
@@ -611,7 +641,8 @@
   .global-header-bar .user-input[data-tooltip]:hover::after,
   .btn-audio[data-tooltip]:hover::after,
   .run-btn[data-tooltip]:hover::after,
-  .clear-output-btn[data-tooltip]:hover::after { /* 添加 clear-output-btn */
+  .clear-output-btn[data-tooltip]:hover::after, /* 添加 clear-output-btn */
+  .problem-item .problem-icon[data-tooltip]:hover::after { /* 新增图标的tooltip */
     top: calc(100% + 8px); /* 位于按钮下方 */
     left: 50%;
     transform: translateX(-50%);
@@ -621,7 +652,8 @@
   .global-header-bar .user-input[data-tooltip]:hover::before,
   .btn-audio[data-tooltip]:hover::before,
   .run-btn[data-tooltip]:hover::before,
-  .clear-output-btn[data-tooltip]:hover::before { /* 添加 clear-output-btn */
+  .clear-output-btn[data-tooltip]:hover::before, /* 添加 clear-output-btn */
+  .problem-item .problem-icon[data-tooltip]:hover::before { /* 新增图标的tooltip */
     content: '';
     position: absolute;
     top: calc(100% + 2px); /* 箭头位于按钮下方 */

@@ -60,6 +60,13 @@ interface AudioEvent extends HistoryEventBase {
 
 type HistoryEvent = CodeEditEvent | ProgramRunStartEvent | ProgramOutputEvent | ProgramRunEndEvent | ProblemLifecycleEvent | AudioEvent;
 
+// 新增：应用设置接口
+interface AppSettings {
+  userName: string;
+  studentId: string;
+  lastOpenedProblemId: string | null;
+}
+
 // ----------------------------------------------------
 // 修改：contextBridge.exposeInMainWorld
 // ----------------------------------------------------
@@ -99,4 +106,8 @@ contextBridge.exposeInMainWorld('electron', {
 
   // --- 新增：历史记录 IPC 方法 ---
   recordHistoryEvent: (event: HistoryEvent) => ipcRenderer.send('record-history-event', event),
+
+  // --- 新增：应用设置 IPC 方法 ---
+  loadAppSettings: (): Promise<AppSettings> => ipcRenderer.invoke('load-app-settings'),
+  saveAppSettings: (settings: AppSettings): Promise<boolean> => ipcRenderer.invoke('save-app-settings', settings),
 });

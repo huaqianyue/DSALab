@@ -116,6 +116,10 @@ declare global {
 
       // --- 新增：历史记录 IPC 方法 ---
       recordHistoryEvent: (event: HistoryEvent) => void;
+
+      // --- 新增：应用设置 IPC 方法 ---
+      loadAppSettings: () => Promise<AppSettings>;
+      saveAppSettings: (settings: AppSettings) => Promise<boolean>;
     };
   }
 }
@@ -152,6 +156,13 @@ interface ProblemWorkspaceData {
   audioUrl: string | null;
   filePath: string | null; // 用于 showSaveDialog 的当前文件路径，与持久化无关
   audioModified: boolean; // 音频是否修改（新录制或删除）
+}
+
+// 新增：应用设置接口
+interface AppSettings {
+  userName: string;
+  studentId: string;
+  lastOpenedProblemId: string | null;
 }
 
 
@@ -246,6 +257,7 @@ class DSALabApp {
       playbackFailed: 'Failed to play audio.',
       loadingProblemsFailed: 'Failed to load problems:',
       selectProblem: 'Please select a problem from the "Problem List" on the left to view its description.',
+      selectProblemEditor: 'Please select a problem from the "Problem List" on the left to start coding.', // 新增编辑器提示
       savingData: 'Saving current problem data...',
       dataSaved: 'Current problem data saved.',
       saveFailed: 'Failed to save current problem data:',
@@ -284,6 +296,7 @@ class DSALabApp {
       playbackFailed: '播放音频失败。',
       loadingProblemsFailed: '加载题目失败:',
       selectProblem: '请从左侧的“题目列表”中选择一个题目查看其描述。',
+      selectProblemEditor: '请从左侧的“题目列表”中选择一个题目开始编码。', // 新增编辑器提示
       savingData: '正在保存当前题目数据...',
       dataSaved: '当前题目数据已保存。',
       saveFailed: '保存当前题目数据失败:',
@@ -312,16 +325,26 @@ class DSALabApp {
   private testOutputArea: HTMLElement | null = null;
   private problemPanelTabs: HTMLElement | null = null;
 
+  // 新增：应用设置
+  private appSettings: AppSettings = {
+    userName: '',
+    studentId: '',
+    lastOpenedProblemId: null,
+  };
+
 
   // 构造函数，应用程序初始化时调用
   constructor() {
     this.initializeMonacoTheme(); // 初始化 Monaco Editor 主题
     this.createEditor(); // 创建单个编辑器实例
-    this.fetchProblemsAndInitializeUI();  // 获取问题并初始化UI
-    this.setupEventListeners();  // 设置DOM事件监听器
-    this.setupTerminalInput(); // 设置终端输入
-    this.setupIpcListeners(); // 设置IPC监听器
-    this.setupSplitters(); // 设置分割线拖动功能
+    // 调整初始化顺序：先加载设置，再根据设置加载问题和UI
+    this.loadAppSettings().then(() => {
+      this.fetchProblemsAndInitializeUI();  // 获取问题并初始化UI
+      this.setupEventListeners();  // 设置DOM事件监听器
+      this.setupTerminalInput(); // 设置终端输入
+      this.setupIpcListeners(); // 设置IPC监听器
+      this.setupSplitters(); // 设置分割线拖动功能
+    });
   }
 
   // 初始化 Monaco Editor 的自定义主题
@@ -400,7 +423,7 @@ class DSALabApp {
     }
 
     this.editor = monaco.editor.create(editorContainer, {  // 创建 Monaco Editor 实例
-      value: this.getWelcomeCode(),  // 初始内容为欢迎代码
+      value: this.t('selectProblemEditor'),  // 初始内容为提示信息
       language: 'cpp', // 语言模式设置为 C++
       theme: this.defaultTheme,  // 应用硬编码的主题
       fontSize: this.defaultFontSize,  // 应用硬编码的字体大小
@@ -505,6 +528,31 @@ class DSALabApp {
     });
   }
 
+  // 异步加载应用设置
+  private async loadAppSettings(): Promise<void> {
+    try {
+      this.appSettings = await window.electron.loadAppSettings();
+      // 填充用户输入框
+      const userNameInput = document.getElementById('userNameInput') as HTMLInputElement;
+      const studentIdInput = document.getElementById('studentIdInput') as HTMLInputElement;
+      if (userNameInput) userNameInput.value = this.appSettings.userName;
+      if (studentIdInput) studentIdInput.value = this.appSettings.studentId;
+    } catch (error) {
+      console.error('Failed to load app settings:', error);
+      // 使用默认设置
+      this.appSettings = { userName: '', studentId: '', lastOpenedProblemId: null };
+    }
+  }
+
+  // 异步保存应用设置
+  private async saveAppSettings(): Promise<void> {
+    try {
+      await window.electron.saveAppSettings(this.appSettings);
+    } catch (error) {
+      console.error('Failed to save app settings:', error);
+    }
+  }
+
   // 异步获取问题列表并初始化UI
   private async fetchProblemsAndInitializeUI(): Promise<void> {
     try {
@@ -512,22 +560,13 @@ class DSALabApp {
       this.problems = await window.electron.getProblemsFromLocal();
       this.renderProblemList(); // 渲染问题列表
 
-      if (this.problems.length > 0) {
-        // 默认加载第一个问题
-        await this.switchToProblem(this.problems[0].id);
-        // 记录第一个问题的 problem_loaded 事件
-        this.recordHistoryEvent({
-          timestamp: Date.now(),
-          problemId: this.problems[0].id,
-          eventType: 'problem_loaded',
-          codeSnapshot: this.editor?.getValue() || '',
-        });
-      } else {
-        const problemDescriptionContent = document.getElementById('problemDescriptionContent') as HTMLElement;
-        if (problemDescriptionContent) {
-          problemDescriptionContent.innerHTML = `<p>${this.t('selectProblem')}</p>`;
-        }
+      const problemDescriptionContent = document.getElementById('problemDescriptionContent') as HTMLElement;
+      if (problemDescriptionContent) {
+        problemDescriptionContent.innerHTML = `<p>${this.t('selectProblem')}</p>`;
       }
+      this.editor?.setValue(this.t('selectProblemEditor')); // 编辑器显示提示
+      this.toggleAudioPanelVisibility(false); // 隐藏音频面板
+      this.activateProblemListTab(); // 激活题目列表标签页
     } catch (error) {
       console.error(this.t('loadingProblemsFailed'), error);
       const problemListContent = document.querySelector('.problem-list-content') as HTMLElement;
@@ -538,6 +577,8 @@ class DSALabApp {
       if (problemDescriptionContent) {
         problemDescriptionContent.innerHTML = `<p style="color: red;">${this.t('loadingProblemsFailed')} ${error instanceof Error ? error.message : String(error)}</p>`;
       }
+      this.editor?.setValue(`${this.t('loadingProblemsFailed')} ${error instanceof Error ? error.message : String(error)}`);
+      this.toggleAudioPanelVisibility(false); // 隐藏音频面板
     }
   }
 
@@ -552,7 +593,26 @@ class DSALabApp {
       const listItem = document.createElement('li');
       listItem.className = 'problem-item';
       listItem.setAttribute('data-problem-id', problem.id);
-      listItem.textContent = problem.shortDescription;
+
+      // 添加图标
+      let iconsHtml = '';
+      if (problem.Code) {
+        iconsHtml += `<i class="fas fa-code problem-icon code-icon" data-tooltip="已完成代码"></i>`;
+      }
+      if (problem.Audio) {
+        iconsHtml += `<i class="fas fa-volume-up problem-icon audio-icon" data-tooltip="已录制讲解"></i>`;
+      }
+
+      listItem.innerHTML = `
+        <span class="problem-title-text">${problem.shortDescription}</span>
+        <span class="problem-action-icons">${iconsHtml}</span>
+      `;
+
+      // 如果是上次打开的题目，则高亮
+      if (problem.id === this.appSettings.lastOpenedProblemId) {
+        listItem.classList.add('active');
+      }
+
       listItem.addEventListener('click', () => {
         this.switchToProblem(problem.id);
       });
@@ -564,8 +624,10 @@ class DSALabApp {
   private async switchToProblem(problemId: string): Promise<void> {
     if (!this.editor) return;
 
-    // 记录 problem_switched 事件 (针对上一个问题)
+    // 1. 保存当前问题的工作区状态 (如果已修改)
     if (this.currentProblemId && this.currentProblemId !== problemId) {
+      await this.saveCurrentProblemToDisk();
+      // 记录 problem_switched 事件 (针对上一个问题)
       this.recordHistoryEvent({
         timestamp: Date.now(),
         problemId: this.currentProblemId,
@@ -574,17 +636,16 @@ class DSALabApp {
       });
     }
 
-    // 1. 保存当前问题的工作区状态 (如果已修改)
-    if (this.currentProblemId) {
-      await this.saveCurrentProblemToDisk();
-    }
-
-    // 2. 更新当前问题ID
+    // 2. 更新当前问题ID和应用设置
     this.currentProblemId = problemId;
+    this.appSettings.lastOpenedProblemId = problemId;
+    await this.saveAppSettings(); // 保存最新的 lastOpenedProblemId
 
     // 3. 加载新问题的工作区状态
     let newProblemData = this.problemWorkspaceData.get(problemId);
+    let isProblemLoadedFirstTime = false;
     if (!newProblemData) {
+      isProblemLoadedFirstTime = true;
       // 如果是第一次加载此问题，初始化工作区数据
       newProblemData = {
         content: this.getWelcomeCode(), // 默认欢迎代码
@@ -610,14 +671,6 @@ class DSALabApp {
         newProblemData.audioBlob = audioBlob;
         newProblemData.audioUrl = URL.createObjectURL(audioBlob);
       }
-
-      // 记录 problem_loaded 事件 (针对新加载的问题)
-      this.recordHistoryEvent({
-        timestamp: Date.now(),
-        problemId: problemId,
-        eventType: 'problem_loaded',
-        codeSnapshot: newProblemData.content,
-      });
     }
 
     // 更新编辑器内容
@@ -635,6 +688,7 @@ class DSALabApp {
     this.audioChunks = newProblemData.audioBlob ? [newProblemData.audioBlob] : [];
     this.audioBlobUrl = newProblemData.audioUrl;
     this.updateAudioPanel(newProblemData.audioBlob, newProblemData.audioUrl);
+    this.toggleAudioPanelVisibility(true); // 确保音频面板可见
 
     // 4. 更新UI元素
     this.updateProblemListSelection(problemId);
@@ -642,6 +696,16 @@ class DSALabApp {
     this.updateNavigationButtons();
     this.updateTitle();
     this.activateProblemDescriptionTab(); // 激活题目描述标签页
+
+    // 记录 problem_loaded 事件 (针对新加载的问题)
+    if (isProblemLoadedFirstTime) {
+      this.recordHistoryEvent({
+        timestamp: Date.now(),
+        problemId: problemId,
+        eventType: 'problem_loaded',
+        codeSnapshot: newProblemData.content,
+      });
+    }
   }
 
   // 保存当前问题的工作区数据到磁盘
@@ -688,6 +752,7 @@ class DSALabApp {
   
           this.problems[problemIndex] = updatedProblem;
           await window.electron.saveProblemsToLocal(this.problems); // 保存更新后的 problems 列表
+          this.renderProblemList(); // 重新渲染列表以更新图标
         }
         this.appendOutput('info', this.t('dataSaved'));
         // problem_saved 事件已在 main.ts 中成功写入文件后记录
@@ -748,6 +813,20 @@ class DSALabApp {
     document.querySelector('[data-tab-id="problem-description"]')!.classList.add('active');
   }
 
+  // 激活“题目列表”标签页
+  private activateProblemListTab(): void {
+    document.querySelectorAll('.problem-panel-tabs .problem-tab-header').forEach(tab => {
+      tab.classList.remove('active');
+    });
+    document.querySelectorAll('.problem-description-panel .panel-content').forEach(content => {
+      content.classList.remove('active');
+    });
+
+    document.querySelector('[data-tab-target="problem-list"]')!.classList.add('active');
+    document.querySelector('[data-tab-id="problem-list"]')!.classList.add('active');
+  }
+
+
   // 设置主要的DOM事件监听器
   private setupEventListeners(): void {
     // 运行按钮事件
@@ -765,11 +844,8 @@ class DSALabApp {
       tabHeader.addEventListener('click', (event) => {
         const targetTab = (event.currentTarget as HTMLElement).getAttribute('data-tab-target');
         if (targetTab === 'problem-list') { // 只有题目列表可以主动点击切换
-          document.querySelectorAll('.problem-panel-tabs .problem-tab-header').forEach(tab => tab.classList.remove('active'));
-          document.querySelectorAll('.problem-description-panel .panel-content').forEach(content => content.classList.remove('active'));
-
-          document.querySelector(`[data-tab-target="problem-list"]`)!.classList.add('active');
-          document.querySelector(`[data-tab-id="problem-list"]`)!.classList.add('active');
+          this.activateProblemListTab();
+          this.toggleAudioPanelVisibility(false); // 隐藏音频面板
         }
         // "题目描述"标签页的激活由点击题目列表项触发，这里不处理其点击事件
       });
@@ -778,6 +854,23 @@ class DSALabApp {
     // 音频录制和播放按钮
     document.getElementById('recordAudioBtn')?.addEventListener('click', () => this.toggleRecordAudio());
     document.getElementById('playAudioBtn')?.addEventListener('click', () => this.playAudio());
+
+    // 用户信息输入框监听
+    const userNameInput = document.getElementById('userNameInput') as HTMLInputElement;
+    const studentIdInput = document.getElementById('studentIdInput') as HTMLInputElement;
+
+    if (userNameInput) {
+      userNameInput.addEventListener('input', () => {
+        this.appSettings.userName = userNameInput.value;
+        this.saveAppSettings();
+      });
+    }
+    if (studentIdInput) {
+      studentIdInput.addEventListener('input', () => {
+        this.appSettings.studentId = studentIdInput.value;
+        this.saveAppSettings();
+      });
+    }
   }
 
   // 设置终端输入框的事件监听
@@ -807,7 +900,7 @@ class DSALabApp {
     window.electron.onBeforeQuit(async () => {
       console.log('Renderer process: Received app-before-quit event.');
       await this.saveCurrentProblemToDisk(); // 保存当前问题
-      // 在这里可以添加其他清理或保存逻辑
+      await this.saveAppSettings(); // 保存应用设置
       console.log('Renderer process: Finished saving, acknowledging quit.');
     });
   }
@@ -841,7 +934,10 @@ class DSALabApp {
 
   // 执行当前激活问题中的代码
   private async executeCode(): Promise<void> {
-    if (!this.editor || !this.currentProblemId) return;
+    if (!this.editor || !this.currentProblemId) {
+      this.appendOutput('error', '请先选择一个题目。');
+      return;
+    }
 
     const code = this.editor.getValue();  // 获取编辑器中的代码
     this.clearOutput();   // 清空当前问题的输出
@@ -1108,11 +1204,23 @@ class DSALabApp {
     recordBtn.classList.remove('recording');
   }
 
+  // 新增：控制音频面板的整体可见性
+  private toggleAudioPanelVisibility(show: boolean): void {
+    const audioPanel = document.querySelector('.audio-panel') as HTMLElement;
+    if (audioPanel) {
+      if (show) {
+        audioPanel.classList.remove('hidden');
+      } else {
+        audioPanel.classList.add('hidden');
+      }
+    }
+  }
+
   // ----------------------------------------------------
   // 新增：记录历史事件的辅助方法
   // ----------------------------------------------------
   private recordHistoryEvent(event: HistoryEvent): void {
-    if (!this.currentProblemId) {
+    if (!this.currentProblemId && event.eventType !== 'problem_loaded') { // problem_loaded 可以在 currentProblemId 刚设置时触发
       console.warn('Attempted to record history event without a currentProblemId:', event);
       return;
     }

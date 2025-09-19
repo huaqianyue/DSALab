@@ -577,7 +577,10 @@ const LOCAL_PROBLEMS_JSON_PATH = path.join(app.getPath('userData'), 'DSALab', 'p
 // 定义用户工作区根目录的路径
 const USER_WORKSPACES_ROOT = path.join(app.getPath('documents'), 'DSALab Workspaces');
 // CDN 上的原始 problems.json URL
-const CDN_PROBLEMS_URL = 'https://cdn.jsdelivr.net/gh/huaqianyue/DSALab@refs/heads/main/problem.json';
+const CDN_PROBLEMS_URL = 'https://raw.githubusercontent.com/huaqianyue/DSALab/refs/heads/main/problem.json';
+
+// 新增：用户设置文件路径
+const APP_SETTINGS_PATH = path.join(app.getPath('userData'), 'DSALab', 'settings.json');
 
 interface Problem {
   id: string;
@@ -586,6 +589,13 @@ interface Problem {
   fullDescription: string;
   Audio: string; // 相对路径或空
   Code: string;  // 相对路径或空
+}
+
+// 新增：应用设置接口
+interface AppSettings {
+  userName: string;
+  studentId: string;
+  lastOpenedProblemId: string | null;
 }
 
 /**
@@ -776,6 +786,35 @@ ipcMain.handle('save-problem-workspace', async (event, problemId: string, codeCo
     return false;
   }
 });
+
+// 新增：加载应用设置
+ipcMain.handle('load-app-settings', async (): Promise<AppSettings> => {
+  try {
+    await fs.mkdir(path.dirname(APP_SETTINGS_PATH), { recursive: true });
+    const settingsContent = await fs.readFile(APP_SETTINGS_PATH, 'utf-8');
+    return JSON.parse(settingsContent);
+  } catch (error: any) {
+    if (error.code === 'ENOENT') {
+      console.log('App settings file not found, returning default settings.');
+    } else {
+      console.error('Failed to load app settings:', error);
+    }
+    return { userName: '', studentId: '', lastOpenedProblemId: null };
+  }
+});
+
+// 新增：保存应用设置
+ipcMain.handle('save-app-settings', async (event, settings: AppSettings): Promise<boolean> => {
+  try {
+    await fs.mkdir(path.dirname(APP_SETTINGS_PATH), { recursive: true });
+    await fs.writeFile(APP_SETTINGS_PATH, JSON.stringify(settings, null, 2), 'utf-8');
+    return true;
+  } catch (error: any) {
+    console.error('Failed to save app settings:', error);
+    return false;
+  }
+});
+
 
 // ----------------------------------------------------
 // 修改：应用即将退出事件，强制刷新所有历史记录缓冲区
