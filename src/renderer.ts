@@ -1500,44 +1500,48 @@ int main() {
         await this.saveCurrentProblemToDisk();
       }
 
+      // 尝试从主进程刷新题目列表（会尝试从CDN获取并合并）
       this.problems = await window.electron.refreshProblems();
       this.renderProblemList();
       this.appendOutput('info', this.t('refreshSuccess'));
 
-      // 刷新后尝试重新激活上次打开的题目或当前题目
-      if (this.currentProblemId) {
-        const problemExists = this.problems.some(p => p.id === this.currentProblemId);
-        if (problemExists) {
-          await this.switchToProblem(this.currentProblemId);
-        } else {
-          // 当前题目已不存在，重置状态
-          this.currentProblemId = null;
-          this.appSettings.lastOpenedProblemId = null;
-          await this.saveAppSettings();
-          this.editor?.setValue(this.t('selectProblemEditor'));
-          this.clearOutput();
-          this.toggleAudioPanelVisibility(false);
-          this.updateTitle();
-          this.updateSaveButtonState();
-          this.activateProblemListTab();
-        }
-      } else if (this.appSettings.lastOpenedProblemId) {
-        const lastProblem = this.problems.find(p => p.id === this.appSettings.lastOpenedProblemId);
-        if (lastProblem) {
-          await this.switchToProblem(lastProblem.id);
-        }
-      } else {
+      // 刷新成功后，重置UI到题目列表视图
+      this.currentProblemId = null; // 清除当前选中的题目ID
+      this.appSettings.lastOpenedProblemId = null; // 清除上次打开的题目ID
+      await this.saveAppSettings(); // 保存更新后的设置
+
+      this.editor?.setValue(this.t('selectProblemEditor')); // 编辑器显示欢迎信息
+      this.clearOutput(); // 清空输出面板
+      this.toggleAudioPanelVisibility(false); // 隐藏音频面板
+      this.updateTitle(); // 更新窗口标题（应显示默认标题）
+      this.updateSaveButtonState(); // 更新保存按钮状态（应为禁用）
+      this.activateProblemListTab(); // 激活题目列表标签页
+
+    } catch (error) {
+      console.error(this.t('refreshFailed'), error);
+      this.appendOutput('error', `${this.t('refreshFailed')} ${error instanceof Error ? error.message : String(error)}`);
+      
+      // 如果刷新失败，尝试加载本地题目列表
+      try {
+        this.problems = await window.electron.getProblemsFromLocal(); // 调用 getProblemsFromLocal (它会尝试加载本地并同步CDN，如果CDN失败则返回本地)
+        this.renderProblemList();
+        this.appendOutput('info', '从在线刷新题目列表失败，已加载本地题目列表。');
+
+        // 即使失败，也重置UI到题目列表视图，但使用本地数据
+        this.currentProblemId = null;
+        this.appSettings.lastOpenedProblemId = null;
+        await this.saveAppSettings();
+
         this.editor?.setValue(this.t('selectProblemEditor'));
         this.clearOutput();
         this.toggleAudioPanelVisibility(false);
         this.updateTitle();
         this.updateSaveButtonState();
         this.activateProblemListTab();
+      } catch (localLoadError) {
+        console.error('加载本地题目列表失败:', localLoadError);
+        this.appendOutput('error', `加载本地题目列表失败: ${localLoadError instanceof Error ? localLoadError.message : String(localLoadError)}`);
       }
-
-    } catch (error) {
-      console.error(this.t('refreshFailed'), error);
-      this.appendOutput('error', `${this.t('refreshFailed')} ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       if (refreshBtn) {
         refreshBtn.disabled = false;
@@ -1584,6 +1588,28 @@ int main() {
 
         } else {
           this.appendOutput('error', `${this.t('importFailed')} ${importResult.error || this.t('importInvalidFormat')}`);
+          // 如果导入失败，我们应该仍然尝试加载现有的本地题目，
+          // 以确保UI不会停留在不一致的状态或空白。
+          try {
+            this.problems = await window.electron.getProblemsFromLocal();
+            this.renderProblemList();
+            this.appendOutput('info', '导入失败，已重新加载本地题目列表。');
+
+            // 即使失败，也重置UI到题目列表视图，但使用本地数据
+            this.currentProblemId = null;
+            this.appSettings.lastOpenedProblemId = null;
+            await this.saveAppSettings();
+
+            this.editor?.setValue(this.t('selectProblemEditor'));
+            this.clearOutput();
+            this.toggleAudioPanelVisibility(false);
+            this.updateTitle();
+            this.updateSaveButtonState();
+            this.activateProblemListTab();
+          } catch (localLoadError) {
+            console.error('导入失败后加载本地题目列表失败:', localLoadError);
+            this.appendOutput('error', `加载本地题目列表失败: ${localLoadError instanceof Error ? localLoadError.message : String(localLoadError)}`);
+          }
         }
       } else {
         this.appendOutput('info', '导入已取消。');
@@ -1591,6 +1617,26 @@ int main() {
     } catch (error) {
       console.error(this.t('importFailed'), error);
       this.appendOutput('error', `${this.t('importFailed')} ${error instanceof Error ? error.message : String(error)}`);
+      // 捕获文件对话框失败或其他意外错误的情况，并加载本地数据
+      try {
+        this.problems = await window.electron.getProblemsFromLocal();
+        this.renderProblemList();
+        this.appendOutput('info', '导入操作发生错误，已重新加载本地题目列表。');
+
+        this.currentProblemId = null;
+        this.appSettings.lastOpenedProblemId = null;
+        await this.saveAppSettings();
+
+        this.editor?.setValue(this.t('selectProblemEditor'));
+        this.clearOutput();
+        this.toggleAudioPanelVisibility(false);
+        this.updateTitle();
+        this.updateSaveButtonState();
+        this.activateProblemListTab();
+      } catch (localLoadError) {
+        console.error('导入操作错误后加载本地题目列表失败:', localLoadError);
+        this.appendOutput('error', `加载本地题目列表失败: ${localLoadError instanceof Error ? localLoadError.message : String(localLoadError)}`);
+      }
     }
   }
 

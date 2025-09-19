@@ -577,7 +577,7 @@ const LOCAL_PROBLEMS_JSON_PATH = path.join(app.getPath('userData'), 'DSALab', 'p
 // 定义用户工作区根目录的路径
 const USER_WORKSPACES_ROOT = path.join(app.getPath('documents'), 'DSALab Workspaces');
 // CDN 上的原始 problems.json URL
-const CDN_PROBLEMS_URL = 'https://raw.githubusercontent.com/huaqianyue/DSALab/refs/heads/main/problem.json';
+const CDN_PROBLEMS_URL = 'https://github.com/huaqianyue/DSALab/blob/main/problem.json';
 
 // 新增：用户设置文件路径
 const APP_SETTINGS_PATH = path.join(app.getPath('userData'), 'DSALab', 'settings.json');
@@ -641,9 +641,10 @@ interface AppSettings {
  * 初始化或加载本地的 problems.json 文件。
  * 每次打开应用时，都从网络中加载json，并合并到本地的json中。
  * 处理新增、更新，并保留本地对 Audio 和 Code 路径的修改。
+ * @param webContents 用于向渲染进程发送消息
  * @param forceRefresh 强制从CDN刷新，不读取本地文件
  */
-async function initializeLocalProblems(forceRefresh: boolean = false): Promise<Problem[]> {
+async function initializeLocalProblems(webContents: Electron.WebContents, forceRefresh: boolean = false): Promise<Problem[]> {
   await fs.mkdir(path.dirname(LOCAL_PROBLEMS_JSON_PATH), { recursive: true });
   await fs.mkdir(USER_WORKSPACES_ROOT, { recursive: true });
 
@@ -676,6 +677,7 @@ async function initializeLocalProblems(forceRefresh: boolean = false): Promise<P
 
   // 2. 始终尝试从 CDN 获取最新的 problems.json
   try {
+    webContents.send('cpp-output-chunk', { type: 'info', data: '在线获取最新题目列表...\n' }); // 新增：发送信息到渲染进程
     console.log('Fetching problems from CDN...');
     const response = await fetch(CDN_PROBLEMS_URL);
     if (!response.ok) {
@@ -686,8 +688,9 @@ async function initializeLocalProblems(forceRefresh: boolean = false): Promise<P
     console.log('Fetched problems from CDN.');
   } catch (cdnError) {
     console.error('Failed to fetch problems from CDN:', cdnError);
-    dialog.showErrorBox('加载题目失败', `无法从CDN加载题目列表，请检查网络连接。\n错误: ${cdnError instanceof Error ? cdnError.message : String(cdnError)}`);
-    // 如果 CDN 加载失败，直接返回当前已加载的本地题目（可能是空的）
+    // dialog.showErrorBox('加载题目失败', `无法加载题目列表，请检查网络连接。\n错误: ${cdnError instanceof Error ? cdnError.message : String(cdnError)}`); // 移除此处的对话框，由渲染进程处理
+    webContents.send('cpp-output-chunk', { type: 'error', data: `无法加载题目列表，请检查网络连接。\n错误: ${cdnError instanceof Error ? cdnError.message : String(cdnError)}\n` }); // 新增：发送错误信息到渲染进程
+    // 如果 CDN 加载失败，直接返回当前已加载的本地题目（可能是空的，如果 forceRefresh 为 true 且本地文件不存在）
     return sortProblemsById(Array.from(localProblemsMap.values()));
   }
 
@@ -734,6 +737,7 @@ async function initializeLocalProblems(forceRefresh: boolean = false): Promise<P
   try {
     await fs.writeFile(LOCAL_PROBLEMS_JSON_PATH, JSON.stringify(mergedProblems, null, 2), 'utf-8');
     console.log('Merged problems saved to local problems.json successfully.');
+    webContents.send('cpp-output-chunk', { type: 'info', data: '题目列表已成功加载并更新。\n' });
     return mergedProblems;
   } catch (saveError: any) {
     console.error('Failed to save merged problems to local:', saveError);
@@ -774,13 +778,15 @@ async function readLocalProblemsOnly(): Promise<Problem[]> {
 
 
 // IPC 处理：获取本地问题列表
-ipcMain.handle('get-problems-from-local', async () => {
-  return await initializeLocalProblems(); // 保持原样，应用启动时仍需要CDN同步
+ipcMain.handle('get-problems-from-local', async (event) => { // 传入 event
+  // 这里的 get-problems-from-local 应该只用于初始化时加载本地，并尝试同步CDN
+  // 如果需要纯粹的本地读取，应该调用 readLocalProblemsOnly
+  return await initializeLocalProblems(event.sender, false); // 传递 event.sender 作为 webContents
 });
 
 // IPC 处理：刷新问题列表 (强制从CDN刷新)
-ipcMain.handle('refresh-problems', async () => {
-  return await initializeLocalProblems(true); // 强制刷新
+ipcMain.handle('refresh-problems', async (event) => { // 传入 event
+  return await initializeLocalProblems(event.sender, true); // 传递 event.sender 作为 webContents
 });
 
 // IPC 处理：导入问题列表
