@@ -43,6 +43,14 @@ declare global {
        * @param input 用户输入的字符串。
        */
       sendUserInput: (input: string) => void;
+
+      // --- 新增的持久化相关 IPC 方法 ---
+      getProblemsFromLocal: () => Promise<Problem[]>;
+      saveProblemsToLocal: (problems: Problem[]) => Promise<{ success: boolean; error?: string }>;
+      readProblemCode: (problemId: string) => Promise<string | null>;
+      readProblemAudio: (problemId: string) => Promise<ArrayBuffer | null>;
+      saveProblemWorkspace: (problemId: string, codeContent: string, audioData: ArrayBuffer | null) => Promise<boolean>;
+      onBeforeQuit: (callback: () => Promise<void>) => void;
     };
   }
 }
@@ -60,21 +68,25 @@ interface ThemeDefinition {
   };
 }
 
-// 定义问题数据结构
+// 定义问题数据结构 (与 main.ts 中的 Problem 接口保持一致)
 interface Problem {
   id: string;
+  Title: string; // 新增 Title 字段
   shortDescription: string;
   fullDescription: string;
+  Audio: string; // 存储相对路径，如果本地有音频文件
+  Code: string;  // 存储相对路径，如果本地有代码文件
 }
 
 // 定义每个问题的工作区数据结构
 interface ProblemWorkspaceData {
   content: string;
-  isDirty: boolean;
+  isDirty: boolean; // 代码内容是否修改
   output: string;
   audioBlob: Blob | null;
   audioUrl: string | null;
-  filePath: string | null;
+  filePath: string | null; // 用于 showSaveDialog 的当前文件路径，与持久化无关
+  audioModified: boolean; // 音频是否修改（新录制或删除）
 }
 
 
@@ -82,16 +94,18 @@ interface ProblemWorkspaceData {
 class DSALabApp {
   // 单个 Monaco Editor 实例
   private editor: monaco.editor.IStandaloneCodeEditor | null = null;
-  // 存储所有问题数据
+  // 存储所有问题数据 (从本地 problems.json 加载)
   private problems: Problem[] = [];
   // 当前激活的问题ID
   private currentProblemId: string | null = null;
-  // 存储每个问题的工作区数据
+  // 存储每个问题的工作区数据 (内存中的状态)
   private problemWorkspaceData: Map<string, ProblemWorkspaceData> = new Map();
 
+  private suppressDirtyFlag: boolean = false; // 新增：用于抑制编辑器内容变化时设置isDirty
+
   // 代码执行的最大超时时间（30秒）。
-  private readonly EXECUTION_TIMEOUT = 30000; 
-  
+  private readonly EXECUTION_TIMEOUT = 30000;
+
   // 硬编码的编辑器设置，不再使用 AppSettings 接口
   private currentLanguage: 'en' | 'zh' = 'zh'; // 默认语言为中文
   private readonly defaultTheme = 'github-dark';
@@ -127,7 +141,7 @@ class DSALabApp {
       }
     }
   ];
-  
+
   // 应用程序的国际化翻译文本
   private translations = {
     en: {
@@ -163,7 +177,10 @@ class DSALabApp {
       recordingStopped: 'Recording stopped.',
       playbackFailed: 'Failed to play audio.',
       loadingProblemsFailed: 'Failed to load problems:',
-      selectProblem: 'Please select a problem from the "Problem List" on the left to view its description.'
+      selectProblem: 'Please select a problem from the "Problem List" on the left to view its description.',
+      savingData: 'Saving current problem data...',
+      dataSaved: 'Current problem data saved.',
+      saveFailed: 'Failed to save current problem data:',
     },
     zh: { // 中文翻译
       run: '运行',
@@ -198,7 +215,10 @@ class DSALabApp {
       recordingStopped: '录制结束。',
       playbackFailed: '播放音频失败。',
       loadingProblemsFailed: '加载题目失败:',
-      selectProblem: '请从左侧的“题目列表”中选择一个题目查看其描述。'
+      selectProblem: '请从左侧的“题目列表”中选择一个题目查看其描述。',
+      savingData: '正在保存当前题目数据...',
+      dataSaved: '当前题目数据已保存。',
+      saveFailed: '保存当前题目数据失败:',
     }
   };
 
@@ -352,11 +372,14 @@ class DSALabApp {
 
     // 监听编辑器内容变化，更新当前问题工作区的“已修改”状态
     this.editor.onDidChangeModelContent(() => {
+      if (this.suppressDirtyFlag) { // 如果设置了抑制标志，则不处理
+        return;
+      }
       if (this.currentProblemId) {
         const problemData = this.problemWorkspaceData.get(this.currentProblemId);
         if (problemData) {
           problemData.isDirty = true;  // 设置为已修改
-          problemData.content = this.editor!.getValue();  // 更新内容
+          problemData.content = this.editor!.getValue();  // 更新内存中的内容
           this.updateTitle();  // 更新窗口标题以显示修改状态
         }
       }
@@ -366,11 +389,8 @@ class DSALabApp {
   // 异步获取问题列表并初始化UI
   private async fetchProblemsAndInitializeUI(): Promise<void> {
     try {
-      const response = await fetch('https://cdn.jsdmirror.com/gh/huaqianyue/DSALab/problem.json');
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      this.problems = await response.json();
+      // 从主进程获取本地 problems.json
+      this.problems = await window.electron.getProblemsFromLocal();
       this.renderProblemList(); // 渲染问题列表
 
       if (this.problems.length > 0) {
@@ -415,17 +435,12 @@ class DSALabApp {
   }
 
   // 切换到指定问题
-  private switchToProblem(problemId: string): void {
+  private async switchToProblem(problemId: string): Promise<void> {
     if (!this.editor) return;
 
-    // 1. 保存当前问题的工作区状态
-    if (this.currentProblemId && this.problemWorkspaceData.has(this.currentProblemId)) {
-      const currentProblemData = this.problemWorkspaceData.get(this.currentProblemId)!;
-      currentProblemData.content = this.editor.getValue();
-      currentProblemData.output = document.querySelector('.output-container')?.innerHTML || '';
-      // Only save audio if chunks exist (i.e., something was recorded)
-      currentProblemData.audioBlob = this.audioChunks.length > 0 ? new Blob(this.audioChunks, { type: 'audio/webm' }) : null;
-      currentProblemData.audioUrl = this.audioBlobUrl;
+    // 1. 保存当前问题的工作区状态 (如果已修改)
+    if (this.currentProblemId) {
+      await this.saveCurrentProblemToDisk();
     }
 
     // 2. 更新当前问题ID
@@ -436,18 +451,35 @@ class DSALabApp {
     if (!newProblemData) {
       // 如果是第一次加载此问题，初始化工作区数据
       newProblemData = {
-        content: this.getWelcomeCode(),
+        content: this.getWelcomeCode(), // 默认欢迎代码
         isDirty: false,
         output: '',
         audioBlob: null,
         audioUrl: null,
         filePath: null,
+        audioModified: false,
       };
       this.problemWorkspaceData.set(problemId, newProblemData);
+
+      // 尝试从本地加载代码
+      const localCode = await window.electron.readProblemCode(problemId);
+      if (localCode !== null) {
+        newProblemData.content = localCode;
+      }
+
+      // 尝试从本地加载音频
+      const audioArrayBuffer = await window.electron.readProblemAudio(problemId);
+      if (audioArrayBuffer) {
+        const audioBlob = new Blob([audioArrayBuffer], { type: 'audio/webm' });
+        newProblemData.audioBlob = audioBlob;
+        newProblemData.audioUrl = URL.createObjectURL(audioBlob);
+      }
     }
 
     // 更新编辑器内容
+    this.suppressDirtyFlag = true; // 暂时抑制 onDidChangeModelContent 监听器
     this.editor.setValue(newProblemData.content);
+    this.suppressDirtyFlag = false; // 恢复监听器
     // 更新输出区域内容
     const outputContainer = document.querySelector('.output-container') as HTMLElement;
     if (outputContainer) {
@@ -459,13 +491,65 @@ class DSALabApp {
     this.audioChunks = newProblemData.audioBlob ? [newProblemData.audioBlob] : [];
     this.audioBlobUrl = newProblemData.audioUrl;
     this.updateAudioPanel(newProblemData.audioBlob, newProblemData.audioUrl);
-    
+
     // 4. 更新UI元素
     this.updateProblemListSelection(problemId);
     this.updateProblemDescription(problemId); // This will also re-attach navigation button listeners
     this.updateNavigationButtons();
     this.updateTitle();
     this.activateProblemDescriptionTab(); // 激活题目描述标签页
+  }
+
+  // 保存当前问题的工作区数据到磁盘
+  private async saveCurrentProblemToDisk(): Promise<void> {
+    if (!this.currentProblemId) return;
+  
+    const problemData = this.problemWorkspaceData.get(this.currentProblemId);
+    if (!problemData) return;
+  
+    // 只有当代码或音频被修改时才保存
+    if (problemData.isDirty || problemData.audioModified) {
+      this.appendOutput('info', this.t('savingData'));
+  
+      let audioDataForMain: ArrayBuffer | null = null;
+      if (problemData.audioBlob) {
+        try {
+          // 将 Blob 转换为 ArrayBuffer，这是可跨进程传输的
+          audioDataForMain = await problemData.audioBlob.arrayBuffer();
+        } catch (e) {
+          console.error("Failed to convert audio Blob to ArrayBuffer:", e);
+          this.appendOutput('error', `音频数据转换失败: ${e instanceof Error ? e.message : String(e)}`);
+          // 即使转换失败，也尝试保存代码，并标记音频保存失败
+          audioDataForMain = null;
+        }
+      }
+  
+      const success = await window.electron.saveProblemWorkspace(
+        this.currentProblemId,
+        problemData.content,
+        audioDataForMain // 现在发送的是 ArrayBuffer 或 null
+      );
+  
+      if (success) {
+        problemData.isDirty = false;
+        problemData.audioModified = false;
+        this.updateTitle(); // 移除标题上的修改标记
+  
+        // 更新本地 problems.json 中的路径
+        const problemIndex = this.problems.findIndex(p => p.id === this.currentProblemId);
+        if (problemIndex !== -1) {
+          const updatedProblem = { ...this.problems[problemIndex] };
+          updatedProblem.Code = 'code.cpp'; // 相对路径
+          updatedProblem.Audio = problemData.audioBlob ? 'audio.webm' : ''; // 如果没有音频，路径为空
+  
+          this.problems[problemIndex] = updatedProblem;
+          await window.electron.saveProblemsToLocal(this.problems); // 保存更新后的 problems 列表
+        }
+        this.appendOutput('info', this.t('dataSaved'));
+      } else {
+        this.appendOutput('error', `${this.t('saveFailed')} ${this.currentProblemId}`);
+      }
+    }
   }
 
   // 更新问题列表中的选中状态
@@ -572,6 +656,14 @@ class DSALabApp {
     window.electron.onCppOutputChunk((chunk) => {
       this.appendOutput(chunk.type, chunk.data);
     });
+
+    // 监听主进程发出的应用即将退出的事件
+    window.electron.onBeforeQuit(async () => {
+      console.log('Renderer process: Received app-before-quit event.');
+      await this.saveCurrentProblemToDisk(); // 保存当前问题
+      // 在这里可以添加其他清理或保存逻辑
+      console.log('Renderer process: Finished saving, acknowledging quit.');
+    });
   }
 
   // 导航到上一题或下一题
@@ -617,7 +709,7 @@ class DSALabApp {
 
     const outputLine = document.createElement('div');  // 创建新的 div 元素作为输出行
     outputLine.className = `output-${type}`;  // 添加对应类型的类名 (如 output-info, output-log, output-error, output-user-input)
-    
+
     // 对于用户输入，直接显示文本；对于其他类型，将换行符转换为 <br> 标签以保留格式
     outputLine.innerHTML = type === 'user-input' ? text : text.replace(/\n/g, '<br>');
     outputContainer.appendChild(outputLine);  // 将输出行添加到容器中
@@ -660,7 +752,7 @@ class DSALabApp {
     const problemData = this.problemWorkspaceData.get(this.currentProblemId);
 
     if (problem && problemData) {
-      const title = `${problem.shortDescription}${problemData.isDirty ? ' •' : ''} - DSALab`;
+      const title = `${problem.shortDescription}${problemData.isDirty || problemData.audioModified ? ' •' : ''} - DSALab`;
       document.title = title;
     } else {
       document.title = 'DSALab';
@@ -686,7 +778,7 @@ class DSALabApp {
           // 如果主进程没有发送任何特殊的结束消息，这里可以添加一个通用结束提示
           // 但通常主进程会发送错误或成功消息
       }
-      
+
     } catch (error: any) {
       // 捕获 IPC 调用本身的错误，而不是C++程序内部的错误
       this.appendFriendlyError(error);
@@ -706,9 +798,9 @@ class DSALabApp {
 
     const errorLine = document.createElement('div');
     errorLine.className = 'output-error-friendly';
-    
+
     let friendlyMessage = '';
-    
+
     // Make error messages more friendly
     if (error.message.includes('Compilation failed')) {
       if (error.message.includes('g++ compiler not found')) {
@@ -727,7 +819,7 @@ class DSALabApp {
     } else {
       friendlyMessage = `❌ ${this.t('error')}: ${error.message}`;
     }
-    
+
     errorLine.innerHTML = friendlyMessage.replace(/\n/g, '<br>');
     outputContainer.appendChild(errorLine);
     outputContainer.scrollTop = outputContainer.scrollHeight;
@@ -753,7 +845,8 @@ class DSALabApp {
     const playBtn = document.getElementById('playAudioBtn') as HTMLButtonElement;
     const audioPlayback = document.getElementById('audioPlayback') as HTMLAudioElement;
 
-    if (!recordBtn || !playBtn || !audioPlayback) return;
+    if (!recordBtn || !playBtn || !audioPlayback || !this.currentProblemId) return;
+    const problemData = this.problemWorkspaceData.get(this.currentProblemId)!;
 
     if (!this.isRecording) {
       // Start recording
@@ -777,13 +870,10 @@ class DSALabApp {
           audioPlayback.style.display = 'block';
 
           // Save to current problem's workspace
-          if (this.currentProblemId) {
-            const problemData = this.problemWorkspaceData.get(this.currentProblemId);
-            if (problemData) {
-              problemData.audioBlob = audioBlob;
-              problemData.audioUrl = this.audioBlobUrl;
-            }
-          }
+          problemData.audioBlob = audioBlob;
+          problemData.audioUrl = this.audioBlobUrl;
+          problemData.audioModified = true; // 标记音频已修改
+          this.updateTitle();
         };
 
         this.mediaRecorder.start();
@@ -894,7 +984,7 @@ class DSALabApp {
 
     this.problemDescriptionPanel.style.flexBasis = `${newLeftPanelWidth}px`;
     this.codeTestPanel.style.flexBasis = `${workspaceRect.width - newLeftPanelWidth - (this.mainSplitter?.offsetWidth || 0)}px`;
-    
+
     this.editor?.layout(); // Re-layout Monaco Editor after resize
   };
 
@@ -932,7 +1022,7 @@ class DSALabApp {
 
     this.editorContainer.style.flexBasis = `${newEditorHeight}px`;
     this.testOutputArea.style.flexBasis = `${codeTestPanelRect.height - headerHeight - newEditorHeight - (this.rightPanelHorizontalSplitter?.offsetHeight || 0)}px`;
-    
+
     this.editor?.layout(); // Re-layout Monaco Editor after resize
   };
 
