@@ -12,20 +12,20 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     icon: './build/icon',
-    name: 'WizardJS',
-    executableName: 'WizardJS',
-    appBundleId: 'com.franciscobrito.wizardjs',
-    appCategoryType: 'public.app-category.developer-tools',
+    name: 'DSALab',
+    executableName: 'DSALAb',
+    appBundleId: 'com.huaqianyue.dsalab',
+    appCategoryType: 'public.app-category.education',
     protocols: [{
-      name: 'WizardJS',
-      schemes: ['wizardjs']
+      name: 'DSALAb',
+      schemes: ['dsalab']
     }]
   },
   rebuildConfig: {},
   makers: [
     // macOS DMG Installer
     new MakerDMG({
-      name: 'WizardJS',
+      name: 'DSALab',
       icon: './build/icon.icns',
       format: 'ULFO'
     }),
@@ -34,39 +34,39 @@ const config: ForgeConfig = {
     
     // Windows Installer
     new MakerSquirrel({
-      name: 'WizardJS',
+      name: 'DSALab',
       setupIcon: './build/icon.ico',
-      setupExe: 'WizardJS-Setup-${version}.exe'
+      setupExe: 'DSALab-Setup-${version}.exe'
     }),
     
     // Linux DEB (Debian/Ubuntu)
     new MakerDeb({
       options: {
-        name: 'wizardjs',
-        productName: 'WizardJS',
-        genericName: 'JavaScript Playground',
-        description: 'WizardJS - The Ultimate JavaScript & TypeScript Playground',
-        categories: ['Development'],
+        name: 'dsalab',
+        productName: 'DSALab',
+        genericName: 'C++ Playground',
+        description: 'DSALab - C++ Playground for Data Structures and Algorithms',
+        categories: ['Development', 'Education'],
         icon: './build/icon.png',
         section: 'devel',
         priority: 'optional',
-        maintainer: 'Francisco Brito <francisco.brito.developer@gmail.com>',
-        homepage: 'https://github.com/FranciscoJBrito/WizardJS',
-        bin: 'WizardJS'
+        maintainer: 'Wang Xingyu <WMX_0121@outlook.com>',
+        homepage: 'https://github.com/huaqianyue/DSALab',
+        bin: 'DSALab'
       }
     }),
     
     // Linux RPM (RedHat/Fedora/SUSE)
     new MakerRpm({
       options: {
-        name: 'wizardjs',
-        productName: 'WizardJS',
-        description: 'WizardJS - The Ultimate JavaScript & TypeScript Playground',
+        name: 'dsalab',
+        productName: 'DSALab',
+        description: 'DSALab - C++ Playground for Data Structures and Algorithms',
         categories: ['Development'],
         icon: './build/icon.png',
         license: 'MIT',
-        homepage: 'https://github.com/FranciscoJBrito/WizardJS',
-        bin: 'WizardJS'
+        homepage: 'https://github.com/huaqianyue/DSALab',
+        bin: 'DSALab'
       }
     })
   ],

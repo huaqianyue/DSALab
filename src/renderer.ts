@@ -8,18 +8,79 @@ import './index.css'; //导入主样式文件，应用于整个应用程序的UI
 // Monaco Editor imports
 import * as monaco from 'monaco-editor';
 
-// 声明全局的'electron'API，这个API由Electron的preload.ts脚本暴露给渲染进程。
-//这是渲染进程与主进程进行通信（IPC）的关键接口。
+// ----------------------------------------------------
+// 新增：历史记录相关类型定义
+// ----------------------------------------------------
+
+// Shared HistoryEvent interfaces
+interface HistoryEventBase {
+  timestamp: number;
+  problemId: string;
+  eventType: string; // e.g., 'edit', 'run_start', 'run_end', 'program_output'
+}
+
+interface SimplifiedContentChange {
+  range: { startLineNumber: number; startColumn: number; endLineNumber: number; endColumn: number };
+  rangeLength: number;
+  text: string;
+  rangeOffset: number;
+}
+
+interface CodeEditEvent extends HistoryEventBase {
+  eventType: 'edit';
+  operationType: 'type' | 'ime_input' | 'paste_insert' | 'paste_replace' | 'delete' | 'other_edit';
+  change: SimplifiedContentChange;
+  cursorPosition: { lineNumber: number; column: number };
+}
+
+interface ProgramRunStartEvent extends HistoryEventBase {
+  eventType: 'run_start';
+  codeSnapshot: string; // Full code at the moment of run
+}
+
+interface ProgramOutputEvent extends HistoryEventBase {
+  eventType: 'program_output' | 'program_error' | 'user_input';
+  data: string;
+  outputType: 'log' | 'error' | 'user-input' | 'info' | 'result'; // Corresponds to cpp-output-chunk types
+}
+
+interface ProgramRunEndEvent extends HistoryEventBase {
+  eventType: 'run_end' | 'compile_error' | 'run_timeout' | 'program_terminated_by_new_run';
+  success: boolean;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  durationMs?: number; // Time taken for execution
+  errorMessage?: string; // For compile_error, run_timeout, or general run_end error
+}
+
+interface ProblemLifecycleEvent extends HistoryEventBase {
+  eventType: 'problem_loaded' | 'problem_saved' | 'problem_switched';
+  codeSnapshot?: string; // Code at load/save/switch
+  audioState?: 'present' | 'absent' | 'modified'; // Audio state at save
+}
+
+interface AudioEvent extends HistoryEventBase {
+  eventType: 'audio_record_start' | 'audio_record_stop' | 'audio_play';
+  durationMs?: number; // For record_stop, play
+  audioSizeKB?: number; // For record_stop
+}
+
+type HistoryEvent = CodeEditEvent | ProgramRunStartEvent | ProgramOutputEvent | ProgramRunEndEvent | ProblemLifecycleEvent | AudioEvent;
+
+// ----------------------------------------------------
+// 修改：Window.electron 接口
+// ----------------------------------------------------
 declare global {
   interface Window {
     electron: {
       /**
        * 调用主进程编译并运行 C++ 代码。
+       * @param problemId 当前题目ID。
        * @param code 要编译和运行的 C++ 代码字符串。
        * @param timeout 执行超时时间（毫秒）。
        * @returns 一个 Promise，包含执行结果：success（是否成功）、output（标准输出）、error（错误信息）。
        */
-      compileAndRunCpp: (code: string, timeout: number) => Promise<{ success: boolean; output: string; error: string }>;
+      compileAndRunCpp: (problemId: string, code: string, timeout: number) => Promise<{ success: boolean; output: string; error: string }>;
       /**
        * 调用主进程显示一个打开文件对话框。
        * @returns 一个 Promise，包含选定文件的路径和内容，如果用户取消则返回 null。
@@ -40,9 +101,10 @@ declare global {
       onCppOutputChunk: (callback: (chunk: { type: string; data: string }) => void) => void;
       /**
        * 向主进程发送用户输入。
+       * @param problemId 当前题目ID。
        * @param input 用户输入的字符串。
        */
-      sendUserInput: (input: string) => void;
+      sendUserInput: (problemId: string, input: string) => void;
 
       // --- 新增的持久化相关 IPC 方法 ---
       getProblemsFromLocal: () => Promise<Problem[]>;
@@ -51,6 +113,9 @@ declare global {
       readProblemAudio: (problemId: string) => Promise<ArrayBuffer | null>;
       saveProblemWorkspace: (problemId: string, codeContent: string, audioData: ArrayBuffer | null) => Promise<boolean>;
       onBeforeQuit: (callback: () => Promise<void>) => void;
+
+      // --- 新增：历史记录 IPC 方法 ---
+      recordHistoryEvent: (event: HistoryEvent) => void;
     };
   }
 }
@@ -102,9 +167,12 @@ class DSALabApp {
   private problemWorkspaceData: Map<string, ProblemWorkspaceData> = new Map();
 
   private suppressDirtyFlag: boolean = false; // 新增：用于抑制编辑器内容变化时设置isDirty
+  private isComposing: boolean = false; // 新增：用于跟踪输入法合成状态
 
   // 代码执行的最大超时时间（30秒）。
   private readonly EXECUTION_TIMEOUT = 30000;
+
+  private recordingStartTime: number | null = null; // 新增：记录录制开始时间
 
   // 硬编码的编辑器设置，不再使用 AppSettings 接口
   private currentLanguage: 'en' | 'zh' = 'zh'; // 默认语言为中文
@@ -370,17 +438,68 @@ class DSALabApp {
       autoSurround: 'languageDefined' // 自动环绕
     });
 
-    // 监听编辑器内容变化，更新当前问题工作区的“已修改”状态
-    this.editor.onDidChangeModelContent(() => {
-      if (this.suppressDirtyFlag) { // 如果设置了抑制标志，则不处理
+    // 监听 composition 事件以检测 IME 输入
+    editorContainer.addEventListener('compositionstart', () => { this.isComposing = true; });
+    editorContainer.addEventListener('compositionend', () => { this.isComposing = false; });
+
+    // 监听编辑器内容变化，更新当前问题工作区的“已修改”状态并记录历史
+    this.editor.onDidChangeModelContent((event) => {
+      if (this.suppressDirtyFlag || !this.currentProblemId) { // 如果设置了抑制标志或没有当前问题，则不处理
         return;
       }
+
+      const problemData = this.problemWorkspaceData.get(this.currentProblemId);
+      if (problemData) {
+        problemData.isDirty = true;  // 设置为已修改
+        problemData.content = this.editor!.getValue();  // 更新内存中的内容
+        this.updateTitle();  // 更新窗口标题以显示修改状态
+      }
+
+      // 记录代码编辑历史
       if (this.currentProblemId) {
-        const problemData = this.problemWorkspaceData.get(this.currentProblemId);
-        if (problemData) {
-          problemData.isDirty = true;  // 设置为已修改
-          problemData.content = this.editor!.getValue();  // 更新内存中的内容
-          this.updateTitle();  // 更新窗口标题以显示修改状态
+        const changes = event.changes;
+        const cursorPosition = this.editor!.getPosition(); // 获取当前光标位置
+
+        for (const change of changes) {
+          let operationType: CodeEditEvent['operationType'] = 'other_edit';
+
+          if (this.isComposing) {
+            operationType = 'ime_input';
+          } else if (change.text.length > 0 && change.rangeLength === 0) {
+            // 插入操作
+            if (change.text.length === 1) {
+              operationType = 'type';
+            } else {
+              operationType = 'paste_insert';
+            }
+          } else if (change.text.length === 0 && change.rangeLength > 0) {
+            // 删除操作
+            operationType = 'delete';
+          } else if (change.text.length > 0 && change.rangeLength > 0) {
+            // 替换操作 (例如，粘贴覆盖选中内容)
+            operationType = 'paste_replace';
+          }
+
+          const simplifiedChange: SimplifiedContentChange = {
+            range: {
+              startLineNumber: change.range.startLineNumber,
+              startColumn: change.range.startColumn,
+              endLineNumber: change.range.endLineNumber,
+              endColumn: change.range.endColumn,
+            },
+            rangeLength: change.rangeLength,
+            text: change.text,
+            rangeOffset: change.rangeOffset,
+          };
+
+          this.recordHistoryEvent({
+            timestamp: Date.now(),
+            problemId: this.currentProblemId,
+            eventType: 'edit',
+            operationType: operationType,
+            change: simplifiedChange,
+            cursorPosition: cursorPosition ? { lineNumber: cursorPosition.lineNumber, column: cursorPosition.column } : { lineNumber: 1, column: 1 },
+          });
         }
       }
     });
@@ -395,7 +514,14 @@ class DSALabApp {
 
       if (this.problems.length > 0) {
         // 默认加载第一个问题
-        this.switchToProblem(this.problems[0].id);
+        await this.switchToProblem(this.problems[0].id);
+        // 记录第一个问题的 problem_loaded 事件
+        this.recordHistoryEvent({
+          timestamp: Date.now(),
+          problemId: this.problems[0].id,
+          eventType: 'problem_loaded',
+          codeSnapshot: this.editor?.getValue() || '',
+        });
       } else {
         const problemDescriptionContent = document.getElementById('problemDescriptionContent') as HTMLElement;
         if (problemDescriptionContent) {
@@ -438,6 +564,16 @@ class DSALabApp {
   private async switchToProblem(problemId: string): Promise<void> {
     if (!this.editor) return;
 
+    // 记录 problem_switched 事件 (针对上一个问题)
+    if (this.currentProblemId && this.currentProblemId !== problemId) {
+      this.recordHistoryEvent({
+        timestamp: Date.now(),
+        problemId: this.currentProblemId,
+        eventType: 'problem_switched',
+        codeSnapshot: this.editor.getValue(),
+      });
+    }
+
     // 1. 保存当前问题的工作区状态 (如果已修改)
     if (this.currentProblemId) {
       await this.saveCurrentProblemToDisk();
@@ -474,6 +610,14 @@ class DSALabApp {
         newProblemData.audioBlob = audioBlob;
         newProblemData.audioUrl = URL.createObjectURL(audioBlob);
       }
+
+      // 记录 problem_loaded 事件 (针对新加载的问题)
+      this.recordHistoryEvent({
+        timestamp: Date.now(),
+        problemId: problemId,
+        eventType: 'problem_loaded',
+        codeSnapshot: newProblemData.content,
+      });
     }
 
     // 更新编辑器内容
@@ -546,6 +690,7 @@ class DSALabApp {
           await window.electron.saveProblemsToLocal(this.problems); // 保存更新后的 problems 列表
         }
         this.appendOutput('info', this.t('dataSaved'));
+        // problem_saved 事件已在 main.ts 中成功写入文件后记录
       } else {
         this.appendOutput('error', `${this.t('saveFailed')} ${this.currentProblemId}`);
       }
@@ -640,10 +785,11 @@ class DSALabApp {
     this.terminalInput = document.getElementById('terminalInput') as HTMLInputElement;
     if (this.terminalInput) {
       this.terminalInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' && this.isProgramRunning) {
+        if (event.key === 'Enter' && this.isProgramRunning && this.currentProblemId) { // 增加了 currentProblemId 判断
           const input = this.terminalInput!.value;
           this.appendOutput('user-input', `$&gt; ${input}`); // 在终端显示用户输入
-          window.electron.sendUserInput(input); // 发送输入到主进程
+          window.electron.sendUserInput(this.currentProblemId, input); // 发送输入到主进程，并传递 problemId
+          // user_input 事件已在 main.ts 中记录
           this.terminalInput!.value = ''; // 清空输入框
           event.preventDefault(); // 阻止默认的回车行为（如表单提交）
         }
@@ -699,7 +845,7 @@ class DSALabApp {
 
     const code = this.editor.getValue();  // 获取编辑器中的代码
     this.clearOutput();   // 清空当前问题的输出
-    await this.executeCodeSafely(this.currentProblemId, code);  // 安全地执行代码
+    await this.executeCodeSafely(this.currentProblemId, code);  // 安全地执行代码，并传递 problemId
   }
 
   // 向输出面板追加内容
@@ -711,7 +857,7 @@ class DSALabApp {
     outputLine.className = `output-${type}`;  // 添加对应类型的类名 (如 output-info, output-log, output-error, output-user-input)
 
     // 对于用户输入，直接显示文本；对于其他类型，将换行符转换为 <br> 标签以保留格式
-    outputLine.innerHTML = type === 'user-input' ? text : text.replace(/\n/g, '<br>');
+    outputLine.innerHTML = type === 'user-input' ? `$&gt; ${text}` : text.replace(/\n/g, '<br>'); // 对用户输入添加 "> "前缀
     outputContainer.appendChild(outputLine);  // 将输出行添加到容器中
     outputContainer.scrollTop = outputContainer.scrollHeight;  // 滚动到最新输出
 
@@ -770,8 +916,8 @@ class DSALabApp {
     try {
       // 调用主进程编译并运行 C++ 代码。
       // 主进程会通过 'cpp-output-chunk' IPC 通道实时发送输出和错误。
-      // 此处的 await 仅等待整个 C++ 程序的生命周期结束（包括编译和执行）。
-      const result = await window.electron.compileAndRunCpp(code, this.EXECUTION_TIMEOUT);
+      // run_start, run_end, compile_error, run_timeout 等事件已在 main.ts 中记录。
+      const result = await window.electron.compileAndRunCpp(problemId, code, this.EXECUTION_TIMEOUT);
 
       // 程序执行结束后，根据最终结果更新状态
       if (!result.success && !result.error && !result.output) {
@@ -874,16 +1020,34 @@ class DSALabApp {
           problemData.audioUrl = this.audioBlobUrl;
           problemData.audioModified = true; // 标记音频已修改
           this.updateTitle();
+
+          // 记录 audio_record_stop 事件
+          this.recordHistoryEvent({
+            timestamp: Date.now(),
+            problemId: this.currentProblemId!,
+            eventType: 'audio_record_stop',
+            durationMs: this.recordingStartTime ? Date.now() - this.recordingStartTime : undefined, // 使用记录的开始时间
+            audioSizeKB: Math.round(audioBlob.size / 1024),
+          });
+          this.recordingStartTime = null; // 录制结束后清除开始时间
         };
 
         this.mediaRecorder.start();
         this.isRecording = true;
+        this.recordingStartTime = Date.now(); // 记录录制开始时间
         recordBtn.innerHTML = `<i class="fas fa-stop"></i> ${this.t('recordAudio')}`; // Change text to "Stop"
         recordBtn.classList.add('recording'); // Add a class for visual feedback
         playBtn.disabled = true; // Disable play during recording
         audioPlayback.style.display = 'none'; // Hide audio player during recording
         audioPlayback.src = ''; // Clear source
         this.appendOutput('info', this.t('recordingStarted'));
+
+        // 记录 audio_record_start 事件
+        this.recordHistoryEvent({
+          timestamp: Date.now(),
+          problemId: this.currentProblemId!,
+          eventType: 'audio_record_start',
+        });
       } catch (err) {
         console.error(this.t('microphoneAccessFailed'), err);
         this.appendOutput('error', `${this.t('microphoneAccessFailed')}: ${err instanceof Error ? err.message : String(err)}`);
@@ -893,17 +1057,27 @@ class DSALabApp {
       this.mediaRecorder?.stop();
       this.mediaRecorder?.stream.getTracks().forEach(track => track.stop()); // Stop microphone access
       this.isRecording = false;
+      this.recordingStartTime = null; // 停止录制时清除开始时间
       recordBtn.innerHTML = `<i class="fas fa-microphone"></i> ${this.t('recordAudio')}`; // Change text back to "Record"
       recordBtn.classList.remove('recording');
       this.appendOutput('info', this.t('recordingStopped'));
+      // audio_record_stop 事件已在 mediaRecorder.onstop 中记录
     }
   }
 
   // 播放录音
   private playAudio(): void {
     const audioPlayback = document.getElementById('audioPlayback') as HTMLAudioElement;
-    if (audioPlayback && audioPlayback.src) {
-      audioPlayback.play().catch(e => {
+    if (audioPlayback && audioPlayback.src && this.currentProblemId) {
+      audioPlayback.play().then(() => {
+        // 记录 audio_play 事件
+        this.recordHistoryEvent({
+          timestamp: Date.now(),
+          problemId: this.currentProblemId!,
+          eventType: 'audio_play',
+          durationMs: audioPlayback.duration * 1000, // 持续时间 (毫秒)
+        });
+      }).catch(e => {
         console.error(this.t('playbackFailed'), e);
         this.appendOutput('error', `${this.t('playbackFailed')}: ${e instanceof Error ? e.message : String(e)}`);
       });
@@ -932,6 +1106,17 @@ class DSALabApp {
     this.isRecording = false;
     recordBtn.innerHTML = `<i class="fas fa-microphone"></i> ${this.t('recordAudio')}`;
     recordBtn.classList.remove('recording');
+  }
+
+  // ----------------------------------------------------
+  // 新增：记录历史事件的辅助方法
+  // ----------------------------------------------------
+  private recordHistoryEvent(event: HistoryEvent): void {
+    if (!this.currentProblemId) {
+      console.warn('Attempted to record history event without a currentProblemId:', event);
+      return;
+    }
+    window.electron.recordHistoryEvent(event);
   }
 
   // --- Splitter Logic ---

@@ -1,16 +1,16 @@
 {
-  "name": "wizardjs",
-  "productName": "WizardJS",
+  "name": "dsalab",
+  "productName": "DSALab",
   "version": "1.0.0",
-  "description": "WizardJS - The Ultimate JavaScript & TypeScript Playground",
+  "description": "DSALab - C++ Playground for Data Structures and Algorithms",
   "main": ".vite/build/main.js",
-  "homepage": "https://github.com/FranciscoJBrito/WizardJS",
+  "homepage": "https://github.com/huaqianyue/DSALab",
   "repository": {
     "type": "git",
-    "url": "https://github.com/FranciscoJBrito/WizardJS.git"
+    "url": "https://github.com/huaqianyue/DSALab.git"
   },
   "bugs": {
-    "url": "https://github.com/FranciscoJBrito/WizardJS/issues"
+    "url": "https://github.com/huaqianyue/DSALab/issues"
   },
   "scripts": {
     "start": "electron-forge start",
@@ -22,19 +22,22 @@
     "lint:fix": "eslint --ext .ts,.tsx . --fix",
     "clean": "rm -rf out dist .vite"
   },
-  "keywords": [
-    "javascript",
+  "keywords": [ 
+    "cpp",
+    "c++",
+    "dsa",
+    "data-structures",
+    "algorithms",
     "playground",
     "editor",
     "electron",
-    "runjs",
     "code-runner",
-    "development-tools",
+    "education",
     "open-source"
   ],
-  "author": {
-    "name": "Francisco Brito",
-    "email": "franciscojavierbrito16@gmail.com"
+  "author": { 
+    "name": "Wang Xingyu",
+    "email": "WMX_0121@outlook.com"
   },
   "license": "MIT",
   "devDependencies": {

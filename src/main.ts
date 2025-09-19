@@ -54,8 +54,194 @@ const createWindow = () => {
 
 let cppProcess: ChildProcessWithoutNullStreams | null = null; // 用于跟踪当前正在运行的C++进程
 
-ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: number) => {
-  const webContents = event.sender; // 获取 webContents 以便发送消息回渲染进程
+// ----------------------------------------------------
+// 新增：历史记录相关类型定义和 IPC 处理
+// ----------------------------------------------------
+
+// Shared HistoryEvent interfaces
+interface HistoryEventBase {
+  timestamp: number;
+  problemId: string;
+  eventType: string; // e.g., 'edit', 'run_start', 'run_end', 'program_output'
+}
+
+interface SimplifiedContentChange {
+  range: { startLineNumber: number; startColumn: number; endLineNumber: number; endColumn: number };
+  rangeLength: number;
+  text: string;
+  rangeOffset: number;
+}
+
+interface CodeEditEvent extends HistoryEventBase {
+  eventType: 'edit';
+  operationType: 'type' | 'ime_input' | 'paste_insert' | 'paste_replace' | 'delete' | 'other_edit';
+  change: SimplifiedContentChange;
+  cursorPosition: { lineNumber: number; column: number };
+}
+
+interface ProgramRunStartEvent extends HistoryEventBase {
+  eventType: 'run_start';
+  codeSnapshot: string; // Full code at the moment of run
+}
+
+interface ProgramOutputEvent extends HistoryEventBase {
+  eventType: 'program_output' | 'program_error' | 'user_input';
+  data: string;
+  outputType: 'log' | 'error' | 'user-input' | 'info' | 'result'; // Corresponds to cpp-output-chunk types
+}
+
+interface ProgramRunEndEvent extends HistoryEventBase {
+  eventType: 'run_end' | 'compile_error' | 'run_timeout' | 'program_terminated_by_new_run';
+  success: boolean;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  durationMs?: number; // Time taken for execution
+  errorMessage?: string; // For compile_error, run_timeout, or general run_end error
+}
+
+interface ProblemLifecycleEvent extends HistoryEventBase {
+  eventType: 'problem_loaded' | 'problem_saved' | 'problem_switched';
+  codeSnapshot?: string; // Code at load/save/switch
+  audioState?: 'present' | 'absent' | 'modified'; // Audio state at save
+}
+
+interface AudioEvent extends HistoryEventBase {
+  eventType: 'audio_record_start' | 'audio_record_stop' | 'audio_play';
+  durationMs?: number; // For record_stop, play
+  audioSizeKB?: number; // For record_stop
+}
+
+type HistoryEvent = CodeEditEvent | ProgramRunStartEvent | ProgramOutputEvent | ProgramRunEndEvent | ProblemLifecycleEvent | AudioEvent;
+
+const HISTORY_FLUSH_BATCH_INTERVAL_MS = 30000; // 30 seconds for batch events
+
+// Buffers for history events, per problemId
+const historyBuffers: Map<string, {
+  batchBuffer: HistoryEvent[];
+  runEventsBuffer: HistoryEvent[];
+  batchTimer: NodeJS.Timeout | null;
+}> = new Map();
+
+// Helper to get history file path for a problem
+function getProblemHistoryFilePath(problemId: string): string {
+  const problemWorkspaceDir = path.join(USER_WORKSPACES_ROOT, problemId);
+  return path.join(problemWorkspaceDir, 'history.json');
+}
+
+// Function to flush events from a buffer to disk
+async function flushBuffer(problemId: string, bufferType: 'batch' | 'run'): Promise<void> {
+  const buffers = historyBuffers.get(problemId);
+  if (!buffers) return;
+
+  const bufferToFlush = bufferType === 'batch' ? buffers.batchBuffer : buffers.runEventsBuffer;
+
+  if (bufferToFlush.length === 0) {
+    return;
+  }
+
+  // Clear timer if flushing batch buffer
+  if (bufferType === 'batch' && buffers.batchTimer) {
+    clearTimeout(buffers.batchTimer);
+    buffers.batchTimer = null;
+  }
+
+  const historyFilePath = getProblemHistoryFilePath(problemId);
+  const problemWorkspaceDir = path.join(USER_WORKSPACES_ROOT, problemId);
+
+  try {
+    await fs.mkdir(problemWorkspaceDir, { recursive: true });
+
+    let existingHistory: HistoryEvent[] = [];
+    try {
+      const content = await fs.readFile(historyFilePath, 'utf-8');
+      existingHistory = JSON.parse(content);
+    } catch (readError: any) {
+      if (readError.code !== 'ENOENT') {
+        console.error(`Failed to read history.json for problem ${problemId}:`, readError);
+      }
+    }
+
+    const newHistory = existingHistory.concat(bufferToFlush);
+    await fs.writeFile(historyFilePath, JSON.stringify(newHistory, null, 2), 'utf-8');
+    console.log(`History for problem ${problemId} flushed (${bufferToFlush.length} events) from ${bufferType} buffer to ${historyFilePath}`);
+
+    // Clear the buffer after successful write
+    if (bufferType === 'batch') {
+      buffers.batchBuffer.length = 0;
+    } else {
+      buffers.runEventsBuffer.length = 0;
+    }
+
+  } catch (error: any) {
+    console.error(`Failed to flush history for problem ${problemId}:`, error);
+  }
+}
+
+// IPC handler for history events
+ipcMain.on('record-history-event', async (event, historyEvent: HistoryEvent) => {
+  const { problemId, eventType } = historyEvent;
+
+  if (!historyBuffers.has(problemId)) {
+    historyBuffers.set(problemId, {
+      batchBuffer: [],
+      runEventsBuffer: [],
+      batchTimer: null,
+    });
+  }
+  const buffers = historyBuffers.get(problemId)!;
+
+  switch (eventType) {
+    case 'edit':
+      buffers.batchBuffer.push(historyEvent);
+      if (buffers.batchTimer) {
+        clearTimeout(buffers.batchTimer);
+      }
+      buffers.batchTimer = setTimeout(() => flushBuffer(problemId, 'batch'), HISTORY_FLUSH_BATCH_INTERVAL_MS);
+      break;
+
+    case 'run_start':
+      buffers.runEventsBuffer.length = 0; // Clear run buffer for new run
+      buffers.batchBuffer.push(historyEvent);
+      await flushBuffer(problemId, 'batch'); // Immediately flush run_start with code snapshot
+      break;
+
+    case 'program_output':
+    case 'program_error':
+    case 'user_input':
+      buffers.runEventsBuffer.push(historyEvent);
+      break;
+
+    case 'run_end':
+    case 'compile_error':
+    case 'run_timeout':
+    case 'program_terminated_by_new_run': // Added this event type for history
+      buffers.runEventsBuffer.push(historyEvent); // Add the end event itself
+      buffers.batchBuffer.push(...buffers.runEventsBuffer); // Move all run events to batch buffer
+      buffers.runEventsBuffer.length = 0; // Clear run buffer
+      await flushBuffer(problemId, 'batch'); // Immediately flush the whole run cycle
+      break;
+
+    case 'problem_loaded':
+    case 'problem_saved':
+    case 'problem_switched':
+    case 'audio_record_start':
+    case 'audio_record_stop':
+    case 'audio_play':
+      buffers.batchBuffer.push(historyEvent);
+      await flushBuffer(problemId, 'batch'); // Immediately flush important events
+      break;
+
+    default:
+      console.warn(`Unknown history event type: ${eventType}`);
+      break;
+  }
+});
+
+// ----------------------------------------------------
+// 修改：compile-and-run-cpp IPC 处理
+// ----------------------------------------------------
+ipcMain.handle('compile-and-run-cpp', async (event, problemId: string, code: string, timeout: number) => { // Added problemId
+  const webContents = event.sender;
   const tempDir = path.join(app.getPath('temp'), 'DSALab-cpp');
   const sourceFilePath = path.join(tempDir, 'main.cpp');
   const executablePath = path.join(tempDir, process.platform === 'win32' ? 'main.exe' : 'main');
@@ -65,11 +251,31 @@ ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: numbe
     cppProcess.kill('SIGKILL');
     cppProcess = null;
     webContents.send('cpp-output-chunk', { type: 'error', data: '上一个程序被强制终止。\n' });
+    // 记录：上一个程序被新程序强制终止
+    ipcMain.emit('record-history-event', null, {
+      timestamp: Date.now(),
+      problemId: problemId,
+      eventType: 'program_terminated_by_new_run',
+      success: false,
+      exitCode: null,
+      signal: 'SIGKILL',
+      errorMessage: 'Previous program was forcefully terminated by a new run.',
+    } as ProgramRunEndEvent);
   }
 
   let finalOutput = ''; // 收集所有标准输出
   let finalError = '';  // 收集所有错误输出
   let compilationSuccess = false;
+  const overallStartTime = Date.now(); // 记录整个运行过程的开始时间
+
+  // 记录 run_start 事件
+  ipcMain.emit('record-history-event', null, {
+    timestamp: overallStartTime,
+    problemId: problemId,
+    eventType: 'run_start',
+    codeSnapshot: code,
+  } as ProgramRunStartEvent);
+
 
   try {
     await fs.mkdir(tempDir, { recursive: true });
@@ -78,8 +284,10 @@ ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: numbe
     // 1. 编译 C++ 代码
     webContents.send('cpp-output-chunk', { type: 'info', data: '正在编译C++代码...\n' });
     const compileCommand = `g++ "${sourceFilePath}" -o "${executablePath}"`;
+    const compileStartTime = Date.now();
     const { stdout: compileStdout, stderr: compileStderr } = await new Promise<{ stdout: string, stderr: string }>((resolve, reject) => {
       exec(compileCommand, { timeout: 10000 }, (err, stdout, stderr) => { // 编译超时10秒
+        const compileDuration = Date.now() - compileStartTime;
         if (err) {
           // 检查是否是 g++ 命令未找到的错误
           if (err.message.includes('command not found') || err.message.includes('不是内部或外部命令')) {
@@ -87,8 +295,30 @@ ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: numbe
               '编译环境错误',
               `无法找到 g++ 编译器。请确保您的系统已安装 g++ 并且其路径已添加到环境变量 (PATH) 中。详细错误: ${err.message}`
             );
+            // 记录编译错误事件
+            ipcMain.emit('record-history-event', null, {
+              timestamp: Date.now(),
+              problemId: problemId,
+              eventType: 'compile_error',
+              success: false,
+              exitCode: err.code || 1,
+              signal: err.signal || null,
+              durationMs: compileDuration,
+              errorMessage: `g++ compiler not found or not in PATH. ${stderr || stdout || err.message}`,
+            } as ProgramRunEndEvent);
             reject(new Error(`Compilation failed: g++ compiler not found or not in PATH. ${stderr || stdout || err.message}`));
           } else {
+            // 记录编译错误事件
+            ipcMain.emit('record-history-event', null, {
+              timestamp: Date.now(),
+              problemId: problemId,
+              eventType: 'compile_error',
+              success: false,
+              exitCode: err.code || 1,
+              signal: err.signal || null,
+              durationMs: compileDuration,
+              errorMessage: stderr || stdout || err.message,
+            } as ProgramRunEndEvent);
             reject(new Error(`Compilation failed: ${stderr || stdout || err.message}`));
           }
         } else {
@@ -100,11 +330,20 @@ ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: numbe
     if (compileStderr) {
       finalError += `[编译错误]\n${compileStderr}\n`;
       webContents.send('cpp-output-chunk', { type: 'error', data: finalError });
-      return { success: false, output: finalOutput, error: finalError }; // 编译失败，提前返回
+      // 编译错误事件已在上面 emit，此处直接返回
+      return { success: false, output: finalOutput, error: finalError };
     }
     if (compileStdout) {
       finalOutput += `[编译输出]\n${compileStdout}\n`;
       webContents.send('cpp-output-chunk', { type: 'log', data: finalOutput });
+      // 记录编译输出事件
+      ipcMain.emit('record-history-event', null, {
+        timestamp: Date.now(),
+        problemId: problemId,
+        eventType: 'program_output',
+        data: `[编译输出]\n${compileStdout}\n`,
+        outputType: 'log',
+      } as ProgramOutputEvent);
     }
     compilationSuccess = true;
     webContents.send('cpp-output-chunk', { type: 'info', data: '编译成功，正在运行...\n' });
@@ -112,11 +351,23 @@ ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: numbe
     // 2. 使用 spawn 执行编译后的程序，以便进行交互
     cppProcess = spawn(executablePath, []); // 不在这里设置超时，手动管理
 
+    const executionStartTime = Date.now();
     const executionTimeoutId = setTimeout(() => {
       if (cppProcess && !cppProcess.killed) {
         cppProcess.kill('SIGKILL');
         finalError += `Execution timed out after ${timeout / 1000} seconds.\n`;
         webContents.send('cpp-output-chunk', { type: 'error', data: `⚠️ 执行超时：你的程序运行时间过长，可能存在无限循环或性能问题 (超过 ${timeout / 1000} 秒)。\n` });
+        // 记录执行超时事件
+        ipcMain.emit('record-history-event', null, {
+          timestamp: Date.now(),
+          problemId: problemId,
+          eventType: 'run_timeout',
+          success: false,
+          exitCode: null,
+          signal: 'SIGKILL',
+          durationMs: Date.now() - executionStartTime,
+          errorMessage: `Execution timed out after ${timeout / 1000} seconds.`,
+        } as ProgramRunEndEvent);
       }
     }, timeout);
 
@@ -125,6 +376,14 @@ ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: numbe
       const chunk = data.toString();
       finalOutput += chunk;
       webContents.send('cpp-output-chunk', { type: 'log', data: chunk });
+      // 记录程序标准输出事件
+      ipcMain.emit('record-history-event', null, {
+        timestamp: Date.now(),
+        problemId: problemId,
+        eventType: 'program_output',
+        data: chunk,
+        outputType: 'log',
+      } as ProgramOutputEvent);
     });
 
     // 监听子进程的错误输出
@@ -132,6 +391,14 @@ ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: numbe
       const chunk = data.toString();
       finalError += chunk;
       webContents.send('cpp-output-chunk', { type: 'error', data: chunk });
+      // 记录程序错误输出事件
+      ipcMain.emit('record-history-event', null, {
+        timestamp: Date.now(),
+        problemId: problemId,
+        eventType: 'program_error',
+        data: chunk,
+        outputType: 'error',
+      } as ProgramOutputEvent);
     });
 
     // 处理子进程退出
@@ -143,10 +410,32 @@ ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: numbe
         if (err.message.includes('ENOENT')) {
           finalError += `错误：无法找到可执行文件。请确保编译成功。\n`;
           webContents.send('cpp-output-chunk', { type: 'error', data: finalError });
+          // 记录程序执行错误事件
+          ipcMain.emit('record-history-event', null, {
+            timestamp: Date.now(),
+            problemId: problemId,
+            eventType: 'run_end',
+            success: false,
+            exitCode: 1,
+            signal: null,
+            durationMs: Date.now() - executionStartTime,
+            errorMessage: `Executable not found: ${err.message}`,
+          } as ProgramRunEndEvent);
           resolve({ code: 1, signal: null });
         } else {
           finalError += `程序执行错误: ${err.message}\n`;
           webContents.send('cpp-output-chunk', { type: 'error', data: finalError });
+          // 记录程序执行错误事件
+          ipcMain.emit('record-history-event', null, {
+            timestamp: Date.now(),
+            problemId: problemId,
+            eventType: 'run_end',
+            success: false,
+            exitCode: 1,
+            signal: null,
+            durationMs: Date.now() - executionStartTime,
+            errorMessage: `Program execution error: ${err.message}`,
+          } as ProgramRunEndEvent);
           resolve({ code: 1, signal: null });
         }
       });
@@ -154,15 +443,39 @@ ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: numbe
 
     clearTimeout(executionTimeoutId); // 如果进程正常退出，清除超时计时器
 
+    const runDuration = Date.now() - executionStartTime;
     if (signal === 'SIGKILL') {
-      // 超时或被强制终止的消息已由超时处理器或主动终止发送
+      // 超时或被强制终止的消息已由超时处理器或主动终止发送，对应的历史事件也已记录
       return { success: false, output: finalOutput, error: finalError };
     } else if (exitCode !== 0) {
       finalError += `程序以非零状态码 ${exitCode} 退出。\n`;
       webContents.send('cpp-output-chunk', { type: 'error', data: `程序以非零状态码 ${exitCode} 退出。\n` });
+      // 记录程序非零状态码退出事件
+      ipcMain.emit('record-history-event', null, {
+        timestamp: Date.now(),
+        problemId: problemId,
+        eventType: 'run_end',
+        success: false,
+        exitCode: exitCode,
+        signal: signal,
+        durationMs: runDuration,
+        errorMessage: `Program exited with non-zero status code ${exitCode}.`,
+      } as ProgramRunEndEvent);
       return { success: false, output: finalOutput, error: finalError };
-    } else if (!finalOutput && !finalError) {
-      webContents.send('cpp-output-chunk', { type: 'result', data: '代码执行完成，无输出。\n' });
+    } else {
+      if (!finalOutput && !finalError) {
+        webContents.send('cpp-output-chunk', { type: 'result', data: '代码执行完成，无输出。\n' });
+      }
+      // 记录程序正常退出事件
+      ipcMain.emit('record-history-event', null, {
+        timestamp: Date.now(),
+        problemId: problemId,
+        eventType: 'run_end',
+        success: true,
+        exitCode: 0,
+        signal: null,
+        durationMs: runDuration,
+      } as ProgramRunEndEvent);
     }
 
     return { success: true, output: finalOutput, error: finalError };
@@ -170,6 +483,17 @@ ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: numbe
   } catch (e: any) {
     finalError += `❌ 错误: ${e.message}\n`;
     webContents.send('cpp-output-chunk', { type: 'error', data: `❌ 错误: ${e.message}\n` });
+    // 记录主进程层面错误事件 (如 exec/spawn 失败)
+    ipcMain.emit('record-history-event', null, {
+      timestamp: Date.now(),
+      problemId: problemId,
+      eventType: 'run_end', // General error
+      success: false,
+      exitCode: 1,
+      signal: null,
+      durationMs: Date.now() - overallStartTime, // Use overall start time for total duration
+      errorMessage: `Main process error during compilation/execution setup: ${e.message}`,
+    } as ProgramRunEndEvent);
     return { success: false, output: finalOutput, error: finalError };
   } finally {
     cppProcess = null; // 进程结束后清除引用
@@ -183,10 +507,21 @@ ipcMain.handle('compile-and-run-cpp', async (event, code: string, timeout: numbe
   }
 });
 
+// ----------------------------------------------------
+// 修改：send-user-input IPC 处理
+// ----------------------------------------------------
 // 新增：用于接收渲染进程发送的用户输入
-ipcMain.on('send-user-input', (event, input: string) => {
+ipcMain.on('send-user-input', (event, problemId: string, input: string) => { // Added problemId
   if (cppProcess && !cppProcess.killed && cppProcess.stdin.writable) {
     cppProcess.stdin.write(Buffer.from(input + '\n', 'utf8'));
+    // 记录用户输入事件
+    ipcMain.emit('record-history-event', null, {
+      timestamp: Date.now(),
+      problemId: problemId,
+      eventType: 'user_input',
+      data: input,
+      outputType: 'user-input',
+    } as ProgramOutputEvent);
   } else {
     event.sender.send('cpp-output-chunk', { type: 'error', data: '错误：没有正在运行的程序可以接收输入。\n' });
   }
@@ -242,7 +577,7 @@ const LOCAL_PROBLEMS_JSON_PATH = path.join(app.getPath('userData'), 'DSALab', 'p
 // 定义用户工作区根目录的路径
 const USER_WORKSPACES_ROOT = path.join(app.getPath('documents'), 'DSALab Workspaces');
 // CDN 上的原始 problems.json URL
-const CDN_PROBLEMS_URL = 'https://cdn.jsdmirror.com/gh/huaqianyue/DSALab/problem.json';
+const CDN_PROBLEMS_URL = 'https://raw.githubusercontent.com/huaqianyue/DSALab/refs/heads/main/problem.json';
 
 interface Problem {
   id: string;
@@ -425,6 +760,16 @@ ipcMain.handle('save-problem-workspace', async (event, problemId: string, codeCo
         }
       }
     }
+
+    // 记录 problem_saved 事件
+    ipcMain.emit('record-history-event', null, {
+      timestamp: Date.now(),
+      problemId: problemId,
+      eventType: 'problem_saved',
+      codeSnapshot: codeContent,
+      audioState: audioData ? 'present' : 'absent',
+    } as ProblemLifecycleEvent);
+
     return true;
   } catch (error: any) {
     console.error(`Failed to save workspace for problem ${problemId}:`, error);
@@ -432,6 +777,9 @@ ipcMain.handle('save-problem-workspace', async (event, problemId: string, codeCo
   }
 });
 
+// ----------------------------------------------------
+// 修改：应用即将退出事件，强制刷新所有历史记录缓冲区
+// ----------------------------------------------------
 // 应用准备就绪时创建窗口
 app.on('ready', createWindow);
 
@@ -459,8 +807,15 @@ app.on('before-quit', async (event) => {
 
     // 等待渲染进程的确认消息
     await new Promise<void>(resolve => {
-      ipcMain.once('app-quit-acknowledged', () => {
-        console.log('Main process: Renderer acknowledged quit, proceeding to exit.');
+      ipcMain.once('app-quit-acknowledged', async () => {
+        console.log('Main process: Renderer acknowledged quit, proceeding to flush all history buffers.');
+        // 强制刷新所有问题的所有历史事件缓冲区
+        for (const problemId of historyBuffers.keys()) {
+          await flushBuffer(problemId, 'batch');
+          // 确保程序运行缓冲区也被清空，以防程序在退出前仍在运行
+          await flushBuffer(problemId, 'run');
+        }
+        console.log('Main process: All history buffers flushed.');
         resolve();
       });
     });
