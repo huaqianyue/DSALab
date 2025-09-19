@@ -154,6 +154,7 @@ interface Problem {
   Title: string; // 新增 Title 字段
   shortDescription: string;
   fullDescription: string;
+  isDelete: boolean; // <-- 新增 isDelete 字段
   Audio: string; // 存储相对路径，如果本地有音频文件
   Code: string;  // 存储相对路径，如果本地有代码文件
 }
@@ -283,12 +284,17 @@ class DSALabApp {
       exportCancelled: 'Export cancelled.', // 新增
       exportSuccess: 'Problems exported successfully to:', // 新增
       exportFailed: 'Failed to export problems:', // 新增
-      missingCodeAudio: 'Missing Code or Audio', // 新增
+      missingCodeAudio: 'Missing Code or Audio', // 新增 (此翻译已不再用于 tooltip, 但保留以防万一)
+      deletedProblem: 'Deleted Problem',
       importSuccess: 'Problems imported successfully. {count} valid problems added/updated. {invalidCount} invalid problems skipped.', // 新增
       importFailed: 'Failed to import problems:', // 新增
       importInvalidFormat: 'Invalid JSON format or structure.', // 新增
       refreshSuccess: 'Problem list refreshed successfully.', // 新增
       refreshFailed: 'Failed to refresh problem list:', // 新增
+      missing: 'Missing ', // 新增：用于构建“Missing Code”, “Missing Audio”
+      Code: 'Code', // 新增：用于构建“Missing Code”
+      Audio: 'Audio', // 新增：用于构建“Missing Audio”
+      or: ' or ', // 新增：用于连接“Code or Audio”
     },
     zh: { // 中文翻译
       run: '运行',
@@ -339,12 +345,17 @@ class DSALabApp {
       exportCancelled: '导出已取消。', // 新增
       exportSuccess: '题目已成功导出到：', // 新增
       exportFailed: '导出题目失败：', // 新增
-      missingCodeAudio: '缺少代码或音频', // 新增
+      missingCodeAudio: '缺少代码或音频', // 新增 (此翻译已不再用于 tooltip, 但保留以防万一)
+      deletedProblem: '已删除', 
       importSuccess: '题目导入成功。新增/更新 {count} 个有效题目，跳过 {invalidCount} 个无效题目。', // 新增
       importFailed: '导入题目失败：', // 新增
       importInvalidFormat: 'JSON格式或结构无效。', // 新增
       refreshSuccess: '题目列表刷新成功。', // 新增
       refreshFailed: '刷新题目列表失败：', // 新增
+      missing: '缺少', // 新增：用于构建“缺少代码”, “缺少音频”
+      Code: '代码', // 新增：用于构建“缺少代码”
+      Audio: '音频', // 新增：用于构建“缺少音频”
+      or: '或', // 新增：用于连接“代码或音频”
     }
   };
 
@@ -663,6 +674,11 @@ class DSALabApp {
       const listItem = document.createElement('li');
       listItem.className = 'problem-item';
       listItem.setAttribute('data-problem-id', problem.id);
+
+      // 如果题目被标记为删除，则添加 'deleted-problem' 类
+      if (problem.isDelete) {
+        listItem.classList.add('deleted-problem');
+      }
 
       // 添加图标
       let iconsHtml = '';
@@ -1550,36 +1566,22 @@ int main() {
           this.problems = importResult.problems;
           this.renderProblemList();
           this.appendOutput('info', this.t('importSuccess', { count: importResult.problems.length - (importResult.invalidCount || 0), invalidCount: importResult.invalidCount || 0 }));
-          // 导入成功后，尝试重新激活上次打开的题目或当前题目
-          if (this.currentProblemId) {
-            const problemExists = this.problems.some(p => p.id === this.currentProblemId);
-            if (problemExists) {
-              await this.switchToProblem(this.currentProblemId);
-            } else {
-              // 当前题目已不存在，重置状态
-              this.currentProblemId = null;
-              this.appSettings.lastOpenedProblemId = null;
-              await this.saveAppSettings();
-              this.editor?.setValue(this.t('selectProblemEditor'));
-              this.clearOutput();
-              this.toggleAudioPanelVisibility(false);
-              this.updateTitle();
-              this.updateSaveButtonState();
-              this.activateProblemListTab();
-            }
-          } else if (this.appSettings.lastOpenedProblemId) {
-            const lastProblem = this.problems.find(p => p.id === this.appSettings.lastOpenedProblemId);
-            if (lastProblem) {
-              await this.switchToProblem(lastProblem.id);
-            }
-          } else {
-            this.editor?.setValue(this.t('selectProblemEditor'));
-            this.clearOutput();
-            this.toggleAudioPanelVisibility(false);
-            this.updateTitle();
-            this.updateSaveButtonState();
-            this.activateProblemListTab();
-          }
+          
+          // ====================================================================
+          // 修改点：导入成功后，不再自动切换题目，而是重置界面并停留在题目列表
+          // ====================================================================
+          this.currentProblemId = null; // 清除当前选中的题目ID
+          this.appSettings.lastOpenedProblemId = null; // 清除上次打开的题目ID
+          await this.saveAppSettings(); // 保存设置
+
+          this.editor?.setValue(this.t('selectProblemEditor')); // 编辑器显示提示信息
+          this.clearOutput(); // 清空输出面板
+          this.toggleAudioPanelVisibility(false); // 隐藏音频面板
+          this.updateTitle(); // 更新窗口标题（应显示默认标题）
+          this.updateSaveButtonState(); // 更新保存按钮状态（应为禁用）
+          this.activateProblemListTab(); // 激活题目列表标签页
+          // ====================================================================
+
         } else {
           this.appendOutput('error', `${this.t('importFailed')} ${importResult.error || this.t('importInvalidFormat')}`);
         }
@@ -1612,12 +1614,18 @@ int main() {
     });
   }
 
-  private openExportModal(): void {
+  // 修改 openExportModal 为 async
+  private async openExportModal(): Promise<void> {
     if (!this.exportModal || !this.exportProblemList) return;
 
     // 提示用户保存当前题目（如果已修改）
     if (this.currentProblemId) {
-      this.saveCurrentProblemToDisk(); // 不等待，异步保存
+      // 确保等待保存操作完成，这样导出列表才能反映最新的保存状态
+      await this.saveCurrentProblemToDisk();
+      // 重新渲染问题列表以更新图标和内部状态，确保 problem.Code 和 problem.Audio 是最新的
+      // 这一步很重要，因为 saveCurrentProblemToDisk 可能会更新 this.problems 中的 Code/Audio 字段
+      // 并且 renderProblemList 依赖这些字段来判断是否显示图标，以及 openExportModal 依赖它们来判断 canExport
+      this.renderProblemList();
     }
 
     this.exportProblemList.innerHTML = ''; // Clear previous list
@@ -1627,22 +1635,42 @@ int main() {
       listItem.className = 'export-problem-item';
       listItem.setAttribute('data-problem-id', problem.id);
 
-      const hasCode = problem.Code !== '';
-      const hasAudio = problem.Audio !== '';
-      const canExport = hasCode && hasAudio;
+      // 这里的 hasCode 和 hasAudio 现在应该反映了最新的磁盘状态
+      // 因为我们已经在打开弹窗前尝试保存了当前题目并重新渲染了列表
+      let hasCode = problem.Code !== '';
+      let hasAudio = problem.Audio !== '';
+      let canExport = hasCode && hasAudio; // Default export condition
 
-      let tooltipText = '';
-      if (!canExport) {
-        tooltipText = this.t('missingCodeAudio');
-        if (!hasCode) tooltipText += ' (缺少代码)';
-        if (!hasAudio) tooltipText += ' (缺少音频)';
-        listItem.classList.add('disabled-problem');
+      let statusTextHtml = ''; // Initialize status HTML
+
+      if (problem.isDelete) {
+        canExport = false; // 已删除的题目不能导出
+        statusTextHtml = ` <span class="export-status deleted-status">(${this.t('deletedProblem')})</span>`;
+        listItem.classList.add('deleted-problem-export'); // Add a class for visual feedback for deleted problems
+        listItem.classList.add('disabled-problem'); // Ensure disabled styling
+      } else {
+        // Only check for missing code/audio if the problem is not deleted
+        if (!canExport) {
+          let missingParts: string[] = [];
+          if (!hasCode) {
+            missingParts.push(this.t('Code'));
+          }
+          if (!hasAudio) {
+            missingParts.push(this.t('Audio'));
+          }
+
+          if (missingParts.length > 0) {
+              let missingText = missingParts.join(this.t('or'));
+              statusTextHtml = ` <span class="export-status missing-status">(${this.t('missing')}${missingText})</span>`;
+          }
+          listItem.classList.add('disabled-problem'); // Add disabled styling
+        }
       }
 
       listItem.innerHTML = `
-        <label data-tooltip="${tooltipText}">
-          <input type="checkbox" data-problem-id="${problem.id}" ${!canExport ? 'disabled' : ''} ${problem.id === this.currentProblemId ? 'checked' : ''}>
-          <span>${problem.shortDescription}</span>
+        <label>
+          <input type="checkbox" data-problem-id="${problem.id}" ${!canExport ? 'disabled' : ''} ${problem.id === this.currentProblemId && canExport ? 'checked' : ''}>
+          <span>${problem.shortDescription}${statusTextHtml}</span>
         </label>
       `;
 

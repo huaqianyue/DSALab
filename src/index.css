@@ -51,7 +51,7 @@
   .global-header-bar .header-left {
     gap: 8px; /* 按钮之间更紧凑的间距 */
   }
-
+  
   /* 对应 HTML: <div class="user-info"> */
   .global-header-bar .user-info {
     display: flex;
@@ -112,13 +112,13 @@
     transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     -webkit-app-region: no-drag; /* Important for Electron */
   }
-
+  
   .action-button:hover {
     background: #30363d;
     border-color: #444c56;
     color: #e6edf3;
   }
-
+  
   /* 禁用按钮样式 (通用) */
   /* .global-header-bar .header-btn:disabled, */ /* 移除，由 .action-button:disabled 覆盖 */
   .action-button:disabled,
@@ -189,7 +189,7 @@
   .problem-description-panel {
     flex: 0 0 40%; /* 左侧面板占据 40% 宽度，可根据需要调整 */
     /* flex-basis 应该由JS控制，这里提供一个初始值 */
-    flex-basis: 40%; 
+    flex-basis: 40%;
     display: flex; /* 使其成为 flex 容器，以便垂直堆叠题目描述和音频面板 */
     flex-direction: column;
     background: #0d1117; /* 面板背景色 */
@@ -294,7 +294,7 @@
     color: #ffffff;
     font-weight: 600;
   }
-
+  
   /* 新增：包裹图标的容器样式 */
   .problem-action-icons {
     display: flex; /* 让图标在容器内横向排列 */
@@ -307,11 +307,11 @@
     font-size: 0.9em;
     opacity: 0.8;
   }
-
+  
   .problem-item .code-icon {
     color: #7aa6da; /* 蓝色 */
   }
-
+  
   .problem-item .audio-icon {
     color: #e78c45; /* 橙色 */
   }
@@ -383,14 +383,14 @@
     font-size: 13px;
     color: #7d8590;
   }
-
+  
   /* 移除左侧面板内部的水平分割线 */
   /* .problem-description-panel > .horizontal-split-divider {
     height: 4px;
     background: #21262d;
     flex-shrink: 0;
   } */
-
+  
   /* ==========================================================================
      新增：音频录制与播放面板 (Audio Panel)
      对应 HTML: <div class="audio-panel"> ... </div>
@@ -403,7 +403,7 @@
     display: flex; /* 内部 flex 布局 */
     flex-direction: column; /* 垂直堆叠 header 和 content */
   }
-
+  
   /* 新增：音频面板隐藏时的样式 */
   .audio-panel.hidden {
     display: none;
@@ -443,12 +443,12 @@
   
   /* 对应 HTML: <audio id="audioPlayback"> */
   #audioPlayback {
-      flex: 1; /* 让音频播放器占据剩余空间 */
-      min-width: 0; /* 防止内容溢出 */
-      height: 30px; /* 调整高度 */
-      display: none; /* Default hidden */
+    flex: 1; /* 让音频播放器占据剩余空间 */
+    min-width: 0; /* 防止内容溢出 */
+    height: 30px; /* 调整高度 */
+    display: none; /* Default hidden */
   }
-
+  
   /* Style for recording button visual feedback */
   .btn-audio.recording {
     background-color: #d54e53; /* Red background for recording */
@@ -470,7 +470,7 @@
     flex-shrink: 0;
     cursor: ew-resize; /* 左右调整大小的光标 */
   }
-
+  
   /* 只有右侧面板的水平分割线需要 .horizontal-split-divider 样式 */
   .code-test-panel > .horizontal-split-divider {
     height: 4px;
@@ -666,7 +666,7 @@
     z-index: 1001;
     pointer-events: none;
   }
-
+  
   /* Style for problem navigation buttons */
   .problem-navigation-buttons {
     display: flex;
@@ -675,260 +675,358 @@
     padding-top: 15px;
     border-top: 1px solid #21262d; /* Separator line */
   }
-
+  
   .problem-navigation-buttons .btn-audio {
     flex-grow: 1; /* Allow buttons to grow */
     margin: 0 5px; /* Spacing between buttons */
     justify-content: center; /* Center content within button */
   }
-
+  
   /* Make problem description tab header not clickable initially */
   #problemDescriptionTabHeader {
-      pointer-events: none; /* Disable direct clicks */
-      opacity: 0.7; /* Dim it slightly */
+    pointer-events: none; /* Disable direct clicks */
+    opacity: 0.7; /* Dim it slightly */
   }
-
+  
   #problemDescriptionTabHeader.active {
-      pointer-events: auto; /* Enable when active (though it's activated by problem item click) */
-      opacity: 1; /* Full opacity when active */
+    pointer-events: auto; /* Enable when active (though it's activated by problem item click) */
+    opacity: 1; /* Full opacity when active */
   }
   /* ... 现有样式 ... */
-
-/* Terminal Input Area */
-.terminal-input-area {
-  display: flex;
-  align-items: center;
-  padding: 5px;
-  background-color: #1e1e1e; /* 匹配深色背景 */
-  border-top: 1px solid #333;
-  color: #e6edf3;
-  font-family: 'JetBrains Mono', Consolas, monospace;
-  font-size: 14px;
-  flex-shrink: 0; /* Prevent shrinking */
-}
-
-.terminal-input-area .prompt {
-  color: #79c0ff; /* 蓝色提示符 */
-  margin-right: 5px;
-}
-
-.terminal-input {
-  flex-grow: 1;
-  background-color: transparent;
-  border: none;
-  outline: none;
-  color: #e6edf3; /* 默认文本颜色 */
-  font-family: 'JetBrains Mono', Consolas, monospace;
-  font-size: 14px;
-  padding: 2px 0;
-}
-
-.terminal-input:focus {
-  border: none;
-  outline: none;
-}
-
-.terminal-input:disabled {
-  color: #6e7681; /* 禁用时的文本颜色 */
-  cursor: not-allowed;
-}
-
-/* Output types for styling */
-.output-info { color: #79c0ff; } /* Light blue for info messages */
-.output-log { color: #e6edf3; } /* Default text color for program output */
-.output-error { color: #ff7b72; } /* Red for error messages */
-.output-error-friendly { color: #ff7b72; font-weight: bold; } /* Red, bold for friendly error messages */
-.output-result { color: #7ee787; } /* Green for success/result messages */
-.output-user-input { color: #a5d6ff; } /* Lighter blue for user input */
-
-/* Make sure output container can scroll */
-.output-container {
-  flex-grow: 1;
-  overflow-y: auto;
-  padding: 10px;
-  background-color: #0d1117; /* Match editor background */
-  color: #e6edf3;
-  font-family: 'JetBrains Mono', Consolas, monospace;
-  font-size: 14px;
-  white-space: pre-wrap; /* Preserve whitespace and wrap text */
-  word-wrap: break-word; /* Break long words */
-}
-
-/* Adjust .test-output-area .panel-content to use flexbox */
-.test-output-area .panel-content {
-  display: flex;
-  flex-direction: column;
-  height: calc(100% - 40px); /* Adjust based on panel-header height */
-  overflow: hidden; /* Prevent internal scrollbars from messing up layout */
-  padding: 0; /* Remove padding here, output-container has it */
-}
-
-/* Ensure flex-shrink is 0 for elements that should not shrink when resizing */
-.problem-panel-tabs,
-.audio-panel .panel-header,
-.audio-panel .panel-content.audio-controls,
-.code-test-panel > .panel-header {
-  flex-shrink: 0;
-}
-
-/* Specific flex-grow for problem content areas */
-.problem-list-content,
-.problem-description-content {
-  flex-grow: 1;
-  flex-shrink: 1;
-  min-height: 100px; /* Ensure a minimum height for scrolling content */
-}
-
-/* Modal styles */
-.modal {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: fixed;
-  z-index: 1000;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  overflow: auto;
-  background-color: rgba(0, 0, 0, 0.7);
-}
-
-.modal.hidden {
-  display: none;
-}
-
-.modal-content {
-  background-color: #1e1e1e;
-  margin: auto;
-  padding: 0;
-  border: 1px solid #333;
-  border-radius: 8px;
-  width: 80%;
-  max-width: 600px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
-  display: flex;
-  flex-direction: column;
-  max-height: 90vh; /* Limit modal height */
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #333;
-  color: #e6edf3;
-}
-
-.modal-header h2 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.close-button {
-  color: #aaa;
-  font-size: 28px;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-.close-button:hover,
-.close-button:focus {
-  color: #e6edf3;
-  text-decoration: none;
-}
-
-.modal-body {
-  padding: 20px;
-  flex-grow: 1;
-  overflow-y: auto; /* Allow body to scroll */
-  color: #e6edf3;
-  font-size: 14px;
-}
-
-.modal-body p {
-  margin-bottom: 15px;
-}
-
-.export-problem-list-container {
-  max-height: 300px; /* Fixed height for the scrollable list */
-  overflow-y: auto;
-  border: 1px solid #333;
-  border-radius: 4px;
-  padding: 5px;
-  background-color: #0d1117;
-}
-
-#exportProblemList {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.export-problem-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 10px;
-  border-bottom: 1px solid #21262d;
-}
-
-.export-problem-item:last-child {
-  border-bottom: none;
-}
-
-.export-problem-item label {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  flex-grow: 1;
-  color: #e6edf3;
-}
-
-.export-problem-item input[type="checkbox"] {
-  margin-right: 10px;
-  width: 16px;
-  height: 16px;
-  accent-color: #1f6feb; /* Highlight color for checkbox */
-}
-
-.export-problem-item.active-problem {
-  background-color: #21262d;
-  border-radius: 4px;
-}
-
-.export-problem-item.disabled-problem {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.export-problem-item.disabled-problem label {
-  cursor: not-allowed;
-}
-
-.export-problem-item.disabled-problem input[type="checkbox"] {
-  cursor: not-allowed;
-}
-
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  padding: 15px 20px;
-  border-top: 1px solid #333;
-  gap: 10px;
-}
-
-.modal-footer .btn-audio {
-  padding: 8px 15px;
-}
-
-/* Loading spinner for buttons */
-.action-button.loading i.fas.fa-sync-alt {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
+  
+  /* Terminal Input Area */
+  .terminal-input-area {
+    display: flex;
+    align-items: center;
+    padding: 5px;
+    background-color: #1e1e1e; /* 匹配深色背景 */
+    border-top: 1px solid #333;
+    color: #e6edf3;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 14px;
+    flex-shrink: 0; /* Prevent shrinking */
+  }
+  
+  .terminal-input-area .prompt {
+    color: #79c0ff; /* 蓝色提示符 */
+    margin-right: 5px;
+  }
+  
+  .terminal-input {
+    flex-grow: 1;
+    background-color: transparent;
+    border: none;
+    outline: none;
+    color: #e6edf3; /* 默认文本颜色 */
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 14px;
+    padding: 2px 0;
+  }
+  
+  .terminal-input:focus {
+    border: none;
+    outline: none;
+  }
+  
+  .terminal-input:disabled {
+    color: #6e7681; /* 禁用时的文本颜色 */
+    cursor: not-allowed;
+  }
+  
+  /* Output types for styling */
+  .output-info {
+    color: #79c0ff;
+  } /* Light blue for info messages */
+  .output-log {
+    color: #e6edf3;
+  } /* Default text color for program output */
+  .output-error {
+    color: #ff7b72;
+  } /* Red for error messages */
+  .output-error-friendly {
+    color: #ff7b72;
+    font-weight: bold;
+  } /* Red, bold for friendly error messages */
+  .output-result {
+    color: #7ee787;
+  } /* Green for success/result messages */
+  .output-user-input {
+    color: #a5d6ff;
+  } /* Lighter blue for user input */
+  
+  /* Make sure output container can scroll */
+  .output-container {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 10px;
+    background-color: #0d1117; /* Match editor background */
+    color: #e6edf3;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 14px;
+    white-space: pre-wrap; /* Preserve whitespace and wrap text */
+    word-wrap: break-word; /* Break long words */
+  }
+  
+  /* Adjust .test-output-area .panel-content to use flexbox */
+  .test-output-area .panel-content {
+    display: flex;
+    flex-direction: column;
+    height: calc(100% - 40px); /* Adjust based on panel-header height */
+    overflow: hidden; /* Prevent internal scrollbars from messing up layout */
+    padding: 0; /* Remove padding here, output-container has it */
+  }
+  
+  /* Ensure flex-shrink is 0 for elements that should not shrink when resizing */
+  .problem-panel-tabs,
+  .audio-panel .panel-header,
+  .audio-panel .panel-content.audio-controls,
+  .code-test-panel > .panel-header {
+    flex-shrink: 0;
+  }
+  
+  /* Specific flex-grow for problem content areas */
+  .problem-list-content,
+  .problem-description-content {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-height: 100px; /* Ensure a minimum height for scrolling content */
+  }
+  
+  /* Modal styles */
+  .modal {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.7);
+  }
+  
+  .modal.hidden {
+    display: none;
+  }
+  
+  .modal-content {
+    background-color: #1e1e1e;
+    margin: auto;
+    padding: 0;
+    border: 1px solid #333;
+    border-radius: 8px;
+    width: 80%;
+    max-width: 600px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh; /* Limit modal height */
+  }
+  
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #333;
+    color: #e6edf3;
+  }
+  
+  .modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+  }
+  
+  .close-button {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  
+  .close-button:hover,
+  .close-button:focus {
+    color: #e6edf3;
+    text-decoration: none;
+  }
+  
+  .modal-body {
+    padding: 20px;
+    flex-grow: 1;
+    overflow-y: auto; /* Allow body to scroll */
+    color: #e6edf3;
+    font-size: 14px;
+  }
+  
+  .modal-body p {
+    margin-bottom: 15px;
+  }
+  
+  /* --- Start: Export Modal Specific Styles (Adjusted for your theme) --- */
+  
+  .export-problem-list-container {
+    max-height: 300px; /* Fixed height for the scrollable list */
+    overflow-y: auto;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 5px;
+    background-color: #0d1117; /* Match editor background */
+    margin-bottom: 15px; /* Add some space below the list */
+  }
+  
+  #exportProblemList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .export-problem-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    border-bottom: 1px solid #21262d;
+    color: #e6edf3; /* Default text color */
+  }
+  
+  .export-problem-item:last-child {
+    border-bottom: none;
+  }
+  
+  .export-problem-item label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    flex-grow: 1;
+    font-size: 0.95em;
+  }
+  
+  .export-problem-item input[type="checkbox"] {
+    margin-right: 10px;
+    width: 16px;
+    height: 16px;
+    /* 使用您现有的复选框样式或 accent-color */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    border: 1px solid #30363d; /* Border from your user-input */
+    border-radius: 3px;
+    background-color: #21262d; /* Background from your user-input */
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+  }
+  
+  .export-problem-item input[type="checkbox"]:checked {
+    background-color: #1f6feb; /* Primary color from your active problem item */
+    border-color: #1f6feb;
+  }
+  
+  .export-problem-item input[type="checkbox"]:checked::after {
+    content: '\2713'; /* Checkmark character */
+    display: block;
+    color: #ffffff; /* White checkmark */
+    font-size: 12px;
+    line-height: 16px;
+    text-align: center;
+  }
+  
+  .export-problem-item input[type="checkbox"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #333333; /* Darker background for disabled */
+    border-color: #444444;
+  }
+  
+  .export-problem-item input[type="checkbox"]:disabled:checked::after {
+    color: #777777; /* Dimmer checkmark */
+  }
+  
+  .export-problem-item.active-problem {
+    background-color: #21262d; /* Highlight color, similar to problem-item:hover */
+    border-radius: 4px; /* Apply border-radius to the item */
+  }
+  
+  /* 状态文本样式 */
+  .export-status {
+    font-size: 0.85em;
+    margin-left: 8px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: bold;
+    white-space: nowrap; /* 防止状态文本换行 */
+    vertical-align: middle; /* 垂直居中对齐 */
+  }
+  
+  .deleted-status {
+    color: #ff7b72; /* Red, from output-error */
+    background-color: rgba(255, 123, 114, 0.15); /* Semi-transparent red */
+  }
+  
+  .missing-status {
+    color: #e78c45; /* Orange, from audio-icon */
+    background-color: rgba(231, 140, 69, 0.15); /* Semi-transparent orange */
+  }
+  
+  /* 禁用状态的题目项 */
+  .export-problem-item.disabled-problem label {
+    color: #7d8590; /* Dimmer text color, from problem-item default */
+    cursor: not-allowed;
+  }
+  
+  .export-problem-item.disabled-problem .export-status {
+    opacity: 0.7; /* 状态文本也变浅 */
+  }
+  
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 15px 20px;
+    border-top: 1px solid #333;
+    gap: 10px;
+  }
+  
+  .modal-footer .btn-audio {
+    padding: 8px 15px;
+    /* 继承 .btn-audio 的样式，无需额外定义 */
+  }
+  
+  /* --- End: Export Modal Specific Styles --- */
+  
+  /* Loading spinner for buttons */
+  .action-button.loading i.fas.fa-sync-alt {
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+  
+  /* 已删除题目的样式 */
+  .problem-item.deleted-problem {
+    text-decoration: line-through; /* 添加删除线 */
+    color: #888; /* 使文本颜色变淡，表示已删除 */
+    font-style: italic; /* 可选：使字体变为斜体 */
+    opacity: 0.7; /* 可选：降低透明度 */
+  }
+  
+  /* 确保删除线样式也应用于内部文本和图标 */
+  .problem-item.deleted-problem .problem-title-text,
+  .problem-item.deleted-problem .problem-action-icons .problem-icon {
+    color: inherit; /* 继承父元素的变淡颜色 */
+  }
+  
+  /* index.css */
+  
+  /* ... (其他样式) */
+  
+  /* 如果你希望禁用复选框旁边的文本点击，可以这样 */
+  .export-problem-item.deleted-problem-export label {
+    cursor: not-allowed; /* 鼠标变为禁止符号 */
+  }
