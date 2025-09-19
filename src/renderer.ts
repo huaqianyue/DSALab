@@ -623,16 +623,17 @@ class DSALabApp {
       this.toggleAudioPanelVisibility(false); // 隐藏音频面板
       this.activateProblemListTab(); // 激活题目列表标签页
 
-      // 如果有上次打开的题目，尝试切换过去
-      if (this.appSettings.lastOpenedProblemId) {
-        const lastProblem = this.problems.find(p => p.id === this.appSettings.lastOpenedProblemId);
-        if (lastProblem) {
-          await this.switchToProblem(lastProblem.id);
-        } else {
-          this.appSettings.lastOpenedProblemId = null; // 上次打开的题目不存在了
-          await this.saveAppSettings();
-        }
-      }
+      // 移除此处预加载上次打开题目的逻辑
+      // if (this.appSettings.lastOpenedProblemId) {
+      //   const lastProblem = this.problems.find(p => p.id === this.appSettings.lastOpenedProblemId);
+      //   if (lastProblem) {
+      //     // 调用 switchToProblem，但明确指示不激活题目描述标签页
+      //     await this.switchToProblem(lastProblem.id, false);
+      //   } else {
+      //     this.appSettings.lastOpenedProblemId = null; // 上次打开的题目不存在了
+      //     await this.saveAppSettings();
+      //   }
+      // }
       this.updateSaveButtonState(); // 初始化保存按钮状态
     } catch (error) {
       console.error(this.t('loadingProblemsFailed'), error);
@@ -649,6 +650,7 @@ class DSALabApp {
       this.updateSaveButtonState(); // 初始化保存按钮状态
     }
   }
+
 
   // 渲染问题列表
   private renderProblemList(): void {
