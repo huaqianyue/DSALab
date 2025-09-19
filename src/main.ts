@@ -573,11 +573,11 @@ ipcMain.handle('show-save-dialog', async (event, currentFilePath: string | null,
 // --- 持久化相关 IPC 处理 ---
 
 // 定义本地 problems.json 的路径
-const LOCAL_PROBLEMS_JSON_PATH = path.join(app.getPath('userData'), 'DSALab', 'problems.json');
+const LOCAL_PROBLES_JSON_PATH = path.join(app.getPath('userData'), 'DSALab', 'problems.json');
 // 定义用户工作区根目录的路径
 const USER_WORKSPACES_ROOT = path.join(app.getPath('documents'), 'DSALab Workspaces');
 // CDN 上的原始 problems.json URL
-const CDN_PROBLEMS_URL = 'https://github.com/huaqianyue/DSALab/blob/main/problem.json';
+const CDN_PROBLEMS_URL = 'https://raw.githubusercontent.com/huaqianyue/DSALab/refs/heads/main/problem.jso';
 
 // 新增：用户设置文件路径
 const APP_SETTINGS_PATH = path.join(app.getPath('userData'), 'DSALab', 'settings.json');
@@ -637,123 +637,34 @@ interface AppSettings {
   lastOpenedProblemId: string | null;
 }
 
-/**
- * 初始化或加载本地的 problems.json 文件。
- * 每次打开应用时，都从网络中加载json，并合并到本地的json中。
- * 处理新增、更新，并保留本地对 Audio 和 Code 路径的修改。
- * @param webContents 用于向渲染进程发送消息
- * @param forceRefresh 强制从CDN刷新，不读取本地文件
- */
-async function initializeLocalProblems(webContents: Electron.WebContents, forceRefresh: boolean = false): Promise<Problem[]> {
-  await fs.mkdir(path.dirname(LOCAL_PROBLEMS_JSON_PATH), { recursive: true });
-  await fs.mkdir(USER_WORKSPACES_ROOT, { recursive: true });
-
-  const localProblemsMap = new Map<string, Problem>();
-
-  // 1. 尝试加载本地的 problems.json (如果不是强制刷新)
-  if (!forceRefresh) {
-    try {
-      const content = await fs.readFile(LOCAL_PROBLEMS_JSON_PATH, 'utf-8');
-      const rawLocalProblems: RawProblem[] = JSON.parse(content);
-      rawLocalProblems.forEach(rawP => {
-        const p = convertToProblem(rawP);
-        if (p) {
-          localProblemsMap.set(p.id, p);
-        }
-      });
-      console.log('Loaded existing local problems.');
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
-        console.log('Local problems.json not found, will create from CDN if available.');
-      } else {
-        console.error('Failed to read local problems.json:', error);
-        dialog.showErrorBox('加载题目失败', `无法读取本地题目列表文件。\n错误: ${error.message}`);
-      }
-    }
-  }
-
-  let cdnProblems: RawProblem[] = []; // CDN 数据可能不包含 Audio, Code, isDelete
-  const cdnProblemsMap = new Map<string, RawProblem>();
-
-  // 2. 始终尝试从 CDN 获取最新的 problems.json
+// ====================================================================
+// 重构：辅助函数 - 从 CDN 获取题目
+// ====================================================================
+async function fetchProblemsFromCDN(webContents: Electron.WebContents): Promise<RawProblem[]> {
+  webContents.send('cpp-output-chunk', { type: 'info', data: '在线获取最新题目列表...\n' });
+  console.log('Fetching problems from CDN...');
   try {
-    webContents.send('cpp-output-chunk', { type: 'info', data: '在线获取最新题目列表...\n' }); // 新增：发送信息到渲染进程
-    console.log('Fetching problems from CDN...');
     const response = await fetch(CDN_PROBLEMS_URL);
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
     }
-    cdnProblems = await response.json();
-    cdnProblems.forEach(p => cdnProblemsMap.set(p.id, p));
-    console.log('Fetched problems from CDN.');
-  } catch (cdnError) {
-    console.error('Failed to fetch problems from CDN:', cdnError);
-    // dialog.showErrorBox('加载题目失败', `无法加载题目列表，请检查网络连接。\n错误: ${cdnError instanceof Error ? cdnError.message : String(cdnError)}`); // 移除此处的对话框，由渲染进程处理
-    webContents.send('cpp-output-chunk', { type: 'error', data: `无法加载题目列表，请检查网络连接。\n错误: ${cdnError instanceof Error ? cdnError.message : String(cdnError)}\n` }); // 新增：发送错误信息到渲染进程
-    // 如果 CDN 加载失败，直接返回当前已加载的本地题目（可能是空的，如果 forceRefresh 为 true 且本地文件不存在）
-    return sortProblemsById(Array.from(localProblemsMap.values()));
-  }
-
-  // 3. 合并逻辑
-  const finalProblemsMap = new Map<string, Problem>();
-
-  // 3.1. 首先将所有本地题目（包括已标记删除的）加入最终 Map
-  for (const [id, problem] of localProblemsMap.entries()) {
-    finalProblemsMap.set(id, { ...problem }); // 复制一份，避免直接修改
-  }
-
-  // 3.2. 遍历 CDN 题目，进行更新或新增
-  for (const [id, cdnProblem] of cdnProblemsMap.entries()) {
-    if (finalProblemsMap.has(id)) {
-      // 题目已存在于本地，进行更新，但保留本地的 Audio 和 Code 路径
-      const existingProblem = finalProblemsMap.get(id)!;
-      finalProblemsMap.set(id, {
-        ...existingProblem, // 保留 Audio, Code
-        shortDescription: cdnProblem.shortDescription,
-        fullDescription: cdnProblem.fullDescription,
-        isDelete: false, // 题目在 CDN 中存在，所以取消删除标记
-      });
-    } else {
-      // CDN 中有新题目，添加到合并列表，Audio 和 Code 路径初始化为空，isDelete 为 false
-      const newProblem = convertToProblem(cdnProblem);
-      if (newProblem) {
-        finalProblemsMap.set(id, { ...newProblem, Audio: '', Code: '', isDelete: false });
-      }
-    }
-  }
-
-  // 3.3. 标记本地独有且未在 CDN 中出现的题目为删除
-  for (const [id, problem] of finalProblemsMap.entries()) {
-    if (!cdnProblemsMap.has(id) && problem.isDelete === false) {
-      // 题目只存在于本地，且之前未被标记删除，现在标记为删除
-      finalProblemsMap.set(id, { ...problem, isDelete: true });
-    }
-  }
-
-  // 4. 将合并后的题目列表转换为数组并排序
-  const mergedProblems = sortProblemsById(Array.from(finalProblemsMap.values()));
-
-  // 5. 将合并后的题目列表保存到本地
-  try {
-    await fs.writeFile(LOCAL_PROBLEMS_JSON_PATH, JSON.stringify(mergedProblems, null, 2), 'utf-8');
-    console.log('Merged problems saved to local problems.json successfully.');
-    webContents.send('cpp-output-chunk', { type: 'info', data: '题目列表已成功加载并更新。\n' });
-    return mergedProblems;
-  } catch (saveError: any) {
-    console.error('Failed to save merged problems to local:', saveError);
-    dialog.showErrorBox('保存题目失败', `无法保存合并后的题目列表到本地文件。\n错误: ${saveError.message}`);
-    // 如果保存合并后的文件失败，则返回当前内存中的合并结果
-    return mergedProblems;
+    const cdnProblems = await response.json();
+    console.log('Fetched problems from CDN successfully.');
+    return cdnProblems;
+  } catch (error: any) {
+    console.error('Failed to fetch problems from CDN:', error);
+    webContents.send('cpp-output-chunk', { type: 'error', data: `无法加载题目列表，请检查网络连接。\n错误: ${error instanceof Error ? error.message : String(error)}\n` });
+    throw error; // IMPORTANT: Re-throw the error so the caller (IPC handler) can catch it.
   }
 }
 
 // ====================================================================
-// 新增：只读取本地 problems.json 的辅助函数
+// 重构：辅助函数 - 只读取本地 problems.json
 // ====================================================================
-async function readLocalProblemsOnly(): Promise<Problem[]> {
-  await fs.mkdir(path.dirname(LOCAL_PROBLEMS_JSON_PATH), { recursive: true }); // 确保目录存在
+async function loadPureLocalProblems(): Promise<Problem[]> {
+  await fs.mkdir(path.dirname(LOCAL_PROBLES_JSON_PATH), { recursive: true }); // 确保目录存在
   try {
-    const content = await fs.readFile(LOCAL_PROBLEMS_JSON_PATH, 'utf-8');
+    const content = await fs.readFile(LOCAL_PROBLES_JSON_PATH, 'utf-8');
     const rawLocalProblems: RawProblem[] = JSON.parse(content);
     const problems: Problem[] = [];
     rawLocalProblems.forEach(rawP => {
@@ -762,31 +673,158 @@ async function readLocalProblemsOnly(): Promise<Problem[]> {
         problems.push(p);
       }
     });
-    console.log('Successfully read local problems.json without CDN sync.');
+    console.log('Successfully read local problems.json.');
     return sortProblemsById(problems);
   } catch (error: any) {
     if (error.code === 'ENOENT') {
       console.log('Local problems.json not found, returning empty list.');
     } else {
       console.error('Failed to read local problems.json:', error);
-      dialog.showErrorBox('加载本地题目失败', `无法读取本地题目列表文件。\n错误: ${error.message}`);
+      // 对于纯本地加载，如果文件损坏，可以返回空列表或抛出错误
     }
     return [];
   }
 }
+
 // ====================================================================
+// 重构：辅助函数 - 合并题目列表
+// ====================================================================
+function mergeProblemLists(
+  localProblems: Problem[],
+  incomingProblemsRaw: RawProblem[], // 可以是来自 CDN 或导入的 JSON
+  sourceIsCDN: boolean = true // true 表示 incomingProblems 来自 CDN，false 表示来自导入
+): Problem[] {
+  const localMap = new Map<string, Problem>();
+  localProblems.forEach(p => localMap.set(p.id, { ...p })); // 复制一份，避免直接修改
+
+  const incomingMap = new Map<string, RawProblem>();
+  incomingProblemsRaw.forEach(p => incomingMap.set(p.id, p));
+
+  const finalProblemsMap = new Map<string, Problem>();
+
+  // 1. 处理传入的题目 (CDN 或导入)
+  for (const [id, incomingRaw] of incomingMap.entries()) {
+    const incomingProblem = convertToProblem(incomingRaw);
+    if (!incomingProblem) {
+      console.warn(`Skipping invalid incoming problem during merge: ${JSON.stringify(incomingRaw)}`);
+      continue;
+    }
+
+    if (localMap.has(id)) {
+      // 题目已存在于本地，更新其描述，但保留本地的工作区状态 (Audio, Code)
+      const existingLocal = localMap.get(id)!;
+      finalProblemsMap.set(id, {
+        ...existingLocal, // 保留本地 Audio, Code
+        shortDescription: incomingProblem.shortDescription,
+        fullDescription: incomingProblem.fullDescription,
+        isDelete: false, // 如果题目存在于 CDN 或被导入，则取消删除标记
+      });
+      localMap.delete(id); // 标记为已处理
+    } else {
+      // 新题目 (来自 CDN 或导入)
+      finalProblemsMap.set(id, {
+        ...incomingProblem,
+        Audio: '', // 新题目没有本地音频/代码
+        Code: '',
+        isDelete: false, // 新题目未被删除
+      });
+    }
+  }
+
+  // 2. 处理剩余的本地题目
+  for (const [id, localProblem] of localMap.entries()) {
+    if (sourceIsCDN) {
+      // 如果来源是 CDN，且本地题目不在 CDN 列表中，则标记为删除
+      finalProblemsMap.set(id, { ...localProblem, isDelete: true });
+    } else {
+      // 如果来源是导入，本地题目不在导入列表中则保持原样 (不自动标记删除)
+      finalProblemsMap.set(id, { ...localProblem });
+    }
+  }
+
+  return sortProblemsById(Array.from(finalProblemsMap.values()));
+}
+
+// ====================================================================
+// 重构：辅助函数 - 保存题目列表到文件
+// ====================================================================
+async function saveProblemsToFile(problems: Problem[]): Promise<void> {
+  try {
+    await fs.writeFile(LOCAL_PROBLES_JSON_PATH, JSON.stringify(problems, null, 2), 'utf-8');
+    console.log('Problems saved to local problems.json successfully.');
+  } catch (error: any) {
+    console.error('Failed to save problems to local file:', error);
+    throw error; // 抛出错误以便调用者处理
+  }
+}
 
 
-// IPC 处理：获取本地问题列表
-ipcMain.handle('get-problems-from-local', async (event) => { // 传入 event
-  // 这里的 get-problems-from-local 应该只用于初始化时加载本地，并尝试同步CDN
-  // 如果需要纯粹的本地读取，应该调用 readLocalProblemsOnly
-  return await initializeLocalProblems(event.sender, false); // 传递 event.sender 作为 webContents
+// IPC 处理：获取本地问题列表 (初始加载时调用，会尝试 CDN 同步)
+ipcMain.handle('get-problems-from-local', async (event): Promise<Problem[]> => {
+  await fs.mkdir(path.dirname(LOCAL_PROBLES_JSON_PATH), { recursive: true });
+  await fs.mkdir(USER_WORKSPACES_ROOT, { recursive: true });
+
+  let localProblems: Problem[] = await loadPureLocalProblems(); // 1. 加载纯本地题目
+  let cdnProblems: RawProblem[] = [];
+
+  try {
+    cdnProblems = await fetchProblemsFromCDN(event.sender); // 2. 尝试从 CDN 获取
+  } catch (cdnError) {
+    // 如果 CDN 失败，日志已发送。直接返回本地题目。
+    console.warn('CDN fetch failed during initial load, returning local problems only.');
+    return localProblems; // 返回已加载的本地题目
+  }
+
+  // 3. 合并本地题目与 CDN 题目
+  const mergedProblems = mergeProblemLists(localProblems, cdnProblems, true); // true for sourceIsCDN
+
+  try {
+    await saveProblemsToFile(mergedProblems); // 4. 保存合并后的题目
+    event.sender.send('cpp-output-chunk', { type: 'info', data: '题目列表已成功加载并更新。\n' });
+    return mergedProblems;
+  } catch (saveError: any) {
+    console.error('Failed to save merged problems to local during initial load:', saveError);
+    dialog.showErrorBox('保存题目失败', `无法保存合并后的题目列表到本地文件。\n错误: ${saveError.message}`);
+    return mergedProblems; // 即使保存失败也返回合并后的题目
+  }
+});
+// 新增 IPC 处理：纯粹读取本地问题列表 (不进行 CDN 同步)
+ipcMain.handle('get-pure-local-problems', async (): Promise<Problem[]> => { // <-- 修改了通道名称
+  return await loadPureLocalProblems();
+});
+// IPC 处理：刷新问题列表 (强制从CDN刷新)
+ipcMain.handle('refresh-problems', async (event): Promise<Problem[]> => {
+  await fs.mkdir(path.dirname(LOCAL_PROBLES_JSON_PATH), { recursive: true });
+  await fs.mkdir(USER_WORKSPACES_ROOT, { recursive: true });
+
+  let cdnProblems: RawProblem[];
+  try {
+    cdnProblems = await fetchProblemsFromCDN(event.sender); // 1. 强制从 CDN 获取 (失败会抛错)
+  } catch (error) {
+    // 错误信息已由 fetchProblemsFromCDN 发送。
+    throw error; // 重新抛出错误到渲染进程
+  }
+
+  // 2. 如果 CDN 获取成功，加载本地题目以保留用户修改
+  const localProblems: Problem[] = await loadPureLocalProblems();
+  
+  // 3. 合并本地题目与新获取的 CDN 题目
+  const mergedProblems = mergeProblemLists(localProblems, cdnProblems, true); // true for sourceIsCDN
+
+  try {
+    await saveProblemsToFile(mergedProblems); // 4. 保存合并后的题目
+    event.sender.send('cpp-output-chunk', { type: 'info', data: '题目列表已成功刷新并更新。\n' });
+    return mergedProblems;
+  } catch (saveError: any) {
+    console.error('Failed to save refreshed problems to local:', saveError);
+    dialog.showErrorBox('保存题目失败', `无法保存刷新后的题目列表到本地文件。\n错误: ${saveError.message}`);
+    return mergedProblems; // 即使保存失败也返回合并后的题目
+  }
 });
 
-// IPC 处理：刷新问题列表 (强制从CDN刷新)
-ipcMain.handle('refresh-problems', async (event) => { // 传入 event
-  return await initializeLocalProblems(event.sender, true); // 传递 event.sender 作为 webContents
+// 新增 IPC 处理：纯粹读取本地问题列表 (不进行 CDN 同步)
+ipcMain.handle('read-pure-local-problems', async (): Promise<Problem[]> => {
+  return await loadPureLocalProblems();
 });
 
 // IPC 处理：导入问题列表
@@ -797,71 +835,30 @@ ipcMain.handle('import-problems', async (event, jsonContent: string) => {
       throw new Error('Imported JSON is not an array.');
     }
 
-    const validImportedProblems: Problem[] = [];
-    const importedProblemsMap = new Map<string, Problem>();
+    const validImportedProblemsRaw: RawProblem[] = [];
     let invalidProblemCount = 0;
 
     for (const item of importedRaw) {
-      const convertedProblem = convertToProblem(item);
-      if (convertedProblem) {
-        // 对于导入的题目，清除 Audio/Code 路径，并设置 isDelete 为 false
-        const problemToImport: Problem = { ...convertedProblem, Audio: '', Code: '', isDelete: false };
-        validImportedProblems.push(problemToImport);
-        importedProblemsMap.set(problemToImport.id, problemToImport);
+      if (convertToProblem(item)) { // 检查有效性
+        validImportedProblemsRaw.push(item);
       } else {
         invalidProblemCount++;
       }
     }
 
-    if (validImportedProblems.length === 0 && importedRaw.length > 0) {
+    if (validImportedProblemsRaw.length === 0 && importedRaw.length > 0) {
         throw new Error('No valid problems found in the imported JSON file.');
     }
 
-    // ====================================================================
-    // 修改点：这里改为调用 readLocalProblemsOnly()
-    // ====================================================================
-    const currentLocalProblems = await readLocalProblemsOnly(); // 只加载本地数据，不进行CDN同步
-    const currentLocalProblemsMap = new Map<string, Problem>();
-    currentLocalProblems.forEach(p => currentLocalProblemsMap.set(p.id, p));
+    // 1. 加载当前本地题目 (不进行 CDN 同步)
+    const currentLocalProblems = await loadPureLocalProblems();
+    
+    // 2. 合并当前本地题目与导入的题目
+    const mergedProblems = mergeProblemLists(currentLocalProblems, validImportedProblemsRaw, false); // false for sourceIsCDN (这是导入)
 
-    const finalProblemsMap = new Map<string, Problem>();
-
-    // 1. 首先将所有当前本地题目加入最终 Map
-    for (const [id, problem] of currentLocalProblemsMap.entries()) {
-      finalProblemsMap.set(id, { ...problem });
-    }
-
-    // 2. 遍历导入的题目，进行更新或新增
-    for (const [id, importedProblem] of importedProblemsMap.entries()) {
-      if (finalProblemsMap.has(id)) {
-        // 题目已存在于本地，进行更新，但保留本地的 Audio 和 Code 路径
-        const existingProblem = finalProblemsMap.get(id)!;
-        finalProblemsMap.set(id, {
-          ...existingProblem, // 保留 Audio, Code
-          shortDescription: importedProblem.shortDescription,
-          fullDescription: importedProblem.fullDescription,
-          isDelete: false, // 题目在导入列表中存在，所以取消删除标记
-        });
-      } else {
-        // 导入列表中有新题目，添加到合并列表
-        finalProblemsMap.set(id, { ...importedProblem }); // importedProblem 已经设置了 Audio:'', Code:'', isDelete:false
-      }
-    }
-
-    // 3. 标记本地独有且未在导入列表中出现的题目为删除
-    for (const [id, problem] of finalProblemsMap.entries()) {
-      if (!importedProblemsMap.has(id) && problem.isDelete === false) {
-        // 题目只存在于本地，且之前未被标记删除，现在标记为删除
-        finalProblemsMap.set(id, { ...problem, isDelete: true });
-      }
-    }
-
-    // 4. 将合并后的题目列表转换为数组并排序
-    const mergedProblems = sortProblemsById(Array.from(finalProblemsMap.values()));
-
-    // 保存合并后的列表
-    await fs.writeFile(LOCAL_PROBLEMS_JSON_PATH, JSON.stringify(mergedProblems, null, 2), 'utf-8');
-    console.log(`Imported problems merged and saved. ${validImportedProblems.length} valid problems added/updated, ${invalidProblemCount} invalid problems skipped.`);
+    // 3. 保存合并后的列表
+    await saveProblemsToFile(mergedProblems);
+    console.log(`Imported problems merged and saved. ${validImportedProblemsRaw.length} valid problems added/updated, ${invalidProblemCount} invalid problems skipped.`);
     return { success: true, problems: mergedProblems, invalidCount: invalidProblemCount };
 
   } catch (error: any) {
@@ -871,13 +868,12 @@ ipcMain.handle('import-problems', async (event, jsonContent: string) => {
 });
 
 
-// IPC 处理：保存本地问题列表
+// IPC 处理：保存本地问题列表 (渲染进程主动保存整个 problems 列表)
 ipcMain.handle('save-problems-to-local', async (event, problems: Problem[]) => {
   try {
-    // 注意：这里的保存是直接覆盖，用于渲染进程主动保存整个 problems 列表
     // 确保保存前进行排序
     const sortedProblems = sortProblemsById(problems);
-    await fs.writeFile(LOCAL_PROBLEMS_JSON_PATH, JSON.stringify(sortedProblems, null, 2), 'utf-8');
+    await saveProblemsToFile(sortedProblems);
     console.log('Local problems.json saved successfully by renderer.');
     return { success: true };
   } catch (error: any) {

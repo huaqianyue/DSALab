@@ -108,7 +108,7 @@ declare global {
       sendUserInput: (problemId: string, input: string) => void;
 
       // --- 新增的持久化相关 IPC 方法 ---
-      getProblemsFromLocal: () => Promise<Problem[]>;
+      getProblemsFromLocal: () => Promise<Problem[]>; // 初始加载时调用，会尝试 CDN 同步
       saveProblemsToLocal: (problems: Problem[]) => Promise<{ success: boolean; error?: string }>;
       readProblemCode: (problemId: string) => Promise<string | null>;
       readProblemAudio: (problemId: string) => Promise<ArrayBuffer | null>;
@@ -124,7 +124,10 @@ declare global {
       saveAppSettings: (settings: AppSettings) => Promise<boolean>;
 
       // --- 新增：刷新问题列表 IPC 方法 ---
-      refreshProblems: () => Promise<Problem[]>;
+      refreshProblems: () => Promise<Problem[]>; // 强制从 CDN 刷新，失败会抛出错误
+
+      // --- 新增：纯粹读取本地问题列表 IPC 方法 ---
+      getPureLocalProblems: () => Promise<Problem[]>; // 仅从本地文件读取，不进行网络请求
 
       // --- 新增：导入问题列表 IPC 方法 ---
       importProblems: (jsonContent: string) => Promise<{ success: boolean; problems?: Problem[]; invalidCount?: number; error?: string }>;
@@ -622,7 +625,7 @@ class DSALabApp {
   // 异步获取问题列表并初始化UI
   private async fetchProblemsAndInitializeUI(): Promise<void> {
     try {
-      // 从主进程获取本地 problems.json
+      // 从主进程获取本地 problems.json (此 IPC 会尝试 CDN 同步)
       this.problems = await window.electron.getProblemsFromLocal();
       this.renderProblemList(); // 渲染问题列表
 
@@ -1476,11 +1479,6 @@ class DSALabApp {
 
 int main() {
     std::cout << "Hello DSALab!" << std::endl;
-    std::cout << "请输入你的名字: ";
-    std::string name;
-    std::cin >> name;
-    std::cout << "你好, " << name << "!" << std::endl;
-    std::cout << "再见!" << std::endl;
     return 0;
 }
 `;
@@ -1494,13 +1492,19 @@ int main() {
       refreshBtn.classList.add('loading'); // 添加加载动画类
     }
 
+    // 1. 在开始刷新操作前，清空旧的输出内容
+    this.clearOutput();
+
+    // 在尝试刷新之前，保存当前题目列表的副本 (用于判断是否需要回退)
+    const problemsBeforeRefreshCount = this.problems.length;
+
     try {
       // 提示用户保存当前题目（如果已修改）
       if (this.currentProblemId) {
         await this.saveCurrentProblemToDisk();
       }
 
-      // 尝试从主进程刷新题目列表（会尝试从CDN获取并合并）
+      // 尝试从主进程刷新题目列表（此 IPC 失败会抛出错误）
       this.problems = await window.electron.refreshProblems();
       this.renderProblemList();
       this.appendOutput('info', this.t('refreshSuccess'));
@@ -1511,37 +1515,46 @@ int main() {
       await this.saveAppSettings(); // 保存更新后的设置
 
       this.editor?.setValue(this.t('selectProblemEditor')); // 编辑器显示欢迎信息
-      this.clearOutput(); // 清空输出面板
       this.toggleAudioPanelVisibility(false); // 隐藏音频面板
       this.updateTitle(); // 更新窗口标题（应显示默认标题）
       this.updateSaveButtonState(); // 更新保存按钮状态（应为禁用）
       this.activateProblemListTab(); // 激活题目列表标签页
 
     } catch (error) {
+      // 情况：refreshProblems 明确抛出了错误（Promise 被拒绝），表示网络或其他远程获取失败。
       console.error(this.t('refreshFailed'), error);
+      // 错误信息已由 main.ts 通过 cpp-output-chunk 发送，此处可以添加一个通用提示
       this.appendOutput('error', `${this.t('refreshFailed')} ${error instanceof Error ? error.message : String(error)}`);
       
-      // 如果刷新失败，尝试加载本地题目列表
-      try {
-        this.problems = await window.electron.getProblemsFromLocal(); // 调用 getProblemsFromLocal (它会尝试加载本地并同步CDN，如果CDN失败则返回本地)
+      // 如果之前有题目，才尝试加载本地题目列表作为回退
+      if (problemsBeforeRefreshCount > 0) {
+        try {
+          // 调用新的 IPC 方法，只读取本地题目，不进行网络请求
+          this.problems = await window.electron.getPureLocalProblems(); 
+          this.renderProblemList();
+          this.appendOutput('info', '已加载本地题目列表。');
+        } catch (localLoadError) {
+          console.error('加载本地题目列表失败:', localLoadError);
+          this.appendOutput('error', `加载本地题目列表失败: ${localLoadError instanceof Error ? localLoadError.message : String(localLoadError)}`);
+        }
+      } else {
+        // 如果之前就没有题目，且刷新失败，则显示空列表
+        this.problems = [];
         this.renderProblemList();
-        this.appendOutput('info', '从在线刷新题目列表失败，已加载本地题目列表。');
-
-        // 即使失败，也重置UI到题目列表视图，但使用本地数据
-        this.currentProblemId = null;
-        this.appSettings.lastOpenedProblemId = null;
-        await this.saveAppSettings();
-
-        this.editor?.setValue(this.t('selectProblemEditor'));
-        this.clearOutput();
-        this.toggleAudioPanelVisibility(false);
-        this.updateTitle();
-        this.updateSaveButtonState();
-        this.activateProblemListTab();
-      } catch (localLoadError) {
-        console.error('加载本地题目列表失败:', localLoadError);
-        this.appendOutput('error', `加载本地题目列表失败: ${localLoadError instanceof Error ? localLoadError.message : String(localLoadError)}`);
+        this.appendOutput('info', '没有可用的题目列表。');
       }
+
+      // 即使失败，也重置UI到题目列表视图
+      this.currentProblemId = null;
+      this.appSettings.lastOpenedProblemId = null;
+      await this.saveAppSettings();
+
+      this.editor?.setValue(this.t('selectProblemEditor'));
+      this.toggleAudioPanelVisibility(false);
+      this.updateTitle();
+      this.updateSaveButtonState();
+      this.activateProblemListTab();
+
     } finally {
       if (refreshBtn) {
         refreshBtn.disabled = false;
@@ -1556,6 +1569,9 @@ int main() {
     if (this.currentProblemId) {
       await this.saveCurrentProblemToDisk();
     }
+
+    // 在开始导入操作前，清空旧的输出内容
+    this.clearOutput();
 
     try {
       const result = await window.electron.showOpenDialog([
@@ -1579,7 +1595,6 @@ int main() {
           await this.saveAppSettings(); // 保存设置
 
           this.editor?.setValue(this.t('selectProblemEditor')); // 编辑器显示提示信息
-          this.clearOutput(); // 清空输出面板
           this.toggleAudioPanelVisibility(false); // 隐藏音频面板
           this.updateTitle(); // 更新窗口标题（应显示默认标题）
           this.updateSaveButtonState(); // 更新保存按钮状态（应为禁用）
@@ -1591,7 +1606,8 @@ int main() {
           // 如果导入失败，我们应该仍然尝试加载现有的本地题目，
           // 以确保UI不会停留在不一致的状态或空白。
           try {
-            this.problems = await window.electron.getProblemsFromLocal();
+            // 调用新的 IPC 方法，只读取本地题目，不进行网络请求
+            this.problems = await window.electron.getPureLocalProblems();
             this.renderProblemList();
             this.appendOutput('info', '导入失败，已重新加载本地题目列表。');
 
@@ -1601,7 +1617,6 @@ int main() {
             await this.saveAppSettings();
 
             this.editor?.setValue(this.t('selectProblemEditor'));
-            this.clearOutput();
             this.toggleAudioPanelVisibility(false);
             this.updateTitle();
             this.updateSaveButtonState();
@@ -1613,13 +1628,24 @@ int main() {
         }
       } else {
         this.appendOutput('info', '导入已取消。');
+        // If import cancelled, still reset UI to problem list view
+        this.currentProblemId = null;
+        this.appSettings.lastOpenedProblemId = null;
+        await this.saveAppSettings();
+
+        this.editor?.setValue(this.t('selectProblemEditor'));
+        this.toggleAudioPanelVisibility(false);
+        this.updateTitle();
+        this.updateSaveButtonState();
+        this.activateProblemListTab();
       }
     } catch (error) {
       console.error(this.t('importFailed'), error);
       this.appendOutput('error', `${this.t('importFailed')} ${error instanceof Error ? error.message : String(error)}`);
       // 捕获文件对话框失败或其他意外错误的情况，并加载本地数据
       try {
-        this.problems = await window.electron.getProblemsFromLocal();
+        // 调用新的 IPC 方法，只读取本地题目，不进行网络请求
+        this.problems = await window.electron.getPureLocalProblems();
         this.renderProblemList();
         this.appendOutput('info', '导入操作发生错误，已重新加载本地题目列表。');
 
@@ -1628,7 +1654,6 @@ int main() {
         await this.saveAppSettings();
 
         this.editor?.setValue(this.t('selectProblemEditor'));
-        this.clearOutput();
         this.toggleAudioPanelVisibility(false);
         this.updateTitle();
         this.updateSaveButtonState();
@@ -1774,3 +1799,4 @@ if (document.readyState === 'loading') {
 } else {
   new DSALabApp();
 }
+// Initialize the application when DOM is loaded

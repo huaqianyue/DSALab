@@ -73,6 +73,7 @@ interface Problem {
   Title: string;
   shortDescription: string;
   fullDescription: string;
+  isDelete: boolean; // 确保这里也与 main.ts 和 renderer.ts 保持一致
   Audio: string; // 'audio.webm' if present, '' if not
   Code: string;  // 'code.cpp' if present, '' if not
 }
@@ -117,6 +118,9 @@ contextBridge.exposeInMainWorld('electron', {
 
   // --- 新增：刷新问题列表 IPC 方法 ---
   refreshProblems: (): Promise<Problem[]> => ipcRenderer.invoke('refresh-problems'),
+
+  // --- 新增：纯粹读取本地问题列表 IPC 方法 ---
+  getPureLocalProblems: (): Promise<Problem[]> => ipcRenderer.invoke('get-pure-local-problems'), // <-- 这一行是缺失的，现在已添加
 
   // --- 新增：导入问题列表 IPC 方法 ---
   importProblems: (jsonContent: string): Promise<{ success: boolean; problems?: Problem[]; invalidCount?: number; error?: string }> => ipcRenderer.invoke('import-problems', jsonContent),
