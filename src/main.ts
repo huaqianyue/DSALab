@@ -577,7 +577,7 @@ const LOCAL_PROBLES_JSON_PATH = path.join(app.getPath('userData'), 'DSALab', 'pr
 // 定义用户工作区根目录的路径
 const USER_WORKSPACES_ROOT = path.join(app.getPath('documents'), 'DSALab Workspaces');
 // CDN 上的原始 problems.json URL
-const CDN_PROBLEMS_URL = 'https://raw.githubusercontent.com/huaqianyue/DSALab/refs/heads/main/problem.jso';
+const CDN_PROBLEMS_URL = 'https://raw.githubusercontent.com/huaqianyue/DSALab/refs/heads/main/problem.json';
 
 // 新增：用户设置文件路径
 const APP_SETTINGS_PATH = path.join(app.getPath('userData'), 'DSALab', 'settings.json');
@@ -903,7 +903,7 @@ ipcMain.handle('read-problem-audio', async (event, problemId: string): Promise<A
   const audioFilePath = path.join(problemWorkspaceDir, 'audio.webm');
   try {
     const buffer = await fs.readFile(audioFilePath);
-    return buffer.buffer; // 返回 ArrayBuffer
+    return buffer.buffer as ArrayBuffer; // 返回 ArrayBuffer
   } catch (error: any) {
     if (error.code !== 'ENOENT') { // 忽略文件不存在的错误
       console.error(`Failed to read audio for problem ${problemId}:`, error);
