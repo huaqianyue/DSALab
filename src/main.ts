@@ -1,5 +1,5 @@
 // main.ts
-import { app, BrowserWindow, Menu, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain, dialog, shell } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { exec, spawn, ChildProcessWithoutNullStreams } from 'node:child_process';
@@ -235,6 +235,17 @@ ipcMain.on('record-history-event', async (event, historyEvent: HistoryEvent) => 
     default:
       console.warn(`Unknown history event type: ${eventType}`);
       break;
+  }
+});
+
+// 处理在默认浏览器中打开链接的请求
+ipcMain.handle('open-external', async (event, url: string) => {
+  try {
+    await shell.openExternal(url);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to open external URL:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 });
 
@@ -770,8 +781,9 @@ ipcMain.handle('get-problems-from-local', async (event): Promise<Problem[]> => {
   try {
     cdnProblems = await fetchProblemsFromCDN(event.sender); // 2. 尝试从 CDN 获取
   } catch (cdnError) {
-    // 如果 CDN 失败，日志已发送。直接返回本地题目。
+    // 如果 CDN 失败，错误信息已由 fetchProblemsFromCDN 发送，这里只发送一个友好的回退提示
     console.warn('CDN fetch failed during initial load, returning local problems only.');
+    event.sender.send('cpp-output-chunk', { type: 'info', data: '请检查是否能连接GitHub或使用导入功能更新题目！\n' });
     return localProblems; // 返回已加载的本地题目
   }
 

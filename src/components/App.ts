@@ -517,21 +517,21 @@ export class App {
     } catch (error) {
       console.error(this.t('refreshFailed'), error);
       this.outputPanelComponent.appendOutput('error', `${this.t('refreshFailed')} ${error instanceof Error ? error.message : String(error)}`);
-
-      if (problemsBeforeRefreshCount > 0) {
-        try {
-          this.problems = await window.electron.getPureLocalProblems();
-          this.problemListComponent.updateProblems(this.problems, null, null);
-          this.outputPanelComponent.appendOutput('info', '已加载本地题目列表。');
-        } catch (localLoadError) {
-          console.error('加载本地题目列表失败:', localLoadError);
-          this.outputPanelComponent.appendOutput('error', `加载本地题目列表失败: ${localLoadError instanceof Error ? localLoadError.message : String(localLoadError)}`);
-        }
-      } else {
-        this.problems = [];
-        this.problemListComponent.updateProblems(this.problems, null, null);
-        this.outputPanelComponent.appendOutput('info', '没有可用的题目列表。');
-      }
+      this.outputPanelComponent.appendOutput('info', '请检查是否能连接GitHub或使用导入功能更新题目！');
+      // if (problemsBeforeRefreshCount > 0) {
+      //   try {
+      //     this.problems = await window.electron.getPureLocalProblems();
+      //     this.problemListComponent.updateProblems(this.problems, null, null);
+      //     this.outputPanelComponent.appendOutput('info', '已加载本地题目列表。');
+      //   } catch (localLoadError) {
+      //     console.error('加载本地题目列表失败:', localLoadError);
+      //     this.outputPanelComponent.appendOutput('error', `加载本地题目列表失败: ${localLoadError instanceof Error ? localLoadError.message : String(localLoadError)}`);
+      //   }
+      // } else {
+      //   this.problems = [];
+      //   this.problemListComponent.updateProblems(this.problems, null, null);
+      //   this.outputPanelComponent.appendOutput('info', '没有可用的题目列表。');
+      // }
       this.resetUIForProblemList();
     } finally {
       this.toolbarComponent.setRefreshButtonLoading(false);

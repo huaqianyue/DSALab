@@ -127,4 +127,7 @@ contextBridge.exposeInMainWorld('electron', {
 
   // --- 新增：导出问题到ZIP IPC 方法 ---
   exportProblemsToZip: (problemIds: string[], defaultFileName: string) => ipcRenderer.invoke('export-problems-to-zip', problemIds, defaultFileName),
+
+  // --- 新增：在默认浏览器中打开链接 ---
+  openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
 });
