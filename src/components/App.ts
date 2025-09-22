@@ -475,7 +475,14 @@ export class App {
     this.outputPanelComponent.appendOutput('info', '正在准备导出...');
     try {
       const date = new Date();
-      const defaultFileName = `DSALab_Export_${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}.zip`;
+      const year = date.getFullYear().toString().slice(-2); // 两位年份
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const seconds = date.getSeconds().toString().padStart(2, '0');
+      
+      const defaultFileName = `${this.appSettings.studentId}_${this.appSettings.userName}_${year}${month}${day}_${hours}${minutes}${seconds}.zip`;
 
       const result = await window.electron.exportProblemsToZip(selectedProblemIds, defaultFileName);
 
