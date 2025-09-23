@@ -38,7 +38,7 @@ export class App {
   private suppressDirtyFlag: boolean = false; // 用于抑制编辑器内容变化时设置isDirty
 
   // Constants
-  private readonly EXECUTION_TIMEOUT = 30000; // 30 seconds
+  private readonly EXECUTION_TIMEOUT = 360000; // 6 minutes (360 seconds)
   private currentLanguage: Language = 'zh'; // Default language
 
   private readonly translations: AppTranslations = {
@@ -472,6 +472,17 @@ export class App {
   }
 
   private async handleConfirmExport(selectedProblemIds: string[]): Promise<void> {
+    // 检查姓名和学号是否为空
+    if (!this.appSettings.userName || !this.appSettings.userName.trim()) {
+      this.outputPanelComponent.appendOutput('error', '导出失败：请先输入姓名');
+      return;
+    }
+    
+    if (!this.appSettings.studentId || !this.appSettings.studentId.trim()) {
+      this.outputPanelComponent.appendOutput('error', '导出失败：请先输入学号');
+      return;
+    }
+
     this.outputPanelComponent.appendOutput('info', '正在准备导出...');
     try {
       const date = new Date();

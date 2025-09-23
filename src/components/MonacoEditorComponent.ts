@@ -104,7 +104,7 @@ export class MonacoEditorComponent {
       minimap: { enabled: options.minimap !== undefined ? options.minimap : false },
       scrollBeyondLastLine: false,
       automaticLayout: true,
-      tabSize: options.tabSize || 2,
+      tabSize: options.tabSize || 4,
       insertSpaces: true,
       wordWrap: options.wordWrap ? 'on' : 'off',
       lineNumbers: options.lineNumbers ? 'on' : 'off',

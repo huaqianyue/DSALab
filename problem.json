@@ -13,5 +13,15 @@
     "id": "1SequentialList3",
     "shortDescription": "顺序表3：合并两个有序顺序表",
     "fullDescription": "将两个有序顺序表合并成一个新的有序顺序表并由函数返回结果顺序表。"
+  },
+  {
+    "id": "2LinkedList1",
+    "shortDescription": "链表1：单指针实现双链表操作",
+    "fullDescription": "用单指针实现双链表(实现按位置查找、插入、删除三个操作即可)"
+  },
+  {
+    "id": "2LinkedList2",
+    "shortDescription": "链表2：合并与去重有序链表",
+    "fullDescription": "终端定义两个链表的长度，分别输入数据，并存储至链表中(默认两个链表为非递减顺序输入)。实现三个功能：1.将两个有序链表合并成一个新的有序链表允许重复数据，2.要求合并后的有序链表无重复数据3.要求合并后的链表为非递增的有序链表。"
   }
 ]
