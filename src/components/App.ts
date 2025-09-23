@@ -106,8 +106,9 @@ export class App {
       {
         onAudioModified: (blob, url) => this.handleAudioModified(blob, url),
         onRecordStart: () => this.recordHistoryEvent({ timestamp: Date.now(), problemId: this.currentProblemId!, eventType: 'audio_record_start' }),
+        onRecordPause: () => this.recordHistoryEvent({ timestamp: Date.now(), problemId: this.currentProblemId!, eventType: 'audio_record_pause' }),
+        onRecordResume: () => this.recordHistoryEvent({ timestamp: Date.now(), problemId: this.currentProblemId!, eventType: 'audio_record_resume' }),
         onRecordStop: (durationMs, audioSizeKB) => this.recordHistoryEvent({ timestamp: Date.now(), problemId: this.currentProblemId!, eventType: 'audio_record_stop', durationMs, audioSizeKB }),
-        onAudioPlay: (durationMs) => this.recordHistoryEvent({ timestamp: Date.now(), problemId: this.currentProblemId!, eventType: 'audio_play', durationMs }),
         onAppendOutput: (type, text) => this.outputPanelComponent.appendOutput(type, text),
       },
       this.t.bind(this)
