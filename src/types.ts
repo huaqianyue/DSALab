@@ -52,7 +52,7 @@ export interface HistoryEventBase {
   }
   
   export interface AudioEvent extends HistoryEventBase {
-    eventType: 'audio_record_start' | 'audio_record_stop' | 'audio_play';
+    eventType: 'audio_record_start' | 'audio_record_pause' | 'audio_record_resume' | 'audio_record_stop' | 'audio_play';
     durationMs?: number; // For record_stop, play
     audioSizeKB?: number; // For record_stop
   }
