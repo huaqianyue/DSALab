@@ -13,7 +13,7 @@ interface AudioPanelEvents {
 
 export class AudioPanelComponent {
   private recordBtn: HTMLButtonElement;
-  private pauseResumeBtn: HTMLButtonElement; // 修改：从playBtn改为pauseResumeBtn
+  private pauseResumeBtn: HTMLButtonElement;
   private audioPlayback: HTMLAudioElement;
   private panelElement: HTMLElement; // Reference to the audio panel itself
 
@@ -32,7 +32,7 @@ export class AudioPanelComponent {
   constructor(panelElement: HTMLElement, events: AudioPanelEvents, t: (key: keyof Translations, replacements?: { [key: string]: string | number }) => string) {
     this.panelElement = panelElement;
     this.recordBtn = document.getElementById('recordAudioBtn') as HTMLButtonElement;
-    this.pauseResumeBtn = document.getElementById('playAudioBtn') as HTMLButtonElement; // 修改：playBtn改为pauseResumeBtn
+    this.pauseResumeBtn = document.getElementById('pauseResumeBtn') as HTMLButtonElement;
     this.audioPlayback = document.getElementById('audioPlayback') as HTMLAudioElement;
 
     if (!this.recordBtn || !this.pauseResumeBtn || !this.audioPlayback) {
@@ -68,7 +68,7 @@ export class AudioPanelComponent {
           }
           this.audioBlobUrl = URL.createObjectURL(audioBlob);
           this.audioPlayback.src = this.audioBlobUrl;
-          this.pauseResumeBtn.disabled = false;
+          this.pauseResumeBtn.disabled = true;
           this.audioPlayback.style.display = 'block';
 
           this.events.onAudioModified(audioBlob, this.audioBlobUrl); // Notify App of modification
@@ -110,7 +110,7 @@ export class AudioPanelComponent {
       this.recordBtn.innerHTML = `<i class="fas fa-microphone"></i> ${this.t('recordAudio')}`;
       this.recordBtn.classList.remove('recording');
       this.pauseResumeBtn.disabled = true;
-      this.pauseResumeBtn.innerHTML = `<i class="fas fa-play"></i> 播放`;
+      this.pauseResumeBtn.innerHTML = `<i class="fas fa-pause"></i> 暂停`;
       this.events.onAppendOutput('info', this.t('recordingStopped'));
     }
   }
@@ -150,7 +150,7 @@ export class AudioPanelComponent {
     this.audioBlobUrl = audioUrl;
     if (audioBlob && audioUrl) {
       this.audioPlayback.src = audioUrl;
-      this.pauseResumeBtn.disabled = false;
+      this.pauseResumeBtn.disabled = true;
       this.audioPlayback.style.display = 'block';
     } else {
       this.audioPlayback.src = '';
@@ -162,7 +162,7 @@ export class AudioPanelComponent {
     this.isPaused = false;
     this.recordBtn.innerHTML = `<i class="fas fa-microphone"></i> ${this.t('recordAudio')}`;
     this.recordBtn.classList.remove('recording');
-    this.pauseResumeBtn.innerHTML = `<i class="fas fa-play"></i> 播放`;
+    this.pauseResumeBtn.innerHTML = `<i class="fas fa-pause"></i> 暂停`;
   }
 
   public toggleVisibility(show: boolean): void {
