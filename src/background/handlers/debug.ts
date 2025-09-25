@@ -21,7 +21,7 @@ import * as path from 'path';
 import { doCompile } from './build';
 import { getWebContents, getWindow, typedIpcMain, store, getMingwPath } from '../basicUtil';
 
-const gdb = new GdbController(store.get('advanced.ioEncoding'));
+const gdb = new GdbController('utf-8');
 gdb.onResponse(response => {
   switch (response.type) {
     case "console":
