@@ -10,16 +10,16 @@
     <i nz-icon nzType="reload"></i>
   </button>
 
-  <!-- 保存按钮 - 现在是主要的保存方式 -->
+  <!-- 保存按钮 -->
   <button 
     nz-button 
-    nzType="primary" 
+    nzType="default" 
     [nzLoading]="isSaving"
     [disabled]="!currentProblem"
     (click)="saveCurrentProblem()" 
     nz-tooltip 
-    nzTooltipTitle="保存当前问题 (Ctrl+S) - 主要保存方式">
-    <i nz-icon nzType="save"></i> 保存
+    nzTooltipTitle="保存">
+    <i nz-icon nzType="save"></i>
   </button>
 
   <!-- 导入按钮 -->
