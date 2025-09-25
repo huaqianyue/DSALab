@@ -24,14 +24,20 @@ import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { NzIconModule } from 'ng-zorro-antd/icon';
+import { NzListModule } from 'ng-zorro-antd/list';
+import { NzEmptyModule } from 'ng-zorro-antd/empty';
+import { NzCardModule } from 'ng-zorro-antd/card';
+import { NzToolTipModule } from 'ng-zorro-antd/tooltip';
 
 import { CoreModule } from '../../core/core.module';
 
 import { OutlineComponent } from './outline/outline.component';
 import { WatchComponent } from './watch/watch.component';
+import { ProblemListComponent } from './problem-list/problem-list.component';
+import { ProblemDescriptionComponent } from './problem-description/problem-description.component';
 
 @NgModule({
-  declarations: [ OutlineComponent, WatchComponent ],
+  declarations: [ OutlineComponent, WatchComponent, ProblemListComponent, ProblemDescriptionComponent ],
   imports: [
     CommonModule,
     FormsModule,
@@ -41,8 +47,12 @@ import { WatchComponent } from './watch/watch.component';
     NzButtonModule,
     NzTagModule,
     NzIconModule,
+    NzListModule,
+    NzEmptyModule,
+    NzCardModule,
+    NzToolTipModule,
     CoreModule
   ],
-  exports: [ OutlineComponent, WatchComponent ]
+  exports: [ OutlineComponent, WatchComponent, ProblemListComponent, ProblemDescriptionComponent ]
 })
 export class SidebarModule { }

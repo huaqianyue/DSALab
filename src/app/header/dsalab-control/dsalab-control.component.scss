@@ -1,0 +1,78 @@
+.export-modal-content {
+  .user-info {
+    margin-bottom: 16px;
+  }
+
+  .problem-selection {
+    .selection-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+
+      h4 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .selection-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+    }
+
+    .problem-list {
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #d9d9d9;
+      border-radius: 6px;
+      margin-bottom: 16px;
+
+      .problem-item {
+        padding: 8px 16px !important;
+        
+        &.disabled {
+          opacity: 0.5;
+        }
+
+        .problem-status {
+          display: flex;
+          gap: 4px;
+          margin-top: 4px;
+
+          nz-tag {
+            margin: 0;
+            font-size: 12px;
+            
+            i {
+              margin-right: 4px;
+            }
+          }
+        }
+      }
+    }
+
+    .selection-summary {
+      margin-top: 16px;
+    }
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 0;
+  }
+}
+
+// 深色主题适配
+[data-theme="dark"] {
+  .export-modal-content {
+    .problem-selection {
+      .problem-list {
+        border-color: #434343;
+        background: #1f1f1f;
+      }
+    }
+  }
+}

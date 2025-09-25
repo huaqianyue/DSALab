@@ -34,6 +34,18 @@ export class MainViewComponent implements OnInit {
       disabled: false
     },
     {
+      title: '题目列表',
+      url: 'problem-list',
+      icon: 'ordered-list',
+      disabled: false
+    },
+    {
+      title: '题目描述',
+      url: 'problem-description',
+      icon: 'file-text',
+      disabled: false
+    },
+    {
       title: '项目管理',
       url: 'project',
       icon: 'project',

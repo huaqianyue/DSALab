@@ -1,6 +1,7 @@
 <div id="menuBar">
     <nz-button-group>
-        <button nz-button nz-dropdown nzType="text" [nzDropdownMenu]="fileMenu">文件</button>
+        <!-- 隐藏文件菜单 -->
+        <!-- <button nz-button nz-dropdown nzType="text" [nzDropdownMenu]="fileMenu">文件</button> -->
         <button nz-button nz-dropdown nzType="text" [nzDropdownMenu]="editMenu">编辑</button>
         <button nz-button nz-dropdown nzType="text" [nzDropdownMenu]="runMenu">运行</button>
         <button nz-button nz-dropdown nzType="text" [nzDropdownMenu]="toolMenu">工具</button>
@@ -8,9 +9,10 @@
         <button nz-button nz-dropdown nzType="text"></button>
     </nz-button-group>
 </div>
-<nz-dropdown-menu nzNoAnimation #fileMenu>
+<!-- 隐藏文件菜单的下拉内容 -->
+<!-- <nz-dropdown-menu nzNoAnimation #fileMenu>
     <app-header-dropdown [data]="fileMenuId"></app-header-dropdown>
-</nz-dropdown-menu>
+</nz-dropdown-menu> -->
 <nz-dropdown-menu nzNoAnimation #editMenu>
     <app-header-dropdown [data]="editMenuId"></app-header-dropdown>
 </nz-dropdown-menu>
@@ -23,5 +25,7 @@
 <nz-dropdown-menu nzNoAnimation #helpMenu>
     <app-header-dropdown [data]="helpMenuId"></app-header-dropdown>
 </nz-dropdown-menu>
-<app-file-control></app-file-control>
+<!-- 隐藏文件控制组件 -->
+<!-- <app-file-control></app-file-control> -->
 <app-build-control></app-build-control>
+<app-dsalab-control></app-dsalab-control>

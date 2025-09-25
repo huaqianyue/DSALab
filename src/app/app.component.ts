@@ -23,6 +23,7 @@ import { AppConfig } from '../environments/environment';
 import { HotkeysService } from './services/hotkeys.service';
 import { StatusService } from './services/status.service';
 import { ThemeService } from './services/theme.service';
+import { DSALabHistoryService } from './services/dsalab-history.service';
 
 @Component({
   selector: 'app-root',
@@ -34,7 +35,8 @@ export class AppComponent implements OnInit {
     private electronService: ElectronService,
     private translate: TranslateService,
     private statusService: StatusService,
-    private themeService: ThemeService
+    private themeService: ThemeService,
+    private dsalabHistoryService: DSALabHistoryService
   ) {
     this.translate.setDefaultLang('en');
     console.log('AppConfig', AppConfig);

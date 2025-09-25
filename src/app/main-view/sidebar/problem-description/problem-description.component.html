@@ -1,0 +1,113 @@
+<div class="problem-description-container">
+  <!-- 题目描述内容 -->
+  <div class="problem-description-content" *ngIf="currentProblem; else noProblemSelected">
+    <!-- 题目标题 -->
+    <div class="problem-header">
+      <h3 class="problem-title">{{ currentProblem.Title }}</h3>
+      <div class="navigation-buttons">
+        <button 
+          nz-button 
+          nzType="text" 
+          nzSize="small"
+          [disabled]="!canNavigateToPrevious()"
+          (click)="navigateToPrevious()"
+          nz-tooltip 
+          nzTooltipTitle="上一题">
+          <i nz-icon nzType="left"></i>
+        </button>
+        <button 
+          nz-button 
+          nzType="text" 
+          nzSize="small"
+          [disabled]="!canNavigateToNext()"
+          (click)="navigateToNext()"
+          nz-tooltip 
+          nzTooltipTitle="下一题">
+          <i nz-icon nzType="right"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- 题目描述 -->
+    <div class="problem-content">
+      <nz-card nzTitle="题目描述" nzSize="small">
+        <div class="description-text" [innerHTML]="currentProblem.fullDescription"></div>
+      </nz-card>
+    </div>
+  </div>
+
+  <!-- 未选择题目时的提示 -->
+  <ng-template #noProblemSelected>
+    <div class="no-problem-selected">
+      <nz-empty 
+        nzNotFoundImage="simple" 
+        nzNotFoundContent="请从题目列表中选择一个题目">
+      </nz-empty>
+    </div>
+  </ng-template>
+
+  <!-- 音频录制面板 -->
+  <div class="audio-panel" *ngIf="currentProblem">
+    <nz-card nzTitle="音频讲解" nzSize="small">
+      <div class="audio-controls">
+        <!-- 录音控制 -->
+        <div class="recording-controls">
+          <button 
+            nz-button 
+            [nzType]="isRecording ? 'primary' : 'default'"
+            nzSize="small"
+            (click)="toggleRecording()"
+            [nz-tooltip]="getRecordButtonText()">
+            <i nz-icon [nzType]="getRecordButtonIcon()"></i>
+            {{ getRecordButtonText() }}
+          </button>
+
+          <button 
+            nz-button 
+            nzType="default"
+            nzSize="small"
+            *ngIf="isRecording"
+            (click)="togglePause()"
+            [nz-tooltip]="isPaused ? '继续录音' : '暂停录音'">
+            <i nz-icon [nzType]="isPaused ? 'play-circle' : 'pause-circle'"></i>
+          </button>
+        </div>
+
+        <!-- 播放控制 -->
+        <div class="playback-controls" *ngIf="hasAudio()">
+          <button 
+            nz-button 
+            nzType="default"
+            nzSize="small"
+            (click)="playAudio()"
+            nz-tooltip="播放音频">
+            <i nz-icon nzType="play-circle"></i>
+            播放
+          </button>
+        </div>
+
+        <!-- 录音状态指示 -->
+        <div class="recording-status" *ngIf="isRecording">
+          <nz-tag [nzColor]="isPaused ? 'orange' : 'red'">
+            <i nz-icon [nzType]="isPaused ? 'pause-circle' : 'audio'" nzSpin="!isPaused"></i>
+            {{ isPaused ? '录音已暂停' : '正在录音...' }}
+          </nz-tag>
+          <div class="recording-duration">
+            {{ getCurrentDurationText() }}
+          </div>
+        </div>
+
+        <!-- 音频状态指示 -->
+        <div class="audio-status" *ngIf="hasAudio() && !isRecording">
+          <nz-tag nzColor="green">
+            <i nz-icon nzType="check-circle"></i>
+            已有音频讲解
+          </nz-tag>
+          <div class="audio-duration" *ngIf="getAudioDurationText()">
+            {{ getAudioDurationText() }}
+          </div>
+        </div>
+      </div>
+    </nz-card>
+  </div>
+</div>

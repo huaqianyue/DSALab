@@ -33,13 +33,14 @@ export class HeaderComponent implements OnInit {
     [key: string]: Command
   };
 
-  fileMenuId: DropdownList = [
-    "file.new",
-    "file.open",
-    "#divider",
-    "file.save",
-    "file.saveAs"
-  ];
+  // 隐藏文件菜单相关功能
+  // fileMenuId: DropdownList = [
+  //   "file.new",
+  //   "file.open",
+  //   "#divider",
+  //   "file.save",
+  //   "file.saveAs"
+  // ];
   editMenuId: DropdownList = [
     "edit.undo",
     "edit.redo",
@@ -51,7 +52,9 @@ export class HeaderComponent implements OnInit {
     "edit.find",
     "edit.replace",
     "#divider",
-    "edit.commentLine"
+    "edit.commentLine",
+    "#divider",
+    "file.save"  // 将保存移动到编辑菜单中
   ];
   runMenuId: DropdownList = [
     "build.build",

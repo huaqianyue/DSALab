@@ -1,0 +1,151 @@
+<nz-button-group>
+  <!-- 刷新按钮 -->
+  <button 
+    nz-button 
+    nzType="default" 
+    [nzLoading]="isRefreshing"
+    (click)="refreshProblems()" 
+    nz-tooltip 
+    nzTooltipTitle="刷新题目列表">
+    <i nz-icon nzType="reload"></i>
+  </button>
+
+  <!-- 保存按钮 - 现在是主要的保存方式 -->
+  <button 
+    nz-button 
+    nzType="primary" 
+    [nzLoading]="isSaving"
+    [disabled]="!currentProblem"
+    (click)="saveCurrentProblem()" 
+    nz-tooltip 
+    nzTooltipTitle="保存当前问题 (Ctrl+S) - 主要保存方式">
+    <i nz-icon nzType="save"></i> 保存
+  </button>
+
+  <!-- 导入按钮 -->
+  <button 
+    nz-button 
+    nzType="default" 
+    (click)="importProblems()" 
+    nz-tooltip 
+    nzTooltipTitle="导入题目列表">
+    <i nz-icon nzType="import"></i>
+  </button>
+
+  <!-- 导出按钮 -->
+  <button 
+    nz-button 
+    nzType="default" 
+    (click)="openExportModal()" 
+    nz-tooltip 
+    nzTooltipTitle="导出选中题目">
+    <i nz-icon nzType="export"></i>
+  </button>
+</nz-button-group>
+
+<!-- 导出模态框 -->
+<nz-modal
+  [(nzVisible)]="exportModalVisible"
+  nzTitle="导出题目"
+  nzWidth="600px"
+  [nzOkLoading]="isExporting"
+  nzOkText="导出"
+  nzCancelText="取消"
+  (nzOnOk)="confirmExport()"
+  (nzOnCancel)="closeExportModal()">
+  
+  <ng-container *nzModalContent>
+    <div class="export-modal-content">
+      <!-- 用户信息输入 -->
+      <div class="user-info-input">
+        <h4>导出信息</h4>
+        <nz-form-item>
+          <nz-form-label [nzSpan]="4" nzRequired>姓名</nz-form-label>
+          <nz-form-control [nzSpan]="20">
+            <input 
+              nz-input 
+              [(ngModel)]="exportUserName" 
+              placeholder="请输入您的姓名"
+              maxlength="50" />
+          </nz-form-control>
+        </nz-form-item>
+        <nz-form-item>
+          <nz-form-label [nzSpan]="4" nzRequired>学号</nz-form-label>
+          <nz-form-control [nzSpan]="20">
+            <input 
+              nz-input 
+              [(ngModel)]="exportStudentId" 
+              placeholder="请输入您的学号"
+              maxlength="20" />
+          </nz-form-control>
+        </nz-form-item>
+      </div>
+
+      <!-- 选择题目 -->
+      <div class="problem-selection">
+        <div class="selection-header">
+          <h4>选择要导出的题目：</h4>
+          <div class="selection-actions">
+            <nz-checkbox 
+              [nzChecked]="isAllSelected()" 
+              [nzIndeterminate]="isIndeterminate()"
+              (nzCheckedChange)="toggleSelectAll()">
+              全选 ({{ getExportableProblemsCount() }} 个可导出)
+            </nz-checkbox>
+          </div>
+        </div>
+
+        <div class="problem-list">
+          <nz-list nzSize="small" [nzDataSource]="problems" [nzRenderItem]="problemItem">
+            <ng-template #problemItem let-problem>
+              <nz-list-item 
+                class="problem-item"
+                [class.disabled]="problem.isDelete || !hasProblemContent(problem)"
+                *ngIf="!problem.isDelete">
+                
+                <nz-list-item-meta>
+                  <nz-list-item-meta-title>
+                    <nz-checkbox 
+                      [nzChecked]="isProblemSelected(problem.id)"
+                      [nzDisabled]="!hasProblemContent(problem)"
+                      (nzCheckedChange)="toggleProblemSelection(problem.id)">
+                      {{ problem.shortDescription }}
+                    </nz-checkbox>
+                  </nz-list-item-meta-title>
+                  
+                  <nz-list-item-meta-description>
+                    <div class="problem-status">
+                      <nz-tag nzColor="blue" *ngIf="problem.Code">
+                        <i nz-icon nzType="code"></i> 代码
+                      </nz-tag>
+                      <nz-tag nzColor="green" *ngIf="problem.Audio">
+                        <i nz-icon nzType="sound"></i> 音频
+                      </nz-tag>
+                      <nz-tag nzColor="default" *ngIf="!hasProblemContent(problem)">
+                        <i nz-icon nzType="exclamation-circle"></i> 无内容
+                      </nz-tag>
+                    </div>
+                  </nz-list-item-meta-description>
+                </nz-list-item-meta>
+              </nz-list-item>
+            </ng-template>
+          </nz-list>
+        </div>
+
+        <!-- 选择统计 -->
+        <div class="selection-summary" *ngIf="selectedProblemIds.length > 0">
+          <nz-alert 
+            nzType="success" 
+            [nzMessage]="'已选择 ' + selectedProblemIds.length + ' 个题目进行导出'"
+            nzShowIcon>
+          </nz-alert>
+        </div>
+      </div>
+
+      <!-- 空状态 -->
+      <div class="empty-state" *ngIf="problems.length === 0">
+        <nz-empty nzNotFoundContent="暂无可导出的题目"></nz-empty>
+      </div>
+    </div>
+  </ng-container>
+</nz-modal>

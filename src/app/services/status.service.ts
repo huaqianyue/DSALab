@@ -25,6 +25,8 @@ import { EditorService } from './editor.service';
 import { HotkeysService } from './hotkeys.service';
 import { ElectronService } from '../core/services';
 import { SettingsService } from './settings.service';
+import { DSALabProblemService } from './dsalab-problem.service';
+import { TabsService } from './tabs.service';
 
 export interface Command {
   name: string;
@@ -62,11 +64,11 @@ export class StatusService {
         run: () => this.fileService.open()
       },
       'file.save': {
-        name: '保存',
+        name: '保存当前DSALab问题',
         icon: 'save',
         shortcut: 'control.s',
-        enabled: () => this.saveEnabled,
-        run: () => this.fileService.save()
+        enabled: () => this.isDSALabTabActive(),
+        run: () => this.saveDSALabProblem()
       },
       'file.saveAs': {
         name: '另存为...',
@@ -211,7 +213,9 @@ export class StatusService {
     private fileService: FileService,
     private debugService: DebugService,
     private buildService: BuildService,
-    private settingsService: SettingsService
+    private settingsService: SettingsService,
+    private dsalabService: DSALabProblemService,
+    private tabsService: TabsService
   ) {
     this.debugService.isDebugging$.subscribe(v => this.isDebugging = v);
     this.buildService.isBuilding$.subscribe(v => this.isBuilding = v);
@@ -235,5 +239,38 @@ export class StatusService {
   }
   get hasFile() {
     return this.fileService.currentFileType() !== "none";
+  }
+
+  // 检查当前标签页是否为DSALab问题
+  isDSALabTabActive(): boolean {
+    const activeTab = this.tabsService.getActive().value;
+    return activeTab && activeTab.key.startsWith('dsalab-') && !this.isDebugging && !this.isBuilding;
+  }
+
+  // 保存DSALab问题
+  async saveDSALabProblem(): Promise<void> {
+    try {
+      const activeTab = this.tabsService.getActive().value;
+      if (activeTab && activeTab.key.startsWith('dsalab-')) {
+        // 同步编辑器内容到标签页
+        this.tabsService.syncActiveCode();
+        
+        // 更新DSALab服务中的代码内容
+        this.dsalabService.updateCurrentProblemCode(activeTab.code);
+        
+        // 保存当前问题
+        await this.dsalabService.saveCurrentProblem();
+        
+        // 标记标签页为已保存
+        activeTab.saved = true;
+        
+        console.log('DSALab problem saved successfully via Ctrl+S');
+      } else {
+        // 如果不是DSALab标签页，使用原有保存逻辑
+        this.fileService.save();
+      }
+    } catch (error) {
+      console.error('Failed to save DSALab problem:', error);
+    }
   }
 }

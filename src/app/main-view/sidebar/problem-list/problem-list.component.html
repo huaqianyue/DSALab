@@ -1,0 +1,44 @@
+<div class="problem-list-container">
+  <div class="problem-list-header">
+    <h3>题目列表 ({{ problems.length }})</h3>
+    <div class="header-actions">
+      <button 
+        nz-button 
+        nzType="text" 
+        nzSize="small" 
+        nz-tooltip 
+        nzTooltipTitle="刷新题目列表"
+        [nzLoading]="isRefreshing"
+        (click)="refreshProblems()">
+        <i nz-icon nzType="reload"></i>
+      </button>
+    </div>
+  </div>
+
+  <div class="problem-list-content">
+    <!-- 调试信息 -->
+    <div style="padding: 10px; background: #f0f0f0; margin: 5px; font-size: 12px;" *ngIf="problems.length > 0">
+      调试: 找到 {{ problems.length }} 个题目
+    </div>
+    
+    <!-- 简化的列表显示 -->
+    <div *ngFor="let problem of problems" 
+         style="padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;"
+         [style.background]="isCurrentProblem(problem) ? '#e6f7ff' : 'white'"
+         (click)="selectProblem(problem)">
+      <div><strong>{{ problem.shortDescription || problem.Title }}</strong></div>
+      <div style="font-size: 12px; color: #666;">ID: {{ problem.id }}</div>
+      <div style="font-size: 11px; color: #999;" *ngIf="hasCode(problem) || hasAudio(problem)">
+        <span *ngIf="hasCode(problem)">📄 代码</span>
+        <span *ngIf="hasAudio(problem)">🎵 音频</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="problem-list-footer" *ngIf="problems.length === 0">
+    <nz-empty
+      nzNotFoundImage="simple" 
+      nzNotFoundContent="暂无题目">
+    </nz-empty>
+  </div>
+</div>
