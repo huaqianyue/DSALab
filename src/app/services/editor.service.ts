@@ -16,11 +16,7 @@
 // along with Dev-C++ 7.  If not, see <http://www.gnu.org/licenses/>.
 
 import { Injectable } from '@angular/core';
-import { listen, MessageConnection } from 'vscode-ws-jsonrpc';
-import ReconnectingWebSocket from 'reconnecting-websocket';
 import { MonacoEditorLoaderService } from '@materia-ui/ngx-monaco-editor';
-import { MonacoLanguageClient, CloseAction, ErrorAction, MonacoServices, createConnection } from 'monaco-languageclient';
-import { DocumentSymbol, SemanticTokens } from 'vscode-languageserver-protocol';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, filter, take } from 'rxjs/operators';
 
@@ -39,32 +35,6 @@ function isCpp(filename: string) {
   return ['cc', 'cxx', 'cpp', 'h'].includes(ext);
 }
 
-const clangdSemanticTokensLegend: monaco.languages.SemanticTokensLegend = {
-  tokenModifiers: [], // No token modifier supported now (12.0.0-rc1)
-  // See https://github.com/llvm/llvm-project/blob/4dc8365/clang-tools-extra/clangd/SemanticHighlighting.h#L30
-  tokenTypes: [
-    "variable.global",         // Global var
-    "variable.local",          // Local var
-    "variable.param",          // Param
-    "function",                // Function (global)
-    "function.member",         // Member function
-    "function.member.static",  // Static member function
-    "variable.member",         // Member data
-    "variable.member.static",  // Static member data
-    "type.class",              // Class type
-    "type.enum",               // Enum type
-    "number.enum",             // Enum member
-    "type",                    // Type-alias (rely on template)
-    "type",                    // Other type
-    "",                        // Unknown
-    "type.namespace",          // Namespace
-    "type.param",              // Template param
-    "type.concept",            // Concept
-    "type",                    // Primitive type (type-alias)
-    "macro",                   // Macro
-    "comment"                  // Inactive Code
-  ]
-};
 
 interface EditorBreakpointDecInfo {
   id: string;
@@ -87,14 +57,12 @@ interface ModelInfo {
 })
 export class EditorService {
   isInit = false;
-  isLanguageClientStarted = false;
   editorMessage: Subject<{ type: string; arg?: any }> = new Subject();
 
   // Root path of new files, `extraResources/anon_workspace`
   private nullPath = '/anon_workspace/';
 
   private editor: monaco.editor.IStandaloneCodeEditor;
-  private languageClient: MonacoLanguageClient;
   private editorText = new BehaviorSubject<string>("");
   editorText$ = this.editorText.asObservable();
 
@@ -129,74 +97,12 @@ export class EditorService {
       });
       monaco.languages.setMonarchTokensProvider('cpp', cppLang);
       monaco.languages.setLanguageConfiguration('cpp', cppLangConf);
-      monaco.languages.registerDocumentSemanticTokensProvider('cpp', {
-        getLegend() {
-          return clangdSemanticTokensLegend;
-        },
-        provideDocumentSemanticTokens: async (model: monaco.editor.ITextModel) => {
-          return {
-            data: new Uint32Array(await this.getSemanticTokens(model))
-          };
-        },
-        releaseDocumentSemanticTokens() { }
-      });
-      MonacoServices.install(require('monaco-editor-core/esm/vs/platform/commands/common/commands').CommandsRegistry);
-      this.startLanguageClient();
     });
 
     this.electronService.ipcRenderer.invoke('window/getExtraResourcePath')?.then(v => {
       this.nullPath = v + '/anon_workspace/';
     });
 
-    // Language Server Handlers
-    this.electronService.ipcRenderer.on('ng:langServer/started', (_, port) => {
-      // create the web socket
-      const socketUrl = `ws://localhost:${port}/langServer`;
-      const socketOptions = {
-        maxReconnectionDelay: 10000,
-        minReconnectionDelay: 1000,
-        reconnectionDelayGrowFactor: 1.3,
-        connectionTimeout: 10000,
-        maxRetries: 8,
-        debug: false
-      };
-      const webSocket = new ReconnectingWebSocket(socketUrl, [], socketOptions) as any;
-      // listen when the web socket is opened
-      listen({
-        webSocket,
-        onConnection: (connection: MessageConnection) => {
-          // create and start the language client
-          this.languageClient = new MonacoLanguageClient({
-            name: `C++ Client`,
-            clientOptions: {
-              // use a language id as a document selector
-              documentSelector: ['cpp'],
-              // disable the default error handler
-              errorHandler: {
-                error: () => ErrorAction.Continue,
-                closed: () => CloseAction.DoNotRestart
-              }
-            },
-            // create a language client connection from the JSON RPC connection on demand
-            connectionProvider: {
-              get: (errorHandler, closeHandler) => {
-                return Promise.resolve(createConnection(<any>connection, errorHandler, closeHandler));
-              }
-            }
-          });
-          const disposable = this.languageClient.start();
-          this.isLanguageClientStarted = true;
-          connection.onClose(() => {
-            this.isLanguageClientStarted = false;
-            disposable.dispose();
-          });
-        }
-      });
-    });
-    this.electronService.ipcRenderer.on('ng:langServer/stopped', (_) => {
-      this.isLanguageClientStarted = false;
-      this.languageClient.stop();
-    });
   }
 
   private getUri(tab: Tab): monaco.Uri {
@@ -273,11 +179,6 @@ export class EditorService {
     });
   }
 
-  async startLanguageClient() {
-    if (this.isLanguageClientStarted) return;
-    if (await this.electronService.getConfig('env.clangdPath') === null) return;
-    await this.electronService.ipcRenderer.invoke('langServer/start');
-  }
 
   // https://github.com/microsoft/monaco-editor/issues/2000
   private interceptOpenEditor() {
@@ -416,28 +317,6 @@ export class EditorService {
     this.editor.focus();
   }
 
-  async getSymbols(): Promise<DocumentSymbol[]> {
-    if (!this.isInit) return Promise.resolve([]);
-    if (this.editor.getModel() === null) return Promise.resolve([]);
-    if (!this.isLanguageClientStarted) return Promise.resolve([]);
-    return this.languageClient.sendRequest("textDocument/documentSymbol", {
-      textDocument: {
-        uri: this.editor.getModel().uri.toString()
-      }
-    });
-  }
-
-  private async getSemanticTokens(model?: monaco.editor.ITextModel): Promise<number[]> {
-    if (!this.isInit) return Promise.resolve(null);
-    if (!this.isLanguageClientStarted) return Promise.resolve(null);
-    if (typeof model === 'undefined') model = this.editor.getModel();
-    if (model === null) return Promise.resolve(null);
-    return (await this.languageClient.sendRequest<SemanticTokens>("textDocument/semanticTokens/full", {
-      textDocument: {
-        uri: model.uri.toString()
-      }
-    })).data;
-  }
 
   getCode() {
     if (!this.isInit) return "";

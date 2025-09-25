@@ -177,8 +177,6 @@ export interface Configurations {
   'build.compileArgs': string[];
   'env.mingwPath': string;
   'env.useBundledMingw': boolean;
-  'env.clangdPath': string;
-  'env.useBundledClangd': boolean;
   'advanced.ioEncoding': string;
   'theme.active': string;
 }
@@ -193,8 +191,6 @@ export type IpcCommands = {
   'build/build': (options: BuildOptions) => void;
   'build/runExe': (options: RunExeOptions) => void;
 
-  'langServer/start': () => void;
-  'langServer/stop': () => void;
 
   'debug/start': (options: DebugStartOptions) => DebugStartResult;
   'debug/exit': () => void
@@ -228,6 +224,4 @@ export type IpcEvents = {
   'ng:debug/notify': (response: GdbResponse) => void;
   'ng:debug/result': (response: GdbResponse) => void;
 
-  'ng:langServer/started': (port: number) => void;
-  'ng:langServer/stopped': () => void;
 };

@@ -61,7 +61,6 @@ export class EditorComponent implements OnInit, OnDestroy {
   }
 
   editorInit(editor: monaco.editor.IStandaloneCodeEditor) {
-    if (!this.editorService.isLanguageClientStarted) this.editorService.startLanguageClient();
     this.editorService.editorInit(editor);
     if (this.key) {
       const activeTab = this.tabsService.getByKey(this.key).value;

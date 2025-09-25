@@ -14,15 +14,10 @@
   </div>
 
   <div nz-row [nzGutter]="16">
-    <div nz-col [nzSpan]="12">
+    <div nz-col [nzSpan]="24">
       <h3>MinGW 路径</h3>
       <input nz-input type="text" [disabled]="currentEnvOptions.useBundledMingw" [(ngModel)]="currentEnvOptions.mingwPath" (ngModelChange)="onChange()">
       <label nz-checkbox [(nzChecked)]="currentEnvOptions.useBundledMingw" (nzCheckedChange)="onChange()">使用自带的</label>
-    </div>
-    <div nz-col [nzSpan]="12">
-      <h3>Clangd 路径</h3>
-      <input nz-input type="text" [disabled]="currentEnvOptions.useBundledClangd" [(ngModel)]="currentEnvOptions.clangdPath">
-      <label nz-checkbox [(nzChecked)]="currentEnvOptions.useBundledClangd" (nzCheckedChange)="onChange()">使用自带的</label>
     </div>
   </div>
 </nz-layout>

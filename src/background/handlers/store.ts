@@ -21,21 +21,7 @@ import * as iconv from 'iconv-lite';
 
 import { store, typedIpcMain, extraResourcesPath } from "../basicUtil";
 import { Configurations } from '../ipcTyping';
-import { restartServer } from './server';
 
-function ignoreByClangdFilter(arg: string) {
-  if (arg.startsWith('DYN')) return false;
-  if (arg.startsWith('-fexec-charset')) return false;
-  if (arg.startsWith('-finput-charset')) return false;
-  return true;
-}
-
-function updateClangdCompileArgs(value: string[]) {
-  const flags = [
-    '-xc++', '--target=x86_64-pc-windows-gnu', ...value.filter(ignoreByClangdFilter)
-  ];
-  fs.writeFileSync(path.join(extraResourcesPath, '/anon_workspace/compile_flags.txt'), flags.join('\n'));
-}
 
 
 typedIpcMain.handle('store/get', (_, key) => {
@@ -55,15 +41,9 @@ const setStoreHandlers: SetStoreHandlerMap = {
     }
     return true;
   },
-  'build.compileArgs': (value) => {
-    updateClangdCompileArgs(value);
-    return true;
-  },
-  // Restart language server when mingw or clangd path changed
-  'env.mingwPath': () => (restartServer(), true),
-  'env.useBundledMingw': () => (restartServer(), true),
-  'env.clangdPath': () => (restartServer(), true),
-  'env.useBundledClangd': () => (restartServer(), true)
+  'build.compileArgs': () => true,
+  'env.mingwPath': () => true,
+  'env.useBundledMingw': () => true
 };
 
 typedIpcMain.handle('store/set', (_, key, value) => {

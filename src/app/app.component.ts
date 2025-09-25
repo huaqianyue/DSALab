@@ -63,12 +63,9 @@ export class AppComponent implements OnInit {
     return 32 + 1 * 32;
   }
 
-  get footerHeight() {
-    return 20;
-  }
 
   get mainViewHeight() {
-    return this.windowHeight - this.headerHeight - this.footerHeight;
+    return this.windowHeight - this.headerHeight;
   }
 
   async ngOnInit(): Promise<void> {
@@ -93,9 +90,4 @@ export class AppComponent implements OnInit {
     this.setEnvModal = false;
   }
 
-  get currentStatus(): string {
-    if (this.statusService.isBuilding) return "正在编译中";
-    if (this.statusService.isDebugging) return "正在调试中";
-    return "就绪";
-  }
 }

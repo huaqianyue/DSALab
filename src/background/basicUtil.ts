@@ -55,8 +55,6 @@ export const store = new Store<Configurations>({
     ],
     'env.mingwPath': '',
     'env.useBundledMingw': fs.existsSync(path.join(extraResourcesPath, "mingw64")),
-    'env.clangdPath': '',
-    'env.useBundledClangd': fs.existsSync(path.join(extraResourcesPath, "clangd")),
     'advanced.ioEncoding': 'cp936',
     'theme.active': 'classic'
   },
@@ -70,9 +68,3 @@ export function getMingwPath(): string {
   return store.get('env.mingwPath');
 }
 
-export function getClangdPath(): string {
-  if (store.get('env.useBundledClangd')) {
-    return path.join(extraResourcesPath, 'clangd');
-  }
-  return store.get('env.clangdPath');
-}

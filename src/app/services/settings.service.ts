@@ -99,8 +99,6 @@ export interface EnvOptions {
   ioEncoding: string;
   mingwPath: string;
   useBundledMingw: boolean;
-  clangdPath: string;
-  useBundledClangd: boolean;
 }
 
 type OptionsType = {
@@ -150,8 +148,6 @@ class BuildSubSetting extends SubSetting<'build'> {
         ioEncoding: 'cp936',
         mingwPath: null,
         useBundledMingw: true,
-        clangdPath: null,
-        useBundledClangd: true,
       }
     };
   }
@@ -162,8 +158,6 @@ class BuildSubSetting extends SubSetting<'build'> {
       this.electronService.getConfig('advanced.ioEncoding').then(v => this.options.env.ioEncoding = v),
       this.electronService.getConfig('env.mingwPath').then(v => this.options.env.mingwPath = v),
       this.electronService.getConfig('env.useBundledMingw').then(v => this.options.env.useBundledMingw = v),
-      this.electronService.getConfig('env.clangdPath').then(v => this.options.env.clangdPath = v),
-      this.electronService.getConfig('env.useBundledClangd').then(v => this.options.env.useBundledClangd = v),
     ]);
     super.updateSaved();
   }
@@ -176,8 +170,6 @@ class BuildSubSetting extends SubSetting<'build'> {
     this.electronService.setConfig('advanced.ioEncoding', this.options.env.ioEncoding);
     this.electronService.setConfig('env.mingwPath', this.options.env.mingwPath);
     this.electronService.setConfig('env.useBundledMingw', this.options.env.useBundledMingw);
-    this.electronService.setConfig('env.clangdPath', this.options.env.clangdPath);
-    this.electronService.setConfig('env.useBundledClangd', this.options.env.useBundledClangd);
     super.updateSaved();
   }
 }

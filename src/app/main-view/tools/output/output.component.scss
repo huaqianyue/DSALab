@@ -1,10 +1,12 @@
 #collapseContainer {
     height: 100%;
     overflow-y: scroll;
+    padding: 10px;
 
     .output {
         font-family: var(--monospace-font);
         word-break: break-all;
         white-space: pre-wrap;
+        margin: 5px 0;
     }
 }

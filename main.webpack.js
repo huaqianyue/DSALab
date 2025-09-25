@@ -49,11 +49,7 @@ module.exports = {
     ]
   },
   plugins: [
-    new CopyPlugin({
-      patterns: [
-        { from: 'src/background/server', to: 'server' }
-      ]
-    })
+    // CopyPlugin removed as server directory no longer exists
   ],
   target: 'electron-main',
   entry: './main.ts',

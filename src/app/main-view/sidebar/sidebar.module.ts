@@ -31,13 +31,12 @@ import { NzToolTipModule } from 'ng-zorro-antd/tooltip';
 
 import { CoreModule } from '../../core/core.module';
 
-import { OutlineComponent } from './outline/outline.component';
 import { WatchComponent } from './watch/watch.component';
 import { ProblemListComponent } from './problem-list/problem-list.component';
 import { ProblemDescriptionComponent } from './problem-description/problem-description.component';
 
 @NgModule({
-  declarations: [ OutlineComponent, WatchComponent, ProblemListComponent, ProblemDescriptionComponent ],
+  declarations: [ WatchComponent, ProblemListComponent, ProblemDescriptionComponent ],
   imports: [
     CommonModule,
     FormsModule,
@@ -53,6 +52,6 @@ import { ProblemDescriptionComponent } from './problem-description/problem-descr
     NzToolTipModule,
     CoreModule
   ],
-  exports: [ OutlineComponent, WatchComponent, ProblemListComponent, ProblemDescriptionComponent ]
+  exports: [ WatchComponent, ProblemListComponent, ProblemDescriptionComponent ]
 })
 export class SidebarModule { }
