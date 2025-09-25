@@ -18,10 +18,12 @@
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { NzNotificationDataOptions, NzNotificationService } from 'ng-zorro-antd/notification';
+import { NzMessageService } from 'ng-zorro-antd/message';
 import { ElectronService } from '../core/services';
 import { BuildResult, GccDiagnostics } from '../core/ipcTyping';
 import { FileService } from './file.service';
 import { ProblemsService } from './problems.service';
+import { TabsService } from './tabs.service';
 import { BehaviorSubject } from 'rxjs';
 
 @Injectable({
@@ -38,8 +40,10 @@ export class BuildService {
     private router: Router,
     private electronService: ElectronService,
     private notification: NzNotificationService,
+    private message: NzMessageService,
     private fileService: FileService,
-    private problemsService: ProblemsService
+    private problemsService: ProblemsService,
+    private tabsService: TabsService
   ) {
     this.electronService.ipcRenderer.on("ng:build/buildStarted", (_) => {
       this.isBuilding$.next(true);
@@ -49,27 +53,27 @@ export class BuildService {
       console.log("Compile result: ", result);
       if (result.success) {
         if (result.diagnostics.length === 0) {
-          this.notification.success("编译成功", "", this.notifyOption);
+          this.message.success("编译成功");
           this.problemsService.linkerr.next("");
           this.problemsService.problems.next([]);
         } else {
           this.showProblems(result.diagnostics);
-          this.notification.warning("编译成功，但存在警告", "", this.notifyOption);
+          this.message.warning("编译成功，但存在警告");
         }
       } else {
         switch (result.stage) {
           case "compile":
             this.showProblems(result.diagnostics);
-            this.notification.error("编译错误", "", this.notifyOption);
+            this.message.error("编译错误");
             break;
           case "link":
             this.showProblems(result.diagnostics);
-            this.notification.error("链接错误", result.linkerr, this.notifyOption);
+            this.message.error("链接错误");
             this.showOutput(result);
             break;
           default:
             this.showOutput(result);
-            this.notification.error("未知错误", result.what.stderr, this.notifyOption);
+            this.message.error("未知错误");
             break;
         }
       }
@@ -112,14 +116,38 @@ export class BuildService {
   }
 
   async compile(): Promise<void> {
-    const srcPath = await this.fileService.saveOnNeed();
-    if (srcPath !== null)
-      this.sendBuildRequest(srcPath);
+    // 检查当前标签页是否为DSALab问题
+    const activeTab = this.tabsService.getActive().value;
+    if (activeTab && activeTab.key.startsWith('dsalab-')) {
+      // DSALab问题：直接使用路径，不调用saveOnNeed避免标题被改变
+      if (activeTab.path) {
+        this.sendBuildRequest(activeTab.path);
+      } else {
+        console.error('DSALab tab has no path');
+      }
+    } else {
+      // 普通文件：使用原有逻辑
+      const srcPath = await this.fileService.saveOnNeed();
+      if (srcPath !== null)
+        this.sendBuildRequest(srcPath);
+    }
   }
 
   async runExe(forceCompile = false): Promise<void> {
-    const srcPath = await this.fileService.saveOnNeed();
-    if (srcPath !== null)
-      this.sendRunExeRequest(srcPath, forceCompile);
+    // 检查当前标签页是否为DSALab问题
+    const activeTab = this.tabsService.getActive().value;
+    if (activeTab && activeTab.key.startsWith('dsalab-')) {
+      // DSALab问题：直接使用路径，不调用saveOnNeed避免标题被改变
+      if (activeTab.path) {
+        this.sendRunExeRequest(activeTab.path, forceCompile);
+      } else {
+        console.error('DSALab tab has no path');
+      }
+    } else {
+      // 普通文件：使用原有逻辑
+      const srcPath = await this.fileService.saveOnNeed();
+      if (srcPath !== null)
+        this.sendRunExeRequest(srcPath, forceCompile);
+    }
   }
 }

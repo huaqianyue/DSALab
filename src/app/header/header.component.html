@@ -1,3 +1,4 @@
+<!-- 顶部菜单栏 -->
 <div id="menuBar">
     <nz-button-group>
         <!-- 隐藏文件菜单 -->
@@ -8,6 +9,19 @@
         <button nz-button nz-dropdown nzType="text" [nzDropdownMenu]="helpMenu">帮助</button>
         <button nz-button nz-dropdown nzType="text"></button>
     </nz-button-group>
+</div>
+
+<!-- 工具栏：左侧DSALab控制，右侧编译运行 -->
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; border-bottom: 1px solid #e8e8e8;">
+    <!-- 左侧：DSALab控制按钮 -->
+    <div style="display: flex; align-items: center;">
+        <app-dsalab-control></app-dsalab-control>
+    </div>
+    
+    <!-- 右侧：编译运行按钮 -->
+    <div style="display: flex; align-items: center;">
+        <app-build-control></app-build-control>
+    </div>
 </div>
 <!-- 隐藏文件菜单的下拉内容 -->
 <!-- <nz-dropdown-menu nzNoAnimation #fileMenu>
@@ -25,7 +39,3 @@
 <nz-dropdown-menu nzNoAnimation #helpMenu>
     <app-header-dropdown [data]="helpMenuId"></app-header-dropdown>
 </nz-dropdown-menu>
-<!-- 隐藏文件控制组件 -->
-<!-- <app-file-control></app-file-control> -->
-<app-build-control></app-build-control>
-<app-dsalab-control></app-dsalab-control>

@@ -137,5 +137,12 @@ export class ThemeService {
       ]
     };
     this.editorService.setEditorTheme(editorTheme);
+    
+    // 确保主题立即应用到编辑器
+    setTimeout(() => {
+      if (this.editorService.isInit) {
+        monaco.editor.setTheme('mytheme');
+      }
+    }, 100);
   }
 }

@@ -27,12 +27,13 @@ import { ProblemsService } from '../services/problems.service';
 })
 export class MainViewComponent implements OnInit {
   readonly sidebarItems = [
-    {
-      title: '大纲',
-      url: 'outline',
-      icon: 'partition',
-      disabled: false
-    },
+    // 隐藏大纲按钮
+    // {
+    //   title: '大纲',
+    //   url: 'outline',
+    //   icon: 'partition',
+    //   disabled: false
+    // },
     {
       title: '题目列表',
       url: 'problem-list',
@@ -45,12 +46,13 @@ export class MainViewComponent implements OnInit {
       icon: 'file-text',
       disabled: false
     },
-    {
-      title: '项目管理',
-      url: 'project',
-      icon: 'project',
-      disabled: true
-    },
+    // 隐藏项目管理按钮
+    // {
+    //   title: '项目管理',
+    //   url: 'project',
+    //   icon: 'project',
+    //   disabled: true
+    // },
     {
       title: '调试查看',
       url: 'watch',

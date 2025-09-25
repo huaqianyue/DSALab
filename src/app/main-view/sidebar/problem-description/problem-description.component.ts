@@ -363,7 +363,7 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy {
         this.tabsService.add({
           key: `dsalab-${problem.id}`,
           type: 'file',
-          title: problem.shortDescription,
+          title: problem.shortDescription, // 显示题目描述
           code: workspaceData.content,
           path: actualFilePath
         });

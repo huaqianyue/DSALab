@@ -323,8 +323,22 @@ export class EditorService {
   };
 
   editorInit(editor: monaco.editor.IStandaloneCodeEditor): void {
-    monaco.editor.setTheme('mytheme');
     this.editor = editor;
+    
+    // 确保主题已定义后再设置
+    this.monacoEditorLoaderService.isMonacoLoaded$.pipe(
+      filter(isLoaded => isLoaded),
+      take(1)
+    ).subscribe(() => {
+      // 尝试使用自定义主题，如果失败则使用默认主题
+      try {
+        monaco.editor.setTheme('mytheme');
+      } catch (error) {
+        // 如果自定义主题不存在，使用默认的vs主题确保有语法高亮
+        monaco.editor.setTheme('vs');
+      }
+    });
+    
     this.interceptOpenEditor();
     this.addMissingActions();
     this.editor.onMouseDown(this.mouseDownListener);
@@ -347,6 +361,10 @@ export class EditorService {
       take(1)
     ).subscribe(() => {
       monaco.editor.defineTheme('mytheme', theme);
+      // 应用主题到编辑器
+      if (this.editor) {
+        this.editor.updateOptions({ theme: 'mytheme' });
+      }
     });
   }
 
@@ -361,7 +379,9 @@ export class EditorService {
       this.modelInfos[oldUri].scrollTop = this.editor.getScrollTop();
     }
     if (newModel === null) {
-      newModel = monaco.editor.createModel(tab.code, isCpp(tab.title) ? 'cpp' : 'text', uri);
+      // DSALab标签页始终使用C++语言，其他文件根据扩展名判断
+      const language = tab.key.startsWith('dsalab-') ? 'cpp' : (isCpp(tab.title) ? 'cpp' : 'text');
+      newModel = monaco.editor.createModel(tab.code, language, uri);
       newModel.onDidChangeContent(_ => {
         tab.saved = false;
         this.editorText.next(newModel.getValue());
