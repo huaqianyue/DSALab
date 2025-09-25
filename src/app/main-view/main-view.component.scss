@@ -1,0 +1,24 @@
+#asContainer {
+    width : 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+
+    #outerSplit {
+        flex-grow: 1;
+    }
+
+    #upperPart {
+        height: 100%;
+        display: flex;
+        flex-direction: row;
+
+        #sidebarMenu {
+            width: 32px;
+        }
+    }
+
+    #toolsArea {
+        overflow: hidden;
+    }
+}

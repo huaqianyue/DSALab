@@ -1,0 +1,15 @@
+@import "../../common_subsetting_styles.scss";
+
+nz-layout {
+
+  #customArgs {
+    font-family: var(--monospace-font);
+    cursor: text;
+
+    #innerInput {
+      width: 150px;
+      display: inline-block;
+    }
+  }
+
+}

@@ -1,0 +1,26 @@
+<div id="header">
+    <app-header></app-header>
+</div>
+<div id="mainView" [ngStyle]="{ 'height.px': mainViewHeight }">
+    <app-main-view></app-main-view>
+    <nz-modal
+      [nzVisible]="setEnvModal"
+      [nzTitle]="modalTitle"
+      [nzContent]="modalContent"
+      [nzFooter]="modalFooter"
+      [nzClosable]="false"
+    >
+      <ng-template #modalTitle>必要设置</ng-template>
+
+      <ng-template #modalContent>
+        <p>MinGW 路径（如 <code>C:\mingw64</code>）</p>
+        <input nz-input [disabled]="tempUseBundledMingw" [(ngModel)]="tempMingwPath">
+        <label nz-checkbox [(ngModel)]="tempUseBundledMingw">使用自带的 MinGW</label>
+      </ng-template>
+
+      <ng-template #modalFooter>
+        <button nz-button nzType="default" [disabled]="!tempUseBundledMingw && tempMingwPath === ''" (click)="confirmPaths()">完成</button>
+      </ng-template>
+    </nz-modal>
+</div>
+<div id="footer">{{ currentStatus }}</div>

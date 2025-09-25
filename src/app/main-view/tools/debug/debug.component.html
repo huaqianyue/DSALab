@@ -1,0 +1,111 @@
+<div id="debugPanel">
+    <div id="leftPart">
+        <div id="exprEval">
+            <input nz-input type="text" placeholder="表达式求值" [disabled]="!enabled || !(isDebugging$ | async)"
+                [(ngModel)]="expr" (keyup.enter)="evalExpr()">
+            <i nz-icon nzType="arrow-down"></i>
+            <div id="exprResult">{{exprVal}}</div>
+        </div>
+        <div id="debugControl">
+            <button nz-button nzType="default" nz-tooltip nzTooltipPlacement="topLeft" nzTooltipTitle="继续执行"
+                [disabled]="!enabled || !(isDebugging$ | async)" (click)="debugContinue()">
+                <i class="codicon codicon-debug-continue"></i>
+            </button>
+            <button nz-button nzType="default" nz-tooltip nzTooltipPlacement="top" nzTooltipTitle="单步执行"
+                [disabled]="!enabled || !(isDebugging$ | async)" (click)="debugStepover()">
+                <i class="codicon codicon-debug-step-over"></i>
+            </button>
+            <button nz-button nzType="default" nz-tooltip nzTooltipPlacement="top" nzTooltipTitle="单步进入"
+                [disabled]="!enabled || !(isDebugging$ | async)" (click)="debugStepinto()">
+                <i class="codicon codicon-debug-step-into"></i>
+            </button>
+            <button nz-button nzType="default" nz-tooltip nzTooltipPlacement="top" nzTooltipTitle="跳出函数"
+                [disabled]="!enabled || !(isDebugging$ | async)" (click)="debugStepout()">
+                <i class="codicon codicon-debug-step-out"></i>
+            </button>
+            <button nz-button nzType="default" nz-tooltip nzTooltipPlacement="top" nzTooltipTitle="重新运行"
+                [disabled]="!enabled || !(isDebugging$ | async)" (click)="debugRestart()">
+                <i class="codicon codicon-debug-restart"></i>
+            </button>
+            <button *ngIf="!(isDebugging$ | async)" nz-button nzType="default" (click)="startDebug()" nz-tooltip
+                nzTooltipPlacement="topRight" nzTooltipTitle="开始调试" [disabled]="!enabled">
+                <i class="codicon codicon-debug-start"></i>
+            </button>
+            <button *ngIf="(isDebugging$ | async)" nz-button nzType="default" (click)="exitDebug()" nz-tooltip
+                nzTooltipPlacement="topRight" nzTooltipTitle="退出调试" [disabled]="!enabled">
+                <i class="codicon codicon-debug-stop"></i>
+            </button>
+        </div>
+    </div>
+    <div id="rightPart">
+        <div id="tabHeadWrapper">
+            <nz-tabset nzSize="small" [(nzSelectedIndex)]="selectedIndex" nzTabPosition="right">
+                <nz-tab nzTitle="调试控制台"></nz-tab>
+                <nz-tab nzTitle="调用栈"></nz-tab>
+                <nz-tab nzTitle="断点"></nz-tab>
+            </nz-tabset>
+        </div>
+        <div id="tabContentWrapper">
+            <div *ngIf="selectedIndex === 0" id="console" class="tab-content" (click)="cInput.focus();">
+                <div id="consoleOutput" #cOutput>{{consoleOutput$ | async}}</div>
+                <div id="consoleInput">
+                    <i nz-icon nzType="right"
+                        [ngStyle]="{ color: (enabled && (isDebugging$ | async) ? promptColor : '#262626' ) }"></i>
+                    <input #cInput nz-input type="text" nzBorderless placeholder="发送命令给 GDB"
+                        (keyup.enter)="sendCommand();" [(ngModel)]="consoleInput"
+                        [disabled]="!enabled || !(isDebugging$ | async) || !consoleInputEnabled">
+                </div>
+            </div>
+            <div *ngIf="selectedIndex === 1">
+                <nz-table #sTable [nzData]="callStack$ | async" nzTableLayout="fixed" nzSize="small"
+                    [nzFrontPagination]="false" nzNoResult=" ">
+                    <thead>
+                        <tr>
+                            <th nzWidth="50px">层</th>
+                            <th>函数名</th>
+                            <th nzWidth="150px" nzRight>调用点</th>
+                        </tr>
+                    </thead>
+                    <tbody id="callStackTableBody">
+                        <tr *ngFor="let data of sTable.data">
+                            <td>{{ data.level }}</td>
+                            <td>{{ data.func }}</td>
+                            <td [nzEllipsis]="true" nzRight>
+                                <a (click)="locate(data)">{{ printPosition(data) }}</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </nz-table>
+            </div>
+            <div *ngIf="selectedIndex === 2">
+                <nz-table #bTable [nzData]="getEditorBreakpoints()" nzTableLayout="fixed" nzSize="small"
+                    [nzFrontPagination]="false" nzNoResult=" ">
+                    <thead>
+                        <tr>
+                            <th nzWidth="150px" nzRight>位置</th>
+                            <th>条件</th>
+                        </tr>
+                    </thead>
+                    <tbody id="breakpointTableBody">
+                        <tr *ngFor="let data of bTable.data" class="editable-row">
+                            <td [nzEllipsis]="true" nzRight>
+                                <a (click)="locateLine(data.line)">{{ printPosition(data) }}</a>
+                            </td>
+                            <td>
+                                <div class="editable-cell"
+                                    *ngIf="(isDebugging$ | async) || currentEditBkptline !== data.line"
+                                    (click)="startEditBkpt(data)">
+                                    {{ data.expression === null ? "　" : data.expression }}
+                                </div>
+                                <input *ngIf="!(isDebugging$ | async) && currentEditBkptline === data.line"
+                                    type="text" nz-input [(ngModel)]="currentEditValue" appAutofocus
+                                    (blur)="stopEditBkpt(data)" (keyup.enter)="stopEditBkpt(data)"
+                                    placeholder="仅表达式成立时程序中断……">
+                            </td>
+                        </tr>
+                    </tbody>
+                </nz-table>
+            </div>
+        </div>
+    </div>
+</div>

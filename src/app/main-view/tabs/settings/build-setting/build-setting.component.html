@@ -1,0 +1,18 @@
+<div id="wrapper">
+  <nz-layout>
+    <nz-sider [nzWidth]="150">
+      <ul nz-menu nzMode="inline">
+        <li nz-menu-item nzIcon="" nzMatchRouter [routerLink]="['env']">编译环境</li>
+        <li nz-menu-item nzIcon="file" nzMatchRouter [routerLink]="['sfb']">单文件编译</li>
+      </ul>
+    </nz-sider>
+    <nz-layout>
+      <router-outlet></router-outlet>
+    </nz-layout>
+  </nz-layout>
+  <nz-footer>
+    保存后设置才会生效。
+    <button nz-button nzType="default" (click)="resetOption()">放弃更改</button>
+    <button nz-button nzType="primary" (click)="saveOption()">保存设置</button>
+  </nz-footer>
+</div>

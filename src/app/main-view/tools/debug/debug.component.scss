@@ -1,0 +1,118 @@
+:host {
+
+    #debugPanel {
+        display       : flex;
+        height        : 100%;
+        flex-direction: row;
+
+        #leftPart {
+            width          : 225px;
+            flex-shrink    : 0;
+            display        : flex;
+            flex-direction : column;
+            justify-content: center;
+            border-right   : 2px solid lightgrey;
+            padding        : 10px;
+
+            #exprEval {
+                flex-grow: 1;
+                text-align: center;
+
+                input {
+                    width: 100%;
+                }
+
+                #exprResult {
+                    border        : 1px solid lightgray;
+                    border-radius : 2px;
+                    font-family   : var(--monospace-font);
+                    text-align: initial;
+                }
+            }
+
+            #debugControl {
+                display        : flex;
+                flex-direction : row;
+                justify-content: center;
+
+                button {
+                    padding: 4px 6px;
+                }
+            }
+        }
+
+        #rightPart {
+            flex-grow     : 1;
+            height        : 100%;
+            padding       : 10px;
+            display       : flex;
+            flex-direction: row-reverse;
+
+            #tabHeadWrapper {
+                flex-shrink: 0;
+            }
+
+            #tabContentWrapper {
+                flex-grow : 1;
+                min-width : 0px;
+                height    : 100%;
+                overflow-y: auto;
+
+                #console {
+                    display       : flex;
+                    flex-direction: column;
+                    border        : 1px solid lightgray;
+                    border-radius : 2px;
+                    font-family   : var(--monospace-font);
+
+                    #consoleOutput {
+                        flex-grow    : 1;
+                        border-bottom: 1px solid lightgrey;
+                        padding      : 4px 11px;
+                        white-space  : pre-wrap;
+                        overflow-y   : scroll;
+                    }
+
+                    #consoleInput {
+                        display       : flex;
+                        flex-direction: row;
+                        align-items   : center;
+
+                        i {
+                            padding-left: 4px;
+                        }
+
+                        input {
+                            flex-grow   : 1;
+                            padding-left: 2px;
+                        }
+                    }
+                }
+
+                #callStackTableBody {
+                    font-family: var(--monospace-font);
+                }
+
+                #breakpointTableBody {
+                    font-family: var(--monospace-font);
+
+                    .editable-cell {
+                        position: relative;
+                        padding : 5px 12px;
+                        cursor  : pointer;
+                    }
+
+                    .editable-row:hover .editable-cell {
+                        border       : 1px solid #d9d9d9;
+                        border-radius: 2px;
+                        padding      : 4px 11px;
+                    }
+                }
+            }
+
+            .tab-content {
+                height: 100%;
+            }
+        }
+    }
+}

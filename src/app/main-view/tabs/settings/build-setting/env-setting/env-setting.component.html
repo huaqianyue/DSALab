@@ -1,0 +1,28 @@
+<nz-layout>
+  <div nz-row [nzGutter]="16">
+    <div nz-col [nzSpan]="24">
+      <h3>输入输出编码</h3>
+      <nz-input-group nzSearch [nzAddOnAfter]="getAcpBtn">
+        <input nz-input type="text" [(ngModel)]="currentEnvOptions.ioEncoding" (ngModelChange)="onChange();verify()">
+      </nz-input-group>
+      <nz-alert *ngIf="!currentEncodingValid" nzType="warning" nzMessage="不受支持的编码。"></nz-alert>
+      <small>设置与编译器和 GDB 交互时将采用的编码。若在单文件编译中启用了“调整可执行文件编码”选项，则可执行文件的输出编码也将设置为此。</small>
+      <ng-template #getAcpBtn>
+        <button nz-button (click)="getDefaultEncoding()" nzType="default">填入当前系统 ANSI 代码页</button>
+      </ng-template>
+    </div>
+  </div>
+
+  <div nz-row [nzGutter]="16">
+    <div nz-col [nzSpan]="12">
+      <h3>MinGW 路径</h3>
+      <input nz-input type="text" [disabled]="currentEnvOptions.useBundledMingw" [(ngModel)]="currentEnvOptions.mingwPath" (ngModelChange)="onChange()">
+      <label nz-checkbox [(nzChecked)]="currentEnvOptions.useBundledMingw" (nzCheckedChange)="onChange()">使用自带的</label>
+    </div>
+    <div nz-col [nzSpan]="12">
+      <h3>Clangd 路径</h3>
+      <input nz-input type="text" [disabled]="currentEnvOptions.useBundledClangd" [(ngModel)]="currentEnvOptions.clangdPath">
+      <label nz-checkbox [(nzChecked)]="currentEnvOptions.useBundledClangd" (nzCheckedChange)="onChange()">使用自带的</label>
+    </div>
+  </div>
+</nz-layout>
