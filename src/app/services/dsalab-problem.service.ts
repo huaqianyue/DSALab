@@ -173,8 +173,13 @@ export class DSALabProblemService {
         console.log(`Loading existing audio file for problem ${problemId}`);
         const audioArrayBuffer = await this.electronService.ipcRenderer.invoke('dsalab-read-problem-audio' as any, problemId);
         if (audioArrayBuffer) {
+          console.log(`Received audio ArrayBuffer: ${audioArrayBuffer.byteLength} bytes`);
+          // 使用与DSALab完全一致的MIME类型
           audioBlob = new Blob([audioArrayBuffer as any], { type: 'audio/webm' });
           audioUrl = URL.createObjectURL(audioBlob);
+          console.log(`Created audio Blob: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
+        } else {
+          console.log(`No audio data received for problem ${problemId}`);
         }
       }
 

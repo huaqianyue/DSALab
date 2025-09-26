@@ -68,4 +68,14 @@ export class EditorComponent implements OnInit, OnDestroy {
     }
   }
 
+  onTouched() {
+    // Monaco编辑器触摸事件处理
+    // 这个方法是为了解决Monaco编辑器组件库中缺失的回调函数
+  }
+
+  onErrorStatusChange(hasErrors: boolean) {
+    // Monaco编辑器错误状态变化处理
+    // 这个方法是为了解决Monaco编辑器组件库中缺失的回调函数
+  }
+
 }

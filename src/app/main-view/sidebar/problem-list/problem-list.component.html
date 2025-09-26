@@ -1,25 +1,9 @@
 <div class="problem-list-container">
   <div class="problem-list-header">
     <h3>题目列表 ({{ problems.length }})</h3>
-    <div class="header-actions">
-      <button 
-        nz-button 
-        nzType="text" 
-        nzSize="small" 
-        nz-tooltip 
-        nzTooltipTitle="刷新题目列表"
-        [nzLoading]="isRefreshing"
-        (click)="refreshProblems()">
-        <i nz-icon nzType="reload"></i>
-      </button>
-    </div>
   </div>
 
   <div class="problem-list-content">
-    <!-- 调试信息 -->
-    <div style="padding: 10px; background: #f0f0f0; margin: 5px; font-size: 12px;" *ngIf="problems.length > 0">
-      调试: 找到 {{ problems.length }} 个题目
-    </div>
     
     <!-- 简化的列表显示 -->
     <div *ngFor="let problem of problems" 

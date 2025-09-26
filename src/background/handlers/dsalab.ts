@@ -167,33 +167,8 @@ async function fetchProblemsFromCDN(): Promise<RawProblem[]> {
     return cdnProblems;
   } catch (error: any) {
     console.error('从CDN获取题目失败:', error);
-    // 如果CDN获取失败，返回示例题目
-    return [
-      {
-        id: 'problem_001',
-        shortDescription: '数组基础',
-        fullDescription: '练习数组的基本操作，包括创建、访问和修改数组元素。\n\n要求：\n1. 创建一个包含10个整数的数组\n2. 读取用户输入并存储到数组中\n3. 输出数组中所有元素的和',
-        isDelete: false,
-        Audio: '',
-        Code: ''
-      },
-      {
-        id: 'problem_002',
-        shortDescription: '链表实现',
-        fullDescription: '实现一个简单的单向链表数据结构。\n\n要求：\n1. 定义链表节点结构\n2. 实现插入、删除和查找操作\n3. 实现链表的遍历功能',
-        isDelete: false,
-        Audio: '',
-        Code: ''
-      },
-      {
-        id: 'problem_003',
-        shortDescription: '冒泡排序实现',
-        fullDescription: '实现冒泡排序算法。\n\n要求：\n1. 读取一组整数\n2. 使用冒泡排序对数组进行排序\n3. 输出排序后的结果',
-        isDelete: false,
-        Audio: '',
-        Code: ''
-      }
-    ];
+    // CDN获取失败时抛出错误，让调用方处理
+    throw error;
   }
 }
 
@@ -371,24 +346,27 @@ ipcMain.handle('dsalab-refresh-problems', async (event): Promise<Problem[]> => {
   await ensureDirectoryExists(path.dirname(DSALabPaths.getLocalProblemsJsonPath()));
   await ensureDirectoryExists(DSALabPaths.getUserWorkspacesRoot());
 
+  const localProblems: Problem[] = await loadPureLocalProblems();
+
   let cdnProblems: RawProblem[];
   try {
     cdnProblems = await fetchProblemsFromCDN();
+    // CDN获取成功，合并CDN和本地问题
+    const mergedProblems = mergeProblemLists(localProblems, cdnProblems, true);
+    
+    try {
+      await saveProblemsToFile(mergedProblems);
+      return mergedProblems;
+    } catch (saveError: any) {
+      console.error('保存刷新后的问题到本地失败:', saveError);
+      return mergedProblems;
+    }
   } catch (error) {
-    throw error;
+    console.warn('CDN获取失败，返回本地问题列表:', error);
+    // CDN获取失败，直接返回本地问题
+    return localProblems;
   }
 
-  const localProblems: Problem[] = await loadPureLocalProblems();
-
-  const mergedProblems = mergeProblemLists(localProblems, cdnProblems, true);
-
-  try {
-    await saveProblemsToFile(mergedProblems);
-    return mergedProblems;
-  } catch (saveError: any) {
-    console.error('保存刷新后的问题到本地失败:', saveError);
-    return mergedProblems;
-  }
 });
 
 ipcMain.handle('dsalab-import-problems', async (event, jsonContent: string) => {
@@ -515,14 +493,19 @@ ipcMain.handle('dsalab-read-problem-audio', async (event, problemId: string): Pr
   const audioFilePath = DSALabPaths.getProblemAudioPath(problemId);
   try {
     const buffer = await fs.readFile(audioFilePath);
+    console.log(`Read audio file for ${problemId}: ${buffer.length} bytes from ${audioFilePath}`);
     return buffer.buffer as ArrayBuffer;
   } catch (error: any) {
     if (error.code !== 'ENOENT') {
       console.error(`读取问题${problemId}的音频失败:`, error);
+    } else {
+      console.log(`Audio file not found for ${problemId}: ${audioFilePath}`);
     }
     return null;
   }
 });
+
+
 
 ipcMain.handle('dsalab-save-problem-workspace', async (event, problemId: string, codeContent: string, audioData: ArrayBuffer | null): Promise<boolean> => {
   const problemWorkspaceDir = DSALabPaths.getProblemWorkspaceDir(problemId);
@@ -725,3 +708,4 @@ ipcMain.handle('dsalab-get-workspace-root', async () => {
 });
 
 console.log('DSALab handlers registered');
+

@@ -345,7 +345,9 @@ export class EditorService {
     const target = monaco.editor.getModel(uri);
     delete this.modelInfos[uri.toString()];
     if (this.lastTraceUri === uri) this.lastTraceUri = null;
-    target.dispose();
+    if (target) {
+      target.dispose();
+    }
   }
 
   private updateBkptInfo(model: monaco.editor.ITextModel) {

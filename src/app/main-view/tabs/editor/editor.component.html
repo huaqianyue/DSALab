@@ -1,1 +1,6 @@
-<ngx-monaco-editor [options]="editorOptions" (init)="editorInit($event)"></ngx-monaco-editor>
+<ngx-monaco-editor 
+  [options]="editorOptions" 
+  (init)="editorInit($event)"
+  (onTouched)="onTouched()"
+  (onErrorStatusChange)="onErrorStatusChange($event)">
+</ngx-monaco-editor>

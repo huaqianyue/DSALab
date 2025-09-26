@@ -33,7 +33,6 @@ export class ProblemListComponent implements OnInit, OnDestroy {
   problems: Problem[] = [];
   currentProblem: Problem | null = null;
   settings: DSALabSettings = { userName: '', studentId: '', lastOpenedProblemId: null };
-  isRefreshing = false;
   
   private destroy$ = new Subject<void>();
 
@@ -155,17 +154,4 @@ export class ProblemListComponent implements OnInit, OnDestroy {
     return this.settings.lastOpenedProblemId === problem.id;
   }
 
-  // 刷新问题列表
-  async refreshProblems(): Promise<void> {
-    if (this.isRefreshing) return;
-
-    this.isRefreshing = true;
-    try {
-      await this.dsalabService.refreshProblems();
-    } catch (error) {
-      console.error('Failed to refresh problems:', error);
-    } finally {
-      this.isRefreshing = false;
-    }
-  }
 }
