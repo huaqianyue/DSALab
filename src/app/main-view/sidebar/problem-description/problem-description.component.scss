@@ -108,19 +108,20 @@
   padding: 40px 20px;
 }
 
-// 音频面板 - 完全按照DSALab原始CSS
+// 音频面板 - 白色主题
 .audio-panel {
   flex-shrink: 0;
-  height: 100px;
-  background: #0d1117;
-  border-top: 1px solid #21262d;
+  min-height: 100px;
+  background: #ffffff;
+  border-top: 1px solid #e1e4e8;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.05);
 
   .panel-header {
     height: 36px;
-    background: #161b22;
-    border-bottom: 1px solid #21262d;
+    background: #f6f8fa;
+    border-bottom: 1px solid #e1e4e8;
     display: flex;
     align-items: center;
     padding: 0 16px;
@@ -128,68 +129,260 @@
     .panel-title {
       font-size: 14px;
       font-weight: 500;
-      color: #f0f6fc;
+      color: #24292e;
       display: flex;
       align-items: center;
       gap: 8px;
+
+      i {
+        color: #0366d6;
+      }
     }
   }
 
   .panel-content.audio-controls {
-    flex: 1;
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 12px 16px;
+    min-height: 64px;
 
     .btn-audio {
-      background: #21262d;
-      border: 1px solid #30363d;
-      color: #e6edf3;
+      background: #ffffff;
+      border: 1px solid #d1d5da;
+      color: #24292e;
       padding: 8px 12px;
-      border-radius: 4px;
+      border-radius: 6px;
       cursor: pointer;
       font-size: 13px;
       display: flex;
       align-items: center;
       gap: 6px;
-      transition: background 0.2s ease, border-color 0.2s ease;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      box-shadow: 0 1px 0 rgba(27, 31, 35, 0.04);
 
-      &:hover {
-        background: #30363d;
-        border-color: #444c56;
+      &:hover:not(:disabled) {
+        background: #f3f4f6;
+        border-color: #c6cbd1;
+        box-shadow: 0 1px 0 rgba(27, 31, 35, 0.1);
       }
 
       &.recording {
-        background-color: #d54e53;
-        border-color: #d54e53;
+        background-color: #d73a49;
+        border-color: #d73a49;
         color: #ffffff;
+        box-shadow: 0 1px 0 rgba(27, 31, 35, 0.1);
 
         &:hover {
-          background-color: #e74c3c;
-          border-color: #e74c3c;
+          background-color: #cb2431;
+          border-color: #cb2431;
+        }
+      }
+
+      &.active {
+        background-color: #28a745;
+        border-color: #28a745;
+        color: #ffffff;
+        box-shadow: 0 1px 0 rgba(27, 31, 35, 0.1);
+
+        &:hover {
+          background-color: #22863a;
+          border-color: #22863a;
         }
       }
 
       &:disabled {
-        background: #161b22;
-        border-color: #21262d;
-        color: #7d8590;
+        background: #f6f8fa;
+        border-color: #e1e4e8;
+        color: #6a737d;
         cursor: not-allowed;
 
         &:hover {
-          background: #161b22;
-          border-color: #21262d;
-          color: #7d8590;
+          background: #f6f8fa;
+          border-color: #e1e4e8;
+          color: #6a737d;
+          box-shadow: 0 1px 0 rgba(27, 31, 35, 0.04);
         }
+      }
+
+      i {
+        font-size: 12px;
+      }
+
+      span {
+        font-size: 12px;
       }
     }
 
-    #audioPlayback {
-      flex: 1;
-      min-width: 0;
-      height: 30px;
-      display: none; // 默认隐藏
+    // 录制时间显示
+    .recording-time {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: #f1f8ff;
+      border: 1px solid #c8e1ff;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #0366d6;
+      font-family: 'Consolas', 'Monaco', monospace;
+
+      i {
+        font-size: 12px;
+        color: #0366d6;
+      }
+
+      .recording-indicator {
+        color: #d73a49;
+        font-size: 8px;
+        animation: blink 1s infinite;
+      }
+
+      @keyframes blink {
+        0%, 50% { opacity: 1; }
+        51%, 100% { opacity: 0; }
+      }
+    }
+  }
+
+  // Howler播放器容器 - 白色主题
+  .howler-player-container {
+    padding: 0 16px 12px 16px;
+    
+    // 重写Howler组件的样式以匹配白色主题
+    ::ng-deep app-howler-audio-player {
+      .howler-audio-player {
+        .audio-controls {
+          background: transparent;
+          border: none;
+          padding: 0;
+          gap: 8px;
+
+          .btn-audio {
+            background: #ffffff;
+            border: 1px solid #d1d5da;
+            color: #24292e;
+            font-size: 12px;
+            padding: 6px 10px;
+            min-width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            box-shadow: 0 1px 0 rgba(27, 31, 35, 0.04);
+
+            &:hover:not(:disabled) {
+              background: #f3f4f6;
+              border-color: #c6cbd1;
+              box-shadow: 0 1px 0 rgba(27, 31, 35, 0.1);
+            }
+
+            &.playing {
+              background: #28a745;
+              border-color: #28a745;
+              color: #ffffff;
+              
+              &:hover {
+                background: #22863a;
+                border-color: #22863a;
+              }
+            }
+
+            &.loading {
+              background: #0366d6;
+              border-color: #0366d6;
+              color: #ffffff;
+            }
+
+            &:disabled {
+              background: #f6f8fa;
+              border-color: #e1e4e8;
+              color: #6a737d;
+            }
+          }
+
+          .time-display {
+            color: #24292e;
+            font-size: 12px;
+            min-width: 70px;
+
+            .separator {
+              color: #6a737d;
+            }
+
+            .total-time.loaded {
+              color: #0366d6;
+              font-weight: 600;
+            }
+          }
+
+          .progress-container {
+            .progress-bar {
+              background: #e1e4e8;
+              height: 4px;
+
+              &::-webkit-slider-thumb {
+                background: #0366d6;
+                width: 12px;
+                height: 12px;
+                // 只对外观变化添加过渡，位置变化立即生效
+                transition: background 0.1s ease, transform 0.1s ease, box-shadow 0.1s ease;
+                box-shadow: 0 0 0 0 rgba(3, 102, 214, 0.3);
+
+                &:hover {
+                  background: #0256cc;
+                  transform: scale(1.15);
+                  box-shadow: 0 0 0 2px rgba(3, 102, 214, 0.2);
+                }
+
+                &:active {
+                  transform: scale(1.25);
+                  box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.3);
+                }
+              }
+
+              &::-moz-range-thumb {
+                background: #0366d6;
+                width: 12px;
+                height: 12px;
+                // 只对外观变化添加过渡，位置变化立即生效
+                transition: background 0.1s ease, transform 0.1s ease;
+
+                &:hover {
+                  background: #0256cc;
+                  transform: scale(1.15);
+                }
+
+                &:active {
+                  transform: scale(1.25);
+                }
+              }
+            }
+
+            .progress-fill {
+              background: #28a745;
+              height: 4px;
+              // 移除过渡，让宽度变化与滑块完全同步
+              // transition: width 0.05s linear;
+            }
+          }
+        }
+
+        .error-message {
+          background: #d73a49;
+          color: #ffffff;
+          font-size: 12px;
+          padding: 6px 12px;
+          border-radius: 6px;
+        }
+
+        .loading-message {
+          background: #0366d6;
+          color: #ffffff;
+          font-size: 12px;
+          padding: 6px 12px;
+          border-radius: 6px;
+        }
+      }
     }
   }
 }

@@ -1,0 +1,56 @@
+<div class="howler-audio-player">
+  <div class="audio-controls">
+    <!-- 播放/暂停按钮 -->
+    <button 
+      class="btn-audio play-pause-btn"
+      [class.playing]="isPlaying"
+      [class.loading]="isLoading"
+      [disabled]="!sound || isLoading || hasError"
+      (click)="togglePlay()"
+      [attr.data-tooltip]="isPlaying ? '暂停' : '播放'">
+      <i *ngIf="!isLoading" [class]="isPlaying ? 'fas fa-pause' : 'fas fa-play'"></i>
+      <i *ngIf="isLoading" class="fas fa-spinner fa-spin"></i>
+    </button>
+
+    <!-- 停止按钮 -->
+    <button 
+      class="btn-audio stop-btn"
+      [disabled]="!sound || (!isPlaying && !isPaused) || isLoading"
+      (click)="stop()"
+      data-tooltip="停止">
+      <i class="fas fa-stop"></i>
+    </button>
+
+    <!-- 时间显示 -->
+    <div class="time-display">
+      <span class="current-time">{{ formattedCurrentTime }}</span>
+      <span class="separator">/</span>
+      <span class="total-time" [class.loaded]="duration > 0">{{ formattedDuration }}</span>
+    </div>
+
+    <!-- 进度条 -->
+    <div class="progress-container" *ngIf="duration > 0">
+      <input 
+        type="range" 
+        class="progress-bar"
+        [min]="0" 
+        [max]="duration" 
+        [value]="currentTime"
+        (input)="seek(+$event.target.value)"
+        [disabled]="!sound || isLoading">
+      <div class="progress-fill" [style.width.%]="(currentTime / duration) * 100"></div>
+    </div>
+  </div>
+
+  <!-- 错误提示 -->
+  <div *ngIf="hasError" class="error-message">
+    <i class="fas fa-exclamation-triangle"></i>
+    {{ errorMessage }}
+  </div>
+
+  <!-- 加载提示 -->
+  <div *ngIf="isLoading && !hasError" class="loading-message">
+    <i class="fas fa-spinner fa-spin"></i>
+    正在加载音频...
+  </div>
+</div>

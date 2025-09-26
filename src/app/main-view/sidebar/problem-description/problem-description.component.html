@@ -46,7 +46,7 @@
     </div>
   </ng-template>
 
-  <!-- 音频录制面板 - 完全按照DSALab原始设计 -->
+  <!-- 音频录制面板 - 使用Howler.js播放器 -->
   <div class="audio-panel" *ngIf="currentProblem">
     <div class="panel-header">
       <div class="panel-title">
@@ -54,13 +54,43 @@
       </div>
     </div>
     <div class="panel-content audio-controls">
-      <button id="recordAudioBtn" class="btn-audio" data-tooltip="录制音频">
-        <i class="fas fa-microphone"></i> 录制
+      <!-- 录制按钮 -->
+      <button 
+        class="btn-audio record-btn"
+        [class.recording]="isRecording"
+        [disabled]="!currentProblem"
+        (click)="toggleRecordAudio()"
+        [attr.data-tooltip]="getRecordButtonTooltip()">
+        <i [class]="getRecordButtonIcon()"></i>
+        <span>{{ getRecordButtonText() }}</span>
       </button>
-      <button id="pauseResumeBtn" class="btn-audio" data-tooltip="暂停/继续" disabled>
-        <i class="fas fa-pause"></i> 暂停
+
+      <!-- 暂停/继续按钮 -->
+      <button 
+        class="btn-audio pause-btn"
+        [class.active]="isPaused"
+        [disabled]="!isRecording"
+        (click)="togglePauseResumeRecording()"
+        [attr.data-tooltip]="isPaused ? '继续录制' : '暂停录制'">
+        <i [class]="isPaused ? 'fas fa-play' : 'fas fa-pause'"></i>
+        <span>{{ isPaused ? '继续' : '暂停' }}</span>
       </button>
-      <audio id="audioPlayback" controls preload="metadata" style="display: none;"></audio>
+
+      <!-- 录制时间显示 -->
+      <div class="recording-time" *ngIf="isRecording || recordingTime > 0">
+        <i class="fas fa-clock"></i>
+        <span>{{ getFormattedRecordingTime() }}</span>
+        <span class="recording-indicator" *ngIf="isRecording && !isPaused">●</span>
+      </div>
+    </div>
+
+    <!-- Howler.js 音频播放器 -->
+    <div class="howler-player-container" *ngIf="audioBlobUrl">
+      <app-howler-audio-player
+        [audioUrl]="audioBlobUrl"
+        (durationLoaded)="onAudioDurationLoaded($event)"
+        (playStateChange)="onAudioPlayStateChange($event)">
+      </app-howler-audio-player>
     </div>
   </div>
 </div>

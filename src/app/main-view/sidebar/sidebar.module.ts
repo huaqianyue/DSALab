@@ -30,6 +30,7 @@ import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzToolTipModule } from 'ng-zorro-antd/tooltip';
 
 import { CoreModule } from '../../core/core.module';
+import { SharedModule } from '../../shared/shared.module';
 
 import { WatchComponent } from './watch/watch.component';
 import { ProblemListComponent } from './problem-list/problem-list.component';
@@ -50,7 +51,8 @@ import { ProblemDescriptionComponent } from './problem-description/problem-descr
     NzEmptyModule,
     NzCardModule,
     NzToolTipModule,
-    CoreModule
+    CoreModule,
+    SharedModule
   ],
   exports: [ WatchComponent, ProblemListComponent, ProblemDescriptionComponent ]
 })
