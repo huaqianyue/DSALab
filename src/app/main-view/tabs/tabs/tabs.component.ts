@@ -58,6 +58,16 @@ export class TabsComponent implements OnInit {
     return this.tabsService.tabList;
   }
 
+  // 判断是否为DSALab标签页
+  isDSALabTab(tab: Tab): boolean {
+    return tab.key.startsWith('dsalab-');
+  }
+
+  // 判断标签页是否可关闭
+  isTabClosable(tab: Tab): boolean {
+    return !this.isDSALabTab(tab);
+  }
+
 
 
   get activeIndex(): number {
@@ -80,6 +90,13 @@ export class TabsComponent implements OnInit {
 
   closeTab(e: { index: number }) {
     const target = this.tabList[e.index];
+    
+    // 防止关闭DSALab标签页
+    if (this.isDSALabTab(target)) {
+      console.log('🚫 DSALab tabs cannot be closed manually');
+      return;
+    }
+    
     if (target.saved === false) {
       this.notSaveModalShow(target);
     } else {

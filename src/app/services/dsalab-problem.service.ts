@@ -21,6 +21,7 @@ import { ElectronService } from '../core/services';
 import { Problem, ProblemWorkspaceData, DSALabSettings, HistoryEvent } from './dsalab-types';
 import { DSALabPathsService } from './dsalab-paths.service';
 import { DSALabHistoryService } from './dsalab-history.service';
+import { DebugService } from './debug.service';
 
 @Injectable({
   providedIn: 'root'
@@ -38,7 +39,8 @@ export class DSALabProblemService {
   constructor(
     private electronService: ElectronService,
     private pathsService: DSALabPathsService,
-    private historyService: DSALabHistoryService
+    private historyService: DSALabHistoryService,
+    private debugService: DebugService
   ) {
     this.initializeService();
   }
@@ -117,8 +119,28 @@ export class DSALabProblemService {
         throw new Error(`Problem with ID ${problemId} not found`);
       }
 
-      // 保存当前问题的工作区数据
+      // 检查是否是同一个题目
       const currentProblem = this.currentProblemSubject.value;
+      const isSameProblem = currentProblem && currentProblem.id === problemId;
+      
+      if (isSameProblem) {
+        console.log(`📌 Staying on same problem ${problemId}, keeping existing state`);
+        // 相同题目，不做任何处理，直接返回
+        return;
+      }
+
+      console.log(`🔄 Switching from ${currentProblem?.id || 'none'} to ${problemId}`);
+
+      // 如果正在调试，先停止调试
+      if (this.debugService.isDebugging$.value) {
+        console.log('🛑 Stopping debug session before switching problems');
+        this.debugService.exitDebug();
+      }
+
+      // 清除调试信息（控制台输出和断点）
+      this.debugService.clearAllDebugInfo();
+
+      // 保存当前问题的工作区数据
       if (currentProblem) {
         await this.saveProblemWorkspace(currentProblem.id);
       }
@@ -126,8 +148,32 @@ export class DSALabProblemService {
       // 加载新问题的工作区数据
       let workspaceData = this.workspaceDataMap.get(problemId);
       if (!workspaceData) {
+        console.log(`Loading workspace data for problem ${problemId}`);
         workspaceData = await this.loadProblemWorkspace(problemId);
         this.workspaceDataMap.set(problemId, workspaceData);
+      } else {
+        console.log(`Using cached workspace data for problem ${problemId}`);
+        // 对于缓存的数据，只在真正切换题目时才重新创建URL
+        if (workspaceData.audioBlob) {
+          console.log(`Refreshing audio URL for problem ${problemId}`);
+          
+          // 清理旧的URL（如果存在）
+          if (workspaceData.audioUrl) {
+            URL.revokeObjectURL(workspaceData.audioUrl);
+            console.log(`Revoked old audio URL: ${workspaceData.audioUrl}`);
+          }
+          
+          // 创建新的URL
+          workspaceData.audioUrl = URL.createObjectURL(workspaceData.audioBlob);
+          console.log(`Created fresh audio URL: ${workspaceData.audioUrl}`);
+        } else {
+          // 如果没有音频数据，确保URL也是null
+          if (workspaceData.audioUrl) {
+            URL.revokeObjectURL(workspaceData.audioUrl);
+            workspaceData.audioUrl = null;
+            console.log(`Cleared audio URL for problem without audio data`);
+          }
+        }
       }
 
       this.currentProblemSubject.next(problem);

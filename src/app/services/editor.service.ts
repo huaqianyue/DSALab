@@ -244,7 +244,18 @@ export class EditorService {
     this.addMissingActions();
     this.editor.onMouseDown(this.mouseDownListener);
     this.editor.onDidChangeModel((e) => {
-      this.editorText.next(monaco.editor.getModel(e.newModelUrl).getValue());
+      if (e.newModelUrl) {
+        const model = monaco.editor.getModel(e.newModelUrl);
+        if (model) {
+          this.editorText.next(model.getValue());
+        } else {
+          console.warn('Model not found for URL:', e.newModelUrl);
+          this.editorText.next('');
+        }
+      } else {
+        console.warn('newModelUrl is null in onDidChangeModel event');
+        this.editorText.next('');
+      }
     });
     this.isInit = true;
     this.editorMessage.next({ type: "initCompleted" });
@@ -340,13 +351,22 @@ export class EditorService {
   }
 
   destroy(tab: Tab) {
-    const uri = this.getUri(tab);
-    console.log('destroy ', uri.toString());
-    const target = monaco.editor.getModel(uri);
-    delete this.modelInfos[uri.toString()];
-    if (this.lastTraceUri === uri) this.lastTraceUri = null;
-    if (target) {
-      target.dispose();
+    if (!tab) {
+      console.warn('destroy: tab is null or undefined');
+      return;
+    }
+    
+    try {
+      const uri = this.getUri(tab);
+      console.log('destroy ', uri.toString());
+      const target = monaco.editor.getModel(uri);
+      delete this.modelInfos[uri.toString()];
+      if (this.lastTraceUri === uri) this.lastTraceUri = null;
+      if (target) {
+        target.dispose();
+      }
+    } catch (error) {
+      console.error('Error in destroy method:', error);
     }
   }
 
@@ -363,6 +383,42 @@ export class EditorService {
     const currentModel = this.editor.getModel();
     this.modelInfos[currentModel.uri.toString()].bkptDecs.find(v => v.id === id).expression = expression;
     this.updateBkptInfo(currentModel);
+  }
+
+  // 清除所有断点
+  clearAllBreakpoints(): void {
+    console.log('🧹 Starting to clear all breakpoints...');
+    
+    // 清除所有模型的断点信息
+    Object.keys(this.modelInfos).forEach(modelUri => {
+      if (this.modelInfos[modelUri].bkptDecs.length > 0) {
+        try {
+          const model = monaco.editor.getModel(monaco.Uri.parse(modelUri));
+          if (model) {
+            const decorationIds = this.modelInfos[modelUri].bkptDecs.map(dec => dec.id);
+            model.deltaDecorations(decorationIds, []);
+            console.log(`🧹 Cleared ${decorationIds.length} breakpoint decorations in ${modelUri}`);
+          }
+          this.modelInfos[modelUri].bkptDecs = [];
+        } catch (error) {
+          console.warn('Error clearing breakpoints for model:', modelUri, error);
+          // 即使出错也要清空数据
+          this.modelInfos[modelUri].bkptDecs = [];
+        }
+      }
+    });
+    
+    // 无论如何都要清空全局断点信息
+    this.breakpointInfos.next([]);
+    console.log('🧹 Global breakpoint information cleared');
+    
+    // 如果有当前编辑器，也更新一下
+    if (this.editor) {
+      const currentModel = this.editor.getModel();
+      if (currentModel) {
+        this.updateBkptInfo(currentModel);
+      }
+    }
   }
 
   showTrace(line: number) {

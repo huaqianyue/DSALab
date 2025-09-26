@@ -91,10 +91,10 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy, AfterView
     this.destroy$.next();
     this.destroy$.complete();
     
-    // 清理音频资源
-    if (this.audioBlobUrl) {
-      URL.revokeObjectURL(this.audioBlobUrl);
-    }
+    // 重要：不要在组件销毁时清理音频URL！
+    // 因为路由切换会销毁组件，但我们希望保持音频状态
+    // URL的清理由DSALab服务管理
+    console.log('🗑️ ProblemDescriptionComponent destroyed, keeping audio state');
     
     // 清理录制定时器
     this.stopRecordingTimer();
@@ -103,10 +103,30 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy, AfterView
   // 简化的音频录制方法 - 适配Howler.js播放器
 
   private updateWorkspaceData(): void {
-    this.workspaceData = this.dsalabService.getCurrentProblemWorkspaceData();
+    console.log('🔄 Updating workspace data for current problem');
+    
+    const newWorkspaceData = this.dsalabService.getCurrentProblemWorkspaceData();
+    const isNewProblem = !this.workspaceData || 
+                        (this.currentProblem && this.workspaceData !== newWorkspaceData);
+    
+    if (isNewProblem) {
+      console.log('📝 New problem detected, resetting recording state');
+      // 只有在切换到新题目时才清理录制状态
+      this.stopRecordingTimer();
+      this.isRecording = false;
+      this.isPaused = false;
+      this.recordingTime = 0;
+    } else {
+      console.log('📌 Same problem, keeping recording state');
+    }
+    
+    this.workspaceData = newWorkspaceData;
+    
     if (this.workspaceData?.audioUrl && this.workspaceData?.audioBlob) {
+      console.log('🎵 Found audio data in workspace, updating audio state');
       this.updateAudioState(this.workspaceData.audioBlob, this.workspaceData.audioUrl);
     } else {
+      console.log('🎵 No audio data in workspace, clearing audio state');
       this.updateAudioState(null, null);
     }
   }
@@ -232,6 +252,14 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy, AfterView
   }
 
   public updateAudioState(audioBlob: Blob | null, audioUrl: string | null): void {
+    console.log('🔄 updateAudioState called - current URL:', this.audioBlobUrl, 'new URL:', audioUrl);
+    
+    // 只有在URL真正不同时才清理旧的URL
+    if (this.audioBlobUrl && this.audioBlobUrl !== audioUrl) {
+      URL.revokeObjectURL(this.audioBlobUrl);
+      console.log('🧹 Revoked old audio URL:', this.audioBlobUrl);
+    }
+    
     this.audioBlobUrl = audioUrl;
     
     if (audioBlob && audioUrl) {
@@ -241,6 +269,7 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy, AfterView
       // 检查Blob是否有效
       if (audioBlob.size === 0) {
         console.warn('Audio blob is empty!');
+        this.audioBlobUrl = null;
         return;
       }
       
@@ -249,7 +278,7 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy, AfterView
       console.log('🎵 No audio available');
     }
 
-    // 重置录制状态
+    // 重置录制状态（只在真正切换题目时）
     this.isRecording = false;
     this.isPaused = false;
     
@@ -301,7 +330,7 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy, AfterView
       // 先关闭当前DSALab标签页（如果存在）
       const currentTab = this.tabsService.getActive();
       if (currentTab.value && currentTab.value.key.startsWith('dsalab-')) {
-        this.tabsService.remove(currentTab.value.key);
+        this.tabsService.remove(currentTab.value.key, true); // 强制删除
       }
 
       // 切换到新问题（这会自动保存当前问题并加载新问题）

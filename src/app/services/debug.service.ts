@@ -160,6 +160,38 @@ export class DebugService {
     this.programStop.next();
   }
 
+  // 清除调试控制台输出
+  clearConsoleOutput(): void {
+    this.allOutput = "";
+    this.consoleOutput.next("");
+    console.log('🧹 Debug console output cleared');
+  }
+
+  // 清除编辑器断点信息
+  clearBreakpoints(): void {
+    if (this.editorService) {
+      // 清除编辑器中的断点装饰
+      this.editorService.clearAllBreakpoints();
+      console.log('🧹 All breakpoints cleared');
+    }
+    
+    // 直接清除调试面板中的断点列表
+    this.editorBkptList = [];
+    console.log('🧹 Debug panel breakpoint list cleared');
+  }
+
+  // 清除所有调试信息（控制台输出 + 断点）
+  clearAllDebugInfo(): void {
+    console.log('🧹 Starting to clear all debug information...');
+    console.log('🧹 Current editorBkptList length:', this.editorBkptList.length);
+    
+    this.clearConsoleOutput();
+    this.clearBreakpoints();
+    
+    console.log('🧹 After clearing - editorBkptList length:', this.editorBkptList.length);
+    console.log('🧹 All debug information cleared');
+  }
+
   private bkptConditionCmd(info: EditorBreakpointInfo) {
     const cmds: string[] = [];
     if (info.expression !== null) {

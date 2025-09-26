@@ -30,9 +30,16 @@
 
     <!-- 题目描述 -->
     <div class="problem-content">
-      <nz-card nzTitle="题目描述" nzSize="small">
-        <div class="description-text" [innerHTML]="currentProblem.fullDescription"></div>
-      </nz-card>
+      <div class="problem-description-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <i class="fas fa-file-alt"></i> 题目描述
+          </div>
+        </div>
+        <div class="panel-content description-content">
+          <div class="description-text" [innerHTML]="currentProblem.fullDescription"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -46,7 +53,7 @@
     </div>
   </ng-template>
 
-  <!-- 音频录制面板 - 使用Howler.js播放器 -->
+  <!-- 音频录制面板 - 固定在底部 -->
   <div class="audio-panel" *ngIf="currentProblem">
     <div class="panel-header">
       <div class="panel-title">

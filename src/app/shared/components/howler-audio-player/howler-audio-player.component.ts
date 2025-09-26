@@ -136,9 +136,10 @@ export class HowlerAudioPlayerComponent implements OnInit, OnDestroy, OnChanges 
         },
         onloaderror: (id: any, error: any) => {
           console.error('Howler.js - Audio load error:', error);
+          console.error('Audio URL that failed:', this.audioUrl);
           this.isLoading = false;
           this.hasError = true;
-          this.errorMessage = '音频加载失败';
+          this.errorMessage = '音频加载失败 - URL可能已失效';
           this.cdr.detectChanges();
         },
         onplayerror: (id: any, error: any) => {
@@ -258,10 +259,30 @@ export class HowlerAudioPlayerComponent implements OnInit, OnDestroy, OnChanges 
     this.sound.volume(Math.max(0, Math.min(1, volume)));
   }
 
+  private resetState(): void {
+    this.isPlaying = false;
+    this.isPaused = false;
+    this.duration = 0;
+    this.currentTime = 0;
+    this.isLoading = false;
+    this.hasError = false;
+    this.errorMessage = '';
+    this.cdr.markForCheck();
+  }
+
   // 当音频URL改变时重新加载
   ngOnChanges(): void {
-    if (this.howlerLoaded && this.audioUrl) {
-      this.loadAudio();
+    console.log('🔍 ngOnChanges triggered - howlerLoaded:', this.howlerLoaded, 'audioUrl:', this.audioUrl);
+    
+    if (this.howlerLoaded) {
+      if (this.audioUrl) {
+        console.log('🔄 Audio URL changed, reloading:', this.audioUrl);
+        this.loadAudio();
+      } else {
+        console.log('🧹 Audio URL cleared, cleaning up sound');
+        this.cleanup();
+        this.resetState();
+      }
     }
   }
 }

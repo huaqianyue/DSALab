@@ -74,8 +74,11 @@ export class ProblemListComponent implements OnInit, OnDestroy {
 
   // 选择问题
   async selectProblem(problem: Problem): Promise<void> {
+    console.log(`🎯 Selecting problem ${problem.id}, current: ${this.currentProblem?.id}`);
+    
     if (problem.id === this.currentProblem?.id) {
-      // 如果已经是当前问题，只跳转到题目描述页面
+      console.log(`📌 Same problem selected, only navigating to description page`);
+      // 如果已经是当前问题，只跳转到题目描述页面，不做任何其他操作
       this.router.navigate([{
         outlets: {
           sidebar: 'problem-description'
@@ -84,11 +87,14 @@ export class ProblemListComponent implements OnInit, OnDestroy {
       return;
     }
 
+    console.log(`🔄 Switching to different problem: ${problem.id}`);
+
     try {
       // 先关闭当前DSALab标签页（如果存在）
       const currentTab = this.tabsService.getActive();
       if (currentTab.value && currentTab.value.key.startsWith('dsalab-')) {
-        this.tabsService.remove(currentTab.value.key);
+        console.log(`🗂️ Closing current DSALab tab: ${currentTab.value.key}`);
+        this.tabsService.remove(currentTab.value.key, true); // 强制删除
       }
 
       // 切换到新问题（这会自动保存当前问题并加载新问题）
@@ -113,7 +119,7 @@ export class ProblemListComponent implements OnInit, OnDestroy {
         // 激活新标签页
         this.tabsService.changeActive(`dsalab-${problem.id}`);
         
-        console.log(`Switched to problem ${problem.id}, loaded code length: ${workspaceData.content.length}`);
+        console.log(`✅ Switched to problem ${problem.id}, loaded code length: ${workspaceData.content.length}`);
       }
 
       // 重要：跳转到题目描述页面

@@ -143,9 +143,21 @@ export class TabsService {
   }
 
   /** @return new active index */
-  remove(key: string): number {
+  remove(key: string, force: boolean = false): number {
     // Clone it, for we will remove it's src later
-    const index = this.getByKey(key).index;
+    const tabEnum = this.getByKey(key);
+    if (tabEnum.index === -1) {
+      console.warn(`Tab with key ${key} not found, cannot remove`);
+      return -1;
+    }
+    
+    // 保护DSALab标签页，除非强制删除
+    if (key.startsWith('dsalab-') && !force) {
+      console.warn(`DSALab tab ${key} cannot be removed without force flag`);
+      return -1;
+    }
+    
+    const index = tabEnum.index;
     let newIndex = -1;
     const target: Tab = { ...this.tabList[index] };
     this.tabList.splice(index, 1);
@@ -163,7 +175,7 @@ export class TabsService {
         newIndex = index;
       }
     }
-    if (target.type === "file")
+    if (target && target.type === "file")
       this.editorService.destroy(target);
     return newIndex;
   }
