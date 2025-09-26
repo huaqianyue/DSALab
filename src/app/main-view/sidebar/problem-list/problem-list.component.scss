@@ -42,69 +42,59 @@
     overflow-y: auto;
     background: #fff;
 
-    .problem-list {
-      .problem-item {
-        cursor: pointer;
-        padding: 8px 16px !important;
-        border-bottom: 1px solid #f0f0f0;
-        transition: all 0.2s ease;
+    .problem-item {
+      cursor: pointer;
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+      transition: all 0.2s ease;
 
-        &:hover {
-          background-color: #f5f5f5;
+      &:hover {
+        background-color: #f5f5f5;
+      }
+
+      &.current-problem {
+        background-color: #e6f7ff;
+        border-left: 3px solid #1890ff;
+      }
+
+      &.last-opened-problem {
+        background-color: #f6ffed;
+        border-left: 3px solid #52c41a;
+      }
+
+      .problem-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 4px;
+
+        strong {
+          font-size: 13px;
+          color: #262626;
         }
 
-        &.active {
-          background-color: #e6f7ff;
-          border-left: 3px solid #1890ff;
+        .last-opened-badge {
+          font-size: 10px;
+          color: #52c41a;
+          background: #f6ffed;
+          padding: 2px 6px;
+          border-radius: 10px;
+          border: 1px solid #b7eb8f;
         }
+      }
 
-        &.last-opened {
-          background-color: #f6ffed;
-          border-left: 3px solid #52c41a;
-        }
+      .problem-id {
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 4px;
+      }
 
-        &.deleted {
-          opacity: 0.6;
-          text-decoration: line-through;
-        }
+      .problem-content {
+        font-size: 11px;
+        color: #999;
 
-        .problem-content {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          width: 100%;
-
-          .problem-title {
-            flex: 1;
-            font-size: 13px;
-            color: #262626;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-
-          .problem-icons {
-            display: flex;
-            gap: 6px;
-            margin-left: 8px;
-
-            .problem-icon {
-              font-size: 12px;
-              opacity: 0.7;
-
-              &.code-icon {
-                color: #1890ff;
-              }
-
-              &.audio-icon {
-                color: #52c41a;
-              }
-
-              &.deleted-icon {
-                color: #ff4d4f;
-              }
-            }
-          }
+        span {
+          margin-right: 8px;
         }
       }
     }
@@ -133,27 +123,39 @@
     .problem-list-content {
       background: #1f1f1f;
 
-      .problem-list {
-        .problem-item {
-          border-bottom-color: #303030;
+      .problem-item {
+        border-bottom-color: #303030;
 
-          &:hover {
-            background-color: #262626;
+        &:hover {
+          background-color: #262626;
+        }
+
+        &.current-problem {
+          background-color: #111b26;
+        }
+
+        &.last-opened-problem {
+          background-color: #162312;
+        }
+
+        .problem-title {
+          strong {
+            color: #ffffff;
           }
 
-          &.active {
-            background-color: #111b26;
+          .last-opened-badge {
+            color: #95de64;
+            background: #162312;
+            border-color: #52c41a;
           }
+        }
 
-          &.last-opened {
-            background-color: #162312;
-          }
+        .problem-id {
+          color: #999;
+        }
 
-          .problem-content {
-            .problem-title {
-              color: #ffffff;
-            }
-          }
+        .problem-content {
+          color: #666;
         }
       }
     }

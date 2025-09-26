@@ -20,6 +20,7 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { DSALabProblemService } from '../../../services/dsalab-problem.service';
+import { DSALabSettingsService } from '../../../services/dsalab-settings.service';
 import { TabsService } from '../../../services/tabs.service';
 import { ElectronService } from '../../../core/services';
 import { Problem, DSALabSettings } from '../../../services/dsalab-types';
@@ -38,6 +39,7 @@ export class ProblemListComponent implements OnInit, OnDestroy {
 
   constructor(
     private dsalabService: DSALabProblemService,
+    private settingsService: DSALabSettingsService,
     private tabsService: TabsService,
     private electronService: ElectronService,
     private router: Router
@@ -50,6 +52,11 @@ export class ProblemListComponent implements OnInit, OnDestroy {
       .subscribe(problems => {
         this.problems = problems;
         console.log('Problems updated in component:', problems.length, problems);
+        
+        // 题目列表更新后，将最后打开的题目定位到中间
+        setTimeout(() => {
+          this.scrollToLastOpenedProblem();
+        }, 100);
       });
 
     // 订阅当前问题变化
@@ -60,10 +67,11 @@ export class ProblemListComponent implements OnInit, OnDestroy {
       });
 
     // 订阅设置变化
-    this.dsalabService.settings$
+    this.settingsService.settings$
       .pipe(takeUntil(this.destroy$))
       .subscribe(settings => {
         this.settings = settings;
+        // 只更新设置，不自动导航
       });
   }
 
@@ -158,6 +166,44 @@ export class ProblemListComponent implements OnInit, OnDestroy {
   // 检查是否为上次打开的问题
   isLastOpenedProblem(problem: Problem): boolean {
     return this.settings.lastOpenedProblemId === problem.id;
+  }
+
+  // 将最后打开的题目定位到列表中间位置（学习导出页面的实现）
+  private scrollToLastOpenedProblem(): void {
+    if (!this.settings.lastOpenedProblemId) return;
+
+    // 找到题目列表容器
+    const problemListContainer = document.querySelector('.problem-list-content') as HTMLElement;
+    if (!problemListContainer) return;
+
+    // 找到最后打开的题目在原始顺序中的索引
+    const lastOpenedProblemIndex = this.problems.findIndex(p => p.id === this.settings.lastOpenedProblemId);
+    if (lastOpenedProblemIndex === -1) return;
+
+    // 等待DOM完全渲染
+    setTimeout(() => {
+      const listItems = problemListContainer.querySelectorAll('.problem-item');
+      if (listItems.length === 0) return;
+
+      // 计算每个项目的高度
+      const firstItem = listItems[0] as HTMLElement;
+      const itemHeight = firstItem.offsetHeight + 
+        parseInt(getComputedStyle(firstItem).marginBottom) + 
+        parseInt(getComputedStyle(firstItem).marginTop);
+
+      // 计算容器可见高度
+      const containerHeight = problemListContainer.clientHeight;
+      const visibleItemsCount = Math.floor(containerHeight / itemHeight);
+
+      // 计算目标滚动位置，使最后打开的题目显示在中间
+      const targetIndex = Math.max(0, lastOpenedProblemIndex - Math.floor(visibleItemsCount / 2));
+      const targetScrollTop = targetIndex * itemHeight;
+
+      // 直接设置滚动位置（不使用动画）
+      problemListContainer.scrollTop = targetScrollTop;
+      
+      console.log(`📍 Positioned last opened problem ${this.settings.lastOpenedProblemId} to center of list`);
+    }, 50);
   }
 
 }

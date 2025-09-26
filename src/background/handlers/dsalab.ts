@@ -547,33 +547,7 @@ ipcMain.handle('dsalab-save-problem-workspace', async (event, problemId: string,
   }
 });
 
-ipcMain.handle('dsalab-load-settings', async (): Promise<DSALabSettings> => {
-  const appSettingsPath = DSALabPaths.getAppSettingsPath();
-  try {
-    await ensureDirectoryExists(path.dirname(appSettingsPath));
-    const settingsContent = await fs.readFile(appSettingsPath, 'utf-8');
-    return JSON.parse(settingsContent);
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
-      console.log('应用设置文件不存在，返回默认设置');
-    } else {
-      console.error('加载应用设置失败:', error);
-    }
-    return { userName: '', studentId: '', lastOpenedProblemId: null };
-  }
-});
 
-ipcMain.handle('dsalab-save-settings', async (event, settings: DSALabSettings): Promise<boolean> => {
-  const appSettingsPath = DSALabPaths.getAppSettingsPath();
-  try {
-    await ensureDirectoryExists(path.dirname(appSettingsPath));
-    await fs.writeFile(appSettingsPath, JSON.stringify(settings, null, 2), 'utf-8');
-    return true;
-  } catch (error: any) {
-    console.error('保存应用设置失败:', error);
-    return false;
-  }
-});
 
 // 内部历史事件记录函数（与原始DSALab完全一致）
 function recordHistoryEventInternal(historyEvent: HistoryEvent): void {
@@ -705,6 +679,38 @@ ipcMain.handle('dsalab-read-pure-local-problems', async (): Promise<Problem[]> =
 // 获取工作区根路径
 ipcMain.handle('dsalab-get-workspace-root', async () => {
   return DSALabPaths.getUserWorkspacesRoot();
+});
+
+// 加载应用设置
+ipcMain.handle('dsalab-load-settings', async (): Promise<DSALabSettings> => {
+  try {
+    const settingsPath = DSALabPaths.getAppSettingsPath();
+    await fs.mkdir(path.dirname(settingsPath), { recursive: true });
+    const settingsContent = await fs.readFile(settingsPath, 'utf-8');
+    const settings = JSON.parse(settingsContent) as DSALabSettings;
+    console.log('📋 DSALab settings loaded from file:', settings);
+    return settings;
+  } catch (error: any) {
+    if (error.code === 'ENOENT') {
+      console.log('📋 DSALab settings file not found, returning default settings');
+    } else {
+      console.error('❌ Failed to load DSALab settings:', error);
+    }
+    return { userName: '', studentId: '', lastOpenedProblemId: null };
+  }
+});
+
+// 保存应用设置
+ipcMain.handle('dsalab-save-settings', async (event, settings: DSALabSettings): Promise<void> => {
+  try {
+    const settingsPath = DSALabPaths.getAppSettingsPath();
+    await fs.mkdir(path.dirname(settingsPath), { recursive: true });
+    await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+    console.log('💾 DSALab settings saved to file:', settings);
+  } catch (error: any) {
+    console.error('❌ Failed to save DSALab settings:', error);
+    throw error;
+  }
 });
 
 console.log('DSALab handlers registered');

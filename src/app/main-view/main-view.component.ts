@@ -88,7 +88,10 @@ export class MainViewComponent implements OnInit {
 
   constructor(private router: Router, private problemsService: ProblemsService) { }
 
-  ngOnInit(): void { }
+  ngOnInit(): void {
+    // 默认显示题目列表边栏
+    this.showSidebar('problem-list');
+  }
 
   showSidebar(who: string): void {
     if (who === this.currentOutletUrl("sidebar") || who === null) {

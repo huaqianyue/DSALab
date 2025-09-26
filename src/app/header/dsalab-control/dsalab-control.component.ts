@@ -21,6 +21,7 @@ import { takeUntil } from 'rxjs/operators';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzModalService } from 'ng-zorro-antd/modal';
 import { DSALabProblemService } from '../../services/dsalab-problem.service';
+import { DSALabSettingsService } from '../../services/dsalab-settings.service';
 import { ElectronService } from '../../core/services';
 import { TabsService } from '../../services/tabs.service';
 import { Problem, DSALabSettings } from '../../services/dsalab-types';
@@ -48,6 +49,7 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
 
   constructor(
     private dsalabService: DSALabProblemService,
+    private settingsService: DSALabSettingsService,
     private electronService: ElectronService,
     private message: NzMessageService,
     private modal: NzModalService,
@@ -64,7 +66,7 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
       });
 
     // 订阅设置变化
-    this.dsalabService.settings$
+    this.settingsService.settings$
       .pipe(takeUntil(this.destroy$))
       .subscribe(settings => {
         this.settings = settings;
@@ -144,23 +146,98 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
   }
 
   // 打开导出模态框
-  openExportModal(): void {
-    if (this.problems.length === 0) {
-      this.message.warning('没有可导出的题目');
+  async openExportModal(): Promise<void> {
+    // 只在代码真正被修改时才保存当前题目（与切换题目逻辑一致）
+    if (this.currentProblem) {
+      const workspaceData = this.dsalabService.getCurrentProblemWorkspaceData();
+      if (workspaceData && (workspaceData.isDirty || workspaceData.audioModified)) {
+        await this.saveCurrentProblem();
+        console.log('Auto-saved current problem before export (code/audio modified)');
+      } else {
+        console.log('Skipped auto-save before export (no modifications)');
+      }
+    }
+
+    // 过滤出有内容的题目（完全按照DSALab的逻辑）
+    const exportableProblems = this.problems.filter(problem => {
+      // 不导出已删除的题目
+      if (problem.isDelete) return false;
+      
+      // DSALab要求：必须同时有代码和音频才能导出
+      const hasCode = problem.Code !== '';
+      const hasAudio = problem.Audio !== '';
+      
+      return hasCode && hasAudio; // 必须同时有代码和音频
+    });
+
+    if (exportableProblems.length === 0) {
+      this.message.warning('没有可导出的题目，请先完成一些题目的代码和录音（需要同时具备）');
       return;
     }
 
-    // 重置导出信息
-    this.exportUserName = '';
-    this.exportStudentId = '';
+    console.log(`Found ${exportableProblems.length} exportable problems out of ${this.problems.length} total problems`);
+
+    // 从设置中加载用户信息
+    this.exportUserName = this.settings.userName || '';
+    this.exportStudentId = this.settings.studentId || '';
     this.selectedProblemIds = [];
+    
+    // 默认选中当前题目（如果有内容可导出）- 完全按照DSALab的逻辑
+    if (this.currentProblem) {
+      const currentInExportable = exportableProblems.find(p => p.id === this.currentProblem!.id);
+      if (currentInExportable) {
+        this.selectedProblemIds.push(this.currentProblem.id);
+      }
+    }
+    
     this.exportModalVisible = true;
+    
+    // 等待模态框渲染完成后，将当前题目定位到列表中间
+    setTimeout(() => {
+      this.scrollToCurrentProblem();
+    }, 100);
   }
 
   // 关闭导出模态框
   closeExportModal(): void {
     this.exportModalVisible = false;
     this.selectedProblemIds = [];
+  }
+
+  // 将当前题目定位到列表中间位置（通过计算初始滚动位置）
+  private scrollToCurrentProblem(): void {
+    if (!this.currentProblem) return;
+
+    // 找到题目列表容器
+    const problemListContainer = document.querySelector('.export-modal-content .problem-list') as HTMLElement;
+    if (!problemListContainer) return;
+
+    // 找到当前题目在原始顺序中的索引
+    const currentProblemIndex = this.problems.findIndex(p => p.id === this.currentProblem!.id);
+    if (currentProblemIndex === -1) return;
+
+    // 等待DOM完全渲染
+    setTimeout(() => {
+      const listItems = problemListContainer.querySelectorAll('.problem-item');
+      if (listItems.length === 0) return;
+
+      // 计算每个项目的高度
+      const firstItem = listItems[0] as HTMLElement;
+      const itemHeight = firstItem.offsetHeight + 
+        parseInt(getComputedStyle(firstItem).marginBottom) + 
+        parseInt(getComputedStyle(firstItem).marginTop);
+
+      // 计算容器可见高度
+      const containerHeight = problemListContainer.clientHeight;
+      const visibleItemsCount = Math.floor(containerHeight / itemHeight);
+
+      // 计算目标滚动位置，使当前题目显示在中间
+      const targetIndex = Math.max(0, currentProblemIndex - Math.floor(visibleItemsCount / 2));
+      const targetScrollTop = targetIndex * itemHeight;
+
+      // 直接设置滚动位置（不使用动画）
+      problemListContainer.scrollTop = targetScrollTop;
+    }, 50);
   }
 
   // 确认导出
@@ -184,6 +261,10 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
     const hideMessage = this.message.loading('正在导出...', { nzDuration: 0 });
 
     try {
+      // 保存用户信息到设置
+      await this.settingsService.updateUserName(this.exportUserName.trim());
+      await this.settingsService.updateStudentId(this.exportStudentId.trim());
+
       // 生成文件名
       const date = new Date();
       const year = date.getFullYear().toString().slice(-2);
@@ -216,38 +297,53 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
 
   // 切换问题选择
   toggleProblemSelection(problemId: string): void {
+    console.log('🔄 toggleProblemSelection called for:', problemId);
+    
+    const problem = this.problems.find(p => p.id === problemId);
+    
+    // 只允许选择有内容的题目
+    if (!problem || problem.isDelete || !this.hasProblemContent(problem)) {
+      console.warn('❌ Problem cannot be selected:', problemId, 'hasContent:', this.hasProblemContent(problem));
+      this.message.warning('该题目没有可导出的内容（需要同时有代码和音频）');
+      return;
+    }
+
     const index = this.selectedProblemIds.indexOf(problemId);
     if (index > -1) {
       this.selectedProblemIds.splice(index, 1);
+      console.log('➖ Deselected problem:', problemId);
     } else {
       this.selectedProblemIds.push(problemId);
+      console.log('➕ Selected problem:', problemId);
     }
+    
+    console.log('📋 Current selected problems:', this.selectedProblemIds);
   }
 
   // 全选/全不选
   toggleSelectAll(): void {
-    const availableProblems = this.problems.filter(p => !p.isDelete);
-    const availableIds = availableProblems.map(p => p.id);
+    const exportableProblems = this.problems.filter(p => !p.isDelete && this.hasProblemContent(p));
+    const exportableIds = exportableProblems.map(p => p.id);
     
-    if (this.selectedProblemIds.length === availableIds.length) {
+    if (this.selectedProblemIds.length === exportableIds.length) {
       // 全不选
       this.selectedProblemIds = [];
     } else {
-      // 全选
-      this.selectedProblemIds = [...availableIds];
+      // 全选（只选择有内容的题目）
+      this.selectedProblemIds = [...exportableIds];
     }
   }
 
   // 检查是否全选
   isAllSelected(): boolean {
-    const availableProblems = this.problems.filter(p => !p.isDelete);
-    return availableProblems.length > 0 && this.selectedProblemIds.length === availableProblems.length;
+    const exportableProblems = this.problems.filter(p => !p.isDelete && this.hasProblemContent(p));
+    return exportableProblems.length > 0 && this.selectedProblemIds.length === exportableProblems.length;
   }
 
   // 检查是否部分选择
   isIndeterminate(): boolean {
-    const availableProblems = this.problems.filter(p => !p.isDelete);
-    return this.selectedProblemIds.length > 0 && this.selectedProblemIds.length < availableProblems.length;
+    const exportableProblems = this.problems.filter(p => !p.isDelete && this.hasProblemContent(p));
+    return this.selectedProblemIds.length > 0 && this.selectedProblemIds.length < exportableProblems.length;
   }
 
   // 检查问题是否被选中
@@ -255,9 +351,15 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
     return this.selectedProblemIds.includes(problemId);
   }
 
-  // 检查问题是否有内容可导出
+  // 检查问题是否有内容可导出（完全按照DSALab逻辑）
   hasProblemContent(problem: Problem): boolean {
-    return !!(problem.Code || problem.Audio);
+    if (problem.isDelete) return false;
+    
+    // DSALab要求：必须同时有代码和音频才能导出
+    const hasCode = problem.Code !== '';
+    const hasAudio = problem.Audio !== '';
+    
+    return hasCode && hasAudio;
   }
 
   // 获取可导出的问题数量

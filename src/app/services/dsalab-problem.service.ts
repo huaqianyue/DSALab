@@ -22,6 +22,7 @@ import { Problem, ProblemWorkspaceData, DSALabSettings, HistoryEvent } from './d
 import { DSALabPathsService } from './dsalab-paths.service';
 import { DSALabHistoryService } from './dsalab-history.service';
 import { DebugService } from './debug.service';
+import { DSALabSettingsService } from './dsalab-settings.service';
 
 @Injectable({
   providedIn: 'root'
@@ -29,25 +30,24 @@ import { DebugService } from './debug.service';
 export class DSALabProblemService {
   private problemsSubject = new BehaviorSubject<Problem[]>([]);
   private currentProblemSubject = new BehaviorSubject<Problem | null>(null);
-  private settingsSubject = new BehaviorSubject<DSALabSettings>({ userName: '', studentId: '', lastOpenedProblemId: null });
   private workspaceDataMap = new Map<string, ProblemWorkspaceData>();
 
   public problems$ = this.problemsSubject.asObservable();
   public currentProblem$ = this.currentProblemSubject.asObservable();
-  public settings$ = this.settingsSubject.asObservable();
+  public settings$ = this.settingsService.settings$;
 
   constructor(
     private electronService: ElectronService,
     private pathsService: DSALabPathsService,
     private historyService: DSALabHistoryService,
-    private debugService: DebugService
+    private debugService: DebugService,
+    private settingsService: DSALabSettingsService
   ) {
     this.initializeService();
   }
 
   private async initializeService() {
     try {
-      await this.loadSettings();
       await this.loadProblems();
     } catch (error) {
       console.error('Failed to initialize DSALab service:', error);
@@ -178,12 +178,6 @@ export class DSALabProblemService {
 
       this.currentProblemSubject.next(problem);
       
-      // 更新设置中的最后打开问题
-      const settings = this.settingsSubject.value;
-      settings.lastOpenedProblemId = problemId;
-      this.settingsSubject.next(settings);
-      await this.saveSettings(settings);
-
       // 记录历史事件（使用专用服务）
       this.recordProblemLifecycleEvent(problemId, 'problem_loaded', workspaceData.content);
 
@@ -325,6 +319,21 @@ export class DSALabProblemService {
     return this.workspaceDataMap.get(currentProblem.id) || null;
   }
 
+  // 获取当前问题ID（用于应用关闭时保存）
+  getCurrentProblemId(): string | null {
+    const currentProblem = this.currentProblemSubject.value;
+    return currentProblem ? currentProblem.id : null;
+  }
+
+  // 保存最后打开的题目ID（仅在应用关闭时调用）
+  async saveLastOpenedProblemId(): Promise<void> {
+    const currentProblemId = this.getCurrentProblemId();
+    if (currentProblemId) {
+      await this.settingsService.updateLastOpenedProblemId(currentProblemId);
+      console.log(`Saved last opened problem ID: ${currentProblemId}`);
+    }
+  }
+
   // 更新当前问题的代码内容
   updateCurrentProblemCode(code: string): void {
     const currentProblem = this.currentProblemSubject.value;
@@ -344,12 +353,40 @@ export class DSALabProblemService {
       this.workspaceDataMap.set(currentProblem.id, workspaceData);
     } else {
       workspaceData.content = code;
-      workspaceData.isDirty = true;
+      
+      // 关键：比较当前代码和初始代码，只有不同时才设置isDirty
+      const initialCode = this.getInitialCodeForProblem(currentProblem.id);
+      workspaceData.isDirty = code !== initialCode;
     }
   }
 
-  // 更新当前问题的音频数据
+  // 获取题目的初始代码（用于比较是否被修改）
+  private getInitialCodeForProblem(problemId: string): string {
+    const problem = this.problemsSubject.value.find(p => p.id === problemId);
+    if (!problem) return '';
+    
+    // 如果题目有本地保存的代码，使用本地代码作为初始代码
+    if (problem.Code) {
+      return problem.Code;
+    }
+    
+    // 否则返回默认的C++模板代码
+    return this.getDefaultCppTemplate();
+  }
 
+  // 获取默认的C++模板代码
+  private getDefaultCppTemplate(): string {
+    return `#include <iostream>
+using namespace std;
+
+int main() {
+    // 在这里编写你的代码
+    
+    return 0;
+}`;
+  }
+
+  // 更新当前问题的音频数据
   updateCurrentProblemAudio(audioBlob: Blob | null, audioUrl: string | null): void {
     const currentProblem = this.currentProblemSubject.value;
     if (!currentProblem) return;
@@ -362,30 +399,6 @@ export class DSALabProblemService {
     }
   }
 
-  // 加载设置
-  private async loadSettings(): Promise<void> {
-    try {
-      const settings = await this.electronService.ipcRenderer.invoke('dsalab-load-settings' as any);
-      this.settingsSubject.next(settings as DSALabSettings);
-    } catch (error) {
-      console.error('Failed to load settings:', error);
-    }
-  }
-
-  // 保存设置
-  async saveSettings(settings: DSALabSettings): Promise<void> {
-    try {
-      const success = await this.electronService.ipcRenderer.invoke('dsalab-save-settings' as any, settings);
-      if (success) {
-        this.settingsSubject.next(settings);
-      } else {
-        throw new Error('Failed to save settings to file');
-      }
-    } catch (error) {
-      console.error('Failed to save settings:', error);
-      throw error;
-    }
-  }
 
   // 保存问题列表到本地
   async saveProblemsToLocal(problems?: Problem[]): Promise<void> {
@@ -456,7 +469,7 @@ int main() {
 
   // 获取设置
   getSettings(): DSALabSettings {
-    return this.settingsSubject.value;
+    return this.settingsService.currentSettings;
   }
 
   // 获取路径服务

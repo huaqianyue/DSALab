@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Dev-C++ 7.  If not, see <http://www.gnu.org/licenses/>.
 
-import { Component, HostListener, OnInit } from '@angular/core';
+import { Component, HostListener, OnInit, OnDestroy } from '@angular/core';
 import { ElectronService } from './core/services';
 import { TranslateService } from '@ngx-translate/core';
 import { AppConfig } from '../environments/environment';
@@ -24,19 +24,21 @@ import { HotkeysService } from './services/hotkeys.service';
 import { StatusService } from './services/status.service';
 import { ThemeService } from './services/theme.service';
 import { DSALabHistoryService } from './services/dsalab-history.service';
+import { DSALabProblemService } from './services/dsalab-problem.service';
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
   constructor(
     private electronService: ElectronService,
     private translate: TranslateService,
     private statusService: StatusService,
     private themeService: ThemeService,
-    private dsalabHistoryService: DSALabHistoryService
+    private dsalabHistoryService: DSALabHistoryService,
+    private dsalabProblemService: DSALabProblemService
   ) {
     this.translate.setDefaultLang('en');
     console.log('AppConfig', AppConfig);
@@ -78,6 +80,22 @@ export class AppComponent implements OnInit {
     if (!useBundled && mingwPath === '') {
       this.setEnvModal = true;
     }
+
+    // 监听应用关闭事件
+    if (this.electronService.isElectron) {
+      this.electronService.ipcRenderer.on('app-before-quit', async () => {
+        console.log('Renderer: Received app-before-quit, saving last opened problem ID...');
+        try {
+          await this.dsalabProblemService.saveLastOpenedProblemId();
+          console.log('Renderer: Last opened problem ID saved successfully');
+        } catch (error) {
+          console.error('Renderer: Failed to save last opened problem ID:', error);
+        } finally {
+          // 发送确认消息给主进程
+          this.electronService.ipcRenderer.send('app-quit-acknowledged');
+        }
+      });
+    }
   }
 
   setEnvModal = false;
@@ -88,6 +106,13 @@ export class AppComponent implements OnInit {
     this.electronService.setConfig('env.mingwPath', this.tempMingwPath);
     this.electronService.setConfig('env.useBundledMingw', this.tempUseBundledMingw);
     this.setEnvModal = false;
+  }
+
+  ngOnDestroy(): void {
+    // 移除事件监听器
+    if (this.electronService.isElectron) {
+      this.electronService.ipcRenderer.removeAllListeners('app-before-quit');
+    }
   }
 
 }

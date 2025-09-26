@@ -84,14 +84,16 @@
       <!-- 选择题目 -->
       <div class="problem-selection">
         <div class="selection-header">
-          <h4>选择要导出的题目：</h4>
+          <h4>选择要导出的题目（本地保存）：</h4>
           <div class="selection-actions">
-            <nz-checkbox 
-              [nzChecked]="isAllSelected()" 
-              [nzIndeterminate]="isIndeterminate()"
-              (nzCheckedChange)="toggleSelectAll()">
+            <label class="select-all-checkbox">
+              <input 
+                type="checkbox" 
+                [checked]="isAllSelected()" 
+                [indeterminate]="isIndeterminate()"
+                (change)="toggleSelectAll()">
               全选 ({{ getExportableProblemsCount() }} 个可导出)
-            </nz-checkbox>
+            </label>
           </div>
         </div>
 
@@ -101,27 +103,39 @@
               <nz-list-item 
                 class="problem-item"
                 [class.disabled]="problem.isDelete || !hasProblemContent(problem)"
+                [attr.data-problem-id]="problem.id"
                 *ngIf="!problem.isDelete">
                 
                 <nz-list-item-meta>
                   <nz-list-item-meta-title>
-                    <nz-checkbox 
-                      [nzChecked]="isProblemSelected(problem.id)"
-                      [nzDisabled]="!hasProblemContent(problem)"
-                      (nzCheckedChange)="toggleProblemSelection(problem.id)">
-                      {{ problem.shortDescription }}
-                    </nz-checkbox>
+                    <label class="problem-checkbox" [class.disabled]="!hasProblemContent(problem)">
+                      <input 
+                        type="checkbox" 
+                        [checked]="isProblemSelected(problem.id)"
+                        [disabled]="!hasProblemContent(problem)"
+                        (change)="toggleProblemSelection(problem.id)"
+                        (click)="$event.stopPropagation()">
+                      <span class="problem-title">
+                        {{ problem.shortDescription }}
+                        <span class="current-problem-indicator" *ngIf="currentProblem && currentProblem.id === problem.id">
+                          🔵 当前题目
+                        </span>
+                      </span>
+                    </label>
                   </nz-list-item-meta-title>
                   
                   <nz-list-item-meta-description>
                     <div class="problem-status">
-                      <nz-tag nzColor="blue" *ngIf="problem.Code">
+                      <nz-tag nzColor="blue" *ngIf="problem.Code !== ''">
                         <i nz-icon nzType="code"></i> 代码
                       </nz-tag>
-                      <nz-tag nzColor="green" *ngIf="problem.Audio">
+                      <nz-tag nzColor="green" *ngIf="problem.Audio !== ''">
                         <i nz-icon nzType="sound"></i> 音频
                       </nz-tag>
-                      <nz-tag nzColor="default" *ngIf="!hasProblemContent(problem)">
+                      <nz-tag nzColor="orange" *ngIf="!hasProblemContent(problem) && (problem.Code !== '' || problem.Audio !== '')">
+                        <i nz-icon nzType="warning"></i> 缺少{{ problem.Code === '' ? '代码' : '音频' }}
+                      </nz-tag>
+                      <nz-tag nzColor="default" *ngIf="problem.Code === '' && problem.Audio === ''">
                         <i nz-icon nzType="exclamation-circle"></i> 无内容
                       </nz-tag>
                     </div>
@@ -144,7 +158,7 @@
 
       <!-- 空状态 -->
       <div class="empty-state" *ngIf="problems.length === 0">
-        <nz-empty nzNotFoundContent="暂无可导出的题目"></nz-empty>
+        <nz-empty nzNotFoundContent="暂无本地保存的题目可导出"></nz-empty>
       </div>
     </div>
   </ng-container>
