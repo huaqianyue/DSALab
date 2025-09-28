@@ -14,7 +14,14 @@
 
       <ng-template #modalContent>
         <p>MinGW 路径（如 <code>C:\mingw64</code>）</p>
-        <input nz-input [disabled]="tempUseBundledMingw" [(ngModel)]="tempMingwPath">
+        <nz-input-group nzSuffix>
+          <input nz-input [(ngModel)]="tempMingwPath" placeholder="请选择MinGW路径">
+          <ng-template #suffixTemplate>
+            <button nz-button nzType="text" nzSize="small" (click)="selectMingwPathInModal()" nz-tooltip nzTooltipTitle="选择文件夹">
+              <i nz-icon nzType="folder-open"></i>
+            </button>
+          </ng-template>
+        </nz-input-group>
         <label nz-checkbox [(ngModel)]="tempUseBundledMingw">使用自带的 MinGW</label>
       </ng-template>
 

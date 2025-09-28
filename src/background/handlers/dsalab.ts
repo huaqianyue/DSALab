@@ -1281,16 +1281,7 @@ ipcMain.handle('dsalab-run-test', async (event, problemId: string) => {
       timestamp: Date.now()
     });
     
-    // 9. 记录历史事件
-    recordHistoryEventInternal({
-      timestamp: Date.now(),
-      problemId,
-      eventType: 'test_completed',
-      testPassed: testResult.passed,
-      score: testResult.score,
-      passedTests: testResult.passedTests,
-      totalTests: testResult.totalTests
-    } as any);
+    // 历史事件由前端记录，这里不重复记录
     
     return {
       success: true,

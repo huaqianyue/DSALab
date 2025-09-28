@@ -1,7 +1,13 @@
 <nz-button-group>
-    <button nz-button nzType="default" (click)="newFile()" title="新建"><i nz-icon nzType="plus"></i></button>
-    <button nz-button nzType="default" (click)="openFile()" title="打开..."><i nz-icon nzType="folder-open"></i></button>
+    <button nz-button nzType="default" nzSize="small" (click)="newFile()" title="新建" class="compact-button">
+        <i nz-icon nzType="plus"></i> 新建
+    </button>
+    <button nz-button nzType="default" nzSize="small" (click)="openFile()" title="打开..." class="compact-button">
+        <i nz-icon nzType="folder-open"></i> 打开
+    </button>
 </nz-button-group>
 <nz-button-group>
-    <button [disabled]="!isSaveEnable" nz-button nzType="default" (click)="saveFile()" title="保存"><i nz-icon nzType="save"></i></button>
+    <button [disabled]="!isSaveEnable" nz-button nzType="default" nzSize="small" (click)="saveFile()" title="保存" class="compact-button">
+        <i nz-icon nzType="save"></i> 保存
+    </button>
 </nz-button-group>

@@ -19,6 +19,7 @@ import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { ElectronService } from '../../../../../core/services';
 import { SettingsGuard, SettingsService } from '../../../../../services/settings.service';
+import { ThemeService } from '../../../../../services/theme.service';
 
 @Component({
   selector: 'app-theme-setting',
@@ -31,7 +32,8 @@ export class ThemeSettingComponent implements OnInit {
 
   constructor(private settingsService: SettingsService,
     private electronService: ElectronService,
-    private settingsGuard: SettingsGuard) {
+    private settingsGuard: SettingsGuard,
+    private themeService: ThemeService) {
   }
 
   get currentThemeOptions(): { activeName: string } {
@@ -49,6 +51,8 @@ export class ThemeSettingComponent implements OnInit {
 
   onChange(): void {
     this.settingsService.onChange('editor');
+    // 立即应用主题更改
+    this.themeService.setTheme(this.currentThemeOptions.activeName);
   }
 
 }

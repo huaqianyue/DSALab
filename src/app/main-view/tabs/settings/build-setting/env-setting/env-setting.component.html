@@ -16,8 +16,15 @@
   <div nz-row [nzGutter]="16">
     <div nz-col [nzSpan]="24">
       <h3>MinGW 路径</h3>
-      <input nz-input type="text" [disabled]="currentEnvOptions.useBundledMingw" [(ngModel)]="currentEnvOptions.mingwPath" (ngModelChange)="onChange()">
-      <label nz-checkbox [(nzChecked)]="currentEnvOptions.useBundledMingw" (nzCheckedChange)="onChange()">使用自带的</label>
+        <nz-input-group [nzSuffix]="suffixTemplate">
+          <input nz-input type="text" [(ngModel)]="currentEnvOptions.mingwPath" (ngModelChange)="onChange()" placeholder="请选择MinGW路径">
+        </nz-input-group>
+        <ng-template #suffixTemplate>
+          <button nz-button nzType="text" nzSize="small" (click)="selectMingwPath()" nz-tooltip nzTooltipTitle="选择文件夹">
+            <i nz-icon nzType="folder-open"></i>
+          </button>
+        </ng-template>
+        <label nz-checkbox [(nzChecked)]="currentEnvOptions.useBundledMingw" (nzCheckedChange)="onChange()">使用自带的</label>
     </div>
   </div>
 </nz-layout>

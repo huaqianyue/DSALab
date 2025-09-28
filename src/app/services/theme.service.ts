@@ -72,6 +72,8 @@ export class ThemeService {
       this.loadCss(`${theme}.css`, theme).then(
         (e) => {
           this.document.documentElement.classList.add(theme);
+          // 设置data-theme属性用于自定义组件的深色主题
+          this.document.documentElement.setAttribute('data-theme', theme);
           this.removeUnusedTheme(this.reverseTheme(theme));
           resolve(e);
         },

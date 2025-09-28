@@ -6,8 +6,10 @@
       <nz-radio-group [(ngModel)]="currentThemeOptions.activeName" (ngModelChange)="onChange()">
         <label nz-radio *ngFor="let theme of themeList" [nzValue]="theme">{{theme}}</label>
       </nz-radio-group>
-      <button nz-button nzType="default" (click)="refreshList()">刷新</button><br>
-      <small>你可以在 安装路径\resources\extraResources\themes 中添加更多主题。</small>
+      <!-- 隐藏刷新按钮 -->
+      <!-- <button nz-button nzType="default" (click)="refreshList()">刷新</button><br> -->
+      <!-- 隐藏主题路径提示 -->
+      <!-- <small>你可以在 安装路径\resources\extraResources\themes 中添加更多主题。</small> -->
     </div>
   </div>
 </nz-layout>

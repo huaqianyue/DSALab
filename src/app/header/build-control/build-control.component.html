@@ -1,7 +1,11 @@
 <nz-button-group>
-    <button [disabled]="!enabled" nz-button nzType="default" (click)="compile()" title="编译"><i nz-icon nzType="build"></i></button>
-    <button [disabled]="!enabled" nz-button nzType="default" (click)="runExe()" title="运行"><i nz-icon nzType="play-circle"></i></button>
-    <button [disabled]="!enabled || !isDSALabTab" nz-button nzType="primary" (click)="runTest()" title="测试评分" class="test-button">
+    <button [disabled]="!enabled" nz-button nzType="default" nzSize="small" (click)="compile()" title="编译" class="compact-button">
+        <i nz-icon nzType="build"></i> 编译
+    </button>
+    <button [disabled]="!enabled" nz-button nzType="default" nzSize="small" (click)="runExe()" title="运行" class="compact-button">
+        <i nz-icon nzType="play-circle"></i> 运行
+    </button>
+    <button [disabled]="!enabled || !isDSALabTab" nz-button nzType="default" nzSize="small" (click)="runTest()" title="测试评分" class="compact-button test-button">
         <i nz-icon nzType="experiment"></i> 测试
     </button>
 </nz-button-group>

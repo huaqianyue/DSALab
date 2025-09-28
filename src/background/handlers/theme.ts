@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with devcpp7.  If not, see <http://www.gnu.org/licenses/>.
 
-import * as fallbackTheme from '../../extraResources/themes/classic.json';
+import * as fallbackTheme from '../../extraResources/themes/light_plus.json';
 import * as fs from 'fs';
 import * as path from 'path';
 import { extraResourcesPath, store, typedIpcMain } from '../basicUtil';
@@ -54,7 +54,7 @@ typedIpcMain.handle('theme/getData', (_, name?) => {
     };
   }
   // validate
-  if (!(('type' in theme) &&
+  if (!theme || !(('type' in theme) &&
     ('name' in theme) &&
     (theme.type === 'dark' || theme.type === 'light'))) {
     console.error("Invalid theme type");
@@ -71,8 +71,7 @@ typedIpcMain.handle('theme/getData', (_, name?) => {
       type: theme.type,
       name: theme.name,
       colors: {
-        debugStep: fallbackTheme.colors.debugStep,
-        breakpoint: fallbackTheme.colors.breakpoint,
+        ...fallbackTheme.colors,
         ...theme.colors
       },
       boldTokens: theme.boldTokens ?? [],

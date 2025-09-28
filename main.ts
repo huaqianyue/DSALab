@@ -31,6 +31,7 @@ function createWindow(): BrowserWindow {
     height: 600,
     minWidth: 500,
     minHeight: 300,
+    title: 'DSALab',
     webPreferences: {
       nodeIntegration: true,
       allowRunningInsecureContent: false,

@@ -49,4 +49,20 @@ export class EnvSettingComponent implements OnInit {
     this.verify();
   }
 
+  async selectMingwPath(): Promise<void> {
+    try {
+      const result = await this.electronService.ipcRenderer.invoke('file/openDirectoryDialog', {
+        title: '选择MinGW安装目录',
+        defaultPath: this.currentEnvOptions.mingwPath || ''
+      });
+      
+      if (result && result.success && !result.canceled && result.filePaths && result.filePaths.length > 0) {
+        this.currentEnvOptions.mingwPath = result.filePaths[0];
+        this.onChange();
+      }
+    } catch (error) {
+      console.error('选择文件夹失败:', error);
+    }
+  }
+
 }

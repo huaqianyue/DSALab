@@ -16,13 +16,7 @@
   "files": [
     "dist/**/*"
   ],
-  "artifactName": "${productName} ${version} Setup.${ext}",
-  "nsis": {
-    "oneClick": false,
-    "perMachine": true,
-    "allowElevation": true,
-    "allowToChangeInstallationDirectory": true
-  },
+  "artifactName": "${productName} 1.0 with mingw.${ext}",
   "win": {
     "icon": "dist/assets/icons/favicon.ico",
     "fileAssociations": {
@@ -31,7 +25,7 @@
       "icon": "dist/assets/icons/cpp.ico"
     },
     "target": [
-      "nsis"
+      "7z"
     ]
   }
 }

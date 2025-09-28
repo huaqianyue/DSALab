@@ -93,6 +93,21 @@ export class AppComponent implements OnInit, OnDestroy {
     this.setEnvModal = false;
   }
 
+  async selectMingwPathInModal(): Promise<void> {
+    try {
+      const result = await this.electronService.ipcRenderer.invoke('file/openDirectoryDialog', {
+        title: '选择MinGW安装目录',
+        defaultPath: this.tempMingwPath || ''
+      });
+      
+      if (result && result.success && !result.canceled && result.filePaths && result.filePaths.length > 0) {
+        this.tempMingwPath = result.filePaths[0];
+      }
+    } catch (error) {
+      console.error('选择文件夹失败:', error);
+    }
+  }
+
   ngOnDestroy(): void {
     // 组件销毁时的清理工作
   }

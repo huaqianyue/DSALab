@@ -121,3 +121,25 @@ typedIpcMain.handle('file/open', async (_, arg) => {
     };
   }
 });
+
+typedIpcMain.handle('file/openDirectoryDialog', async (_, arg) => {
+  try {
+    const options: electron.OpenDialogOptions = {
+      title: arg.title || '选择文件夹',
+      defaultPath: arg.defaultPath || '',
+      properties: ['openDirectory']
+    };
+    
+    const result = await electron.dialog.showOpenDialog(getWindow(), options);
+    return {
+      success: true,
+      canceled: result.canceled,
+      filePaths: result.filePaths
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e
+    };
+  }
+});

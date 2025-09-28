@@ -516,3 +516,254 @@
     }
   }
 }
+
+// 深色主题适配
+[data-theme="dark"] {
+  .problem-header {
+    background: #1f1f1f;
+    border-bottom-color: #434343;
+  }
+
+  .problem-content {
+    background: #1f1f1f;
+  }
+
+  .problem-title {
+    color: #f0f0f0;
+  }
+
+  .problem-id {
+    color: #bfbfbf;
+  }
+
+  .problem-description {
+    color: #d4d4d4;
+    
+    h1, h2, h3, h4, h5, h6 {
+      color: #f0f0f0;
+    }
+    
+    code {
+      background: #2d2d2d;
+      color: #e06c75;
+    }
+    
+    pre {
+      background: #262626;
+      border-color: #434343;
+      color: #d4d4d4;
+    }
+  }
+
+  .navigation-buttons button {
+    &:hover:not([disabled]) {
+      background-color: #262626;
+    }
+  }
+
+  .nav-btn {
+    background: #1f1f1f;
+    border-color: #434343;
+    color: #f0f0f0;
+    
+    &:hover {
+      background: #262626;
+    }
+    
+    &:disabled:hover {
+      background: #1f1f1f;
+    }
+  }
+
+  // 题目描述面板深色主题
+  .problem-description-panel {
+    background: #1f1f1f;
+    border-color: #434343;
+    
+    .panel-header {
+      background: #262626;
+      border-bottom-color: #434343;
+      
+      .panel-title {
+        color: #f0f0f0;
+        
+        i {
+          color: #40a9ff;
+        }
+      }
+    }
+    
+    .panel-content.description-content {
+      .description-text {
+        color: #d4d4d4;
+        
+        h1, h2, h3, h4, h5, h6 {
+          color: #f0f0f0;
+        }
+        
+        pre {
+          background: #262626;
+          border-color: #434343;
+          
+          code {
+            color: #d4d4d4;
+          }
+        }
+        
+        code {
+          background: #2d2d2d;
+          color: #e06c75;
+        }
+        
+        strong {
+          color: #40a9ff;
+        }
+      }
+    }
+  }
+
+  // 音频面板深色主题
+  .audio-panel {
+    background: #1f1f1f;
+    border-color: #434343;
+    
+    .panel-header {
+      background: #262626;
+      border-bottom-color: #434343;
+      
+      .panel-title {
+        color: #f0f0f0;
+        
+        i {
+          color: #40a9ff;
+        }
+      }
+    }
+    
+    .panel-content.audio-controls {
+      .btn-audio {
+        background: #1f1f1f;
+        border-color: #434343;
+        color: #f0f0f0;
+        
+        &:hover:not(:disabled) {
+          background: #262626;
+          border-color: #40a9ff;
+        }
+        
+        &.recording {
+          background-color: #d73a49;
+          border-color: #d73a49;
+          
+          &:hover {
+            background-color: #cb2431;
+            border-color: #cb2431;
+          }
+        }
+        
+        &.active {
+          background-color: #28a745;
+          border-color: #28a745;
+          
+          &:hover {
+            background-color: #22863a;
+            border-color: #22863a;
+          }
+        }
+        
+        &:disabled {
+          background: #262626;
+          border-color: #434343;
+          color: rgba(255, 255, 255, 0.25);
+          
+          &:hover {
+            background: #262626;
+            border-color: #434343;
+            color: rgba(255, 255, 255, 0.25);
+          }
+        }
+      }
+      
+      .recording-time {
+        background: #1a2332;
+        border-color: #40a9ff;
+        color: #40a9ff;
+        
+        i {
+          color: #40a9ff;
+        }
+      }
+    }
+    
+    // Howler播放器深色主题
+    .howler-player-container {
+      ::ng-deep app-howler-audio-player {
+        .howler-audio-player {
+          .audio-controls {
+            .btn-audio {
+              background: #1f1f1f;
+              border-color: #434343;
+              color: #f0f0f0;
+              
+              &:hover:not(:disabled) {
+                background: #262626;
+                border-color: #40a9ff;
+              }
+              
+              &.playing {
+                background: #28a745;
+                border-color: #28a745;
+                
+                &:hover {
+                  background: #22863a;
+                  border-color: #22863a;
+                }
+              }
+              
+              &.loading {
+                background: #40a9ff;
+                border-color: #40a9ff;
+              }
+              
+              &:disabled {
+                background: #262626;
+                border-color: #434343;
+                color: rgba(255, 255, 255, 0.25);
+              }
+            }
+            
+            .time-display {
+              color: #f0f0f0;
+              
+              .separator {
+                color: #8c8c8c;
+              }
+              
+              .total-time.loaded {
+                color: #40a9ff;
+              }
+            }
+            
+            .progress-container {
+              .progress-bar {
+                background: #434343;
+              }
+              
+              .progress-fill {
+                background: #28a745;
+              }
+            }
+          }
+          
+          .error-message {
+            background: #d73a49;
+          }
+          
+          .loading-message {
+            background: #40a9ff;
+          }
+        }
+      }
+    }
+  }
+}

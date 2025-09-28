@@ -3,43 +3,51 @@
   <button 
     nz-button 
     nzType="default" 
+    nzSize="small"
     [nzLoading]="isRefreshing"
     (click)="refreshProblems()" 
     nz-tooltip 
-    nzTooltipTitle="刷新题目列表">
-    <i nz-icon nzType="reload"></i>
-  </button>
-
-  <!-- 保存按钮 -->
-  <button 
-    nz-button 
-    nzType="default" 
-    [nzLoading]="isSaving"
-    [disabled]="!currentProblem"
-    (click)="saveCurrentProblem()" 
-    nz-tooltip 
-    nzTooltipTitle="保存">
-    <i nz-icon nzType="save"></i>
+    nzTooltipTitle="刷新题目列表"
+    class="compact-button">
+    <i nz-icon nzType="reload"></i> 刷新
   </button>
 
   <!-- 导入按钮 -->
   <button 
     nz-button 
     nzType="default" 
+    nzSize="small"
     (click)="importProblems()" 
     nz-tooltip 
-    nzTooltipTitle="导入题目列表">
-    <i nz-icon nzType="import"></i>
+    nzTooltipTitle="导入题目列表"
+    class="compact-button">
+    <i nz-icon nzType="import"></i> 导入
+  </button>
+
+  <!-- 保存按钮 -->
+  <button 
+    nz-button 
+    nzType="default" 
+    nzSize="small"
+    [nzLoading]="isSaving"
+    [disabled]="!currentProblem"
+    (click)="saveCurrentProblem()" 
+    nz-tooltip 
+    nzTooltipTitle="保存"
+    class="compact-button">
+    <i nz-icon nzType="save"></i> 保存
   </button>
 
   <!-- 导出按钮 -->
   <button 
     nz-button 
     nzType="default" 
+    nzSize="small"
     (click)="openExportModal()" 
     nz-tooltip 
-    nzTooltipTitle="导出选中题目">
-    <i nz-icon nzType="export"></i>
+    nzTooltipTitle="导出选中题目"
+    class="compact-button">
+    <i nz-icon nzType="export"></i> 导出
   </button>
 </nz-button-group>
 
@@ -58,7 +66,6 @@
     <div class="export-modal-content">
       <!-- 用户信息输入 -->
       <div class="user-info-input">
-        <h4>导出信息</h4>
         <nz-form-item>
           <nz-form-label [nzSpan]="4" nzRequired>姓名</nz-form-label>
           <nz-form-control [nzSpan]="20">
