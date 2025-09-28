@@ -18,9 +18,12 @@
           📌 上次打开
         </span>
       </div>
-      <div class="problem-content" *ngIf="hasCode(problem) || hasAudio(problem)">
+      <div class="problem-content" *ngIf="hasCode(problem) || hasAudio(problem) || hasTestStatus(problem)">
         <span *ngIf="hasCode(problem)">📄 代码</span>
         <span *ngIf="hasAudio(problem)">🎵 音频</span>
+        <span *ngIf="hasTestStatus(problem)" class="test-status" [ngClass]="getTestStatusClass(problem)">
+          {{ getTestStatusText(problem) }}
+        </span>
       </div>
     </div>
   </div>

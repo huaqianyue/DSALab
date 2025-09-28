@@ -168,6 +168,37 @@ export class ProblemListComponent implements OnInit, OnDestroy {
     return this.settings.lastOpenedProblemId === problem.id;
   }
 
+  // 检查问题是否有测试状态
+  hasTestStatus(problem: Problem): boolean {
+    return !!(problem as any).testStatus && (problem as any).testStatus !== 'not_tested';
+  }
+
+  // 获取测试状态文本
+  getTestStatusText(problem: Problem): string {
+    const testStatus = (problem as any).testStatus;
+    switch (testStatus) {
+      case 'passed':
+        return '✅ 测试通过';
+      case 'failed':
+        return '❌ 测试失败';
+      default:
+        return '';
+    }
+  }
+
+  // 获取测试状态样式类
+  getTestStatusClass(problem: Problem): string {
+    const testStatus = (problem as any).testStatus;
+    switch (testStatus) {
+      case 'passed':
+        return 'test-status-passed';
+      case 'failed':
+        return 'test-status-failed';
+      default:
+        return '';
+    }
+  }
+
   // 将最后打开的题目定位到列表中间位置（学习导出页面的实现）
   private scrollToLastOpenedProblem(): void {
     if (!this.settings.lastOpenedProblemId) return;

@@ -31,6 +31,10 @@ interface Problem {
   isDelete: boolean;
   Audio: string;
   Code: string;
+  // 新增测试相关字段
+  studentDebugTemplate?: string;
+  judgeTemplate?: string;
+  testStatus?: 'passed' | 'failed' | 'not_tested';
 }
 
 interface DSALabSettings {
@@ -129,6 +133,10 @@ interface RawProblem {
   isDelete?: string | boolean;
   Audio?: string;
   Code?: string;
+  // 新增测试模板字段
+  studentDebugTemplate?: string;
+  judgeTemplate?: string;
+  testStatus?: string;
 }
 
 // 转换原始问题数据为标准格式
@@ -148,6 +156,9 @@ function convertToProblem(raw: RawProblem): Problem | null {
       isDelete: raw.isDelete === true || raw.isDelete === 'true',
       Audio: raw.Audio || '',
       Code: raw.Code || '',
+      studentDebugTemplate: raw.studentDebugTemplate || '',
+      judgeTemplate: raw.judgeTemplate || '',
+      testStatus: (raw.testStatus as 'passed' | 'failed' | 'not_tested') || 'not_tested',
     };
   }
   return null;
@@ -507,7 +518,15 @@ ipcMain.handle('dsalab-read-problem-code', async (event, problemId: string): Pro
     const content = await fs.readFile(codeFilePath, 'utf-8');
     return content;
   } catch (error: any) {
-    if (error.code !== 'ENOENT') {
+    if (error.code === 'ENOENT') {
+      // 如果代码文件不存在，尝试使用调试模板
+      const problems = await loadPureLocalProblems();
+      const problem = problems.find(p => p.id === problemId);
+      if (problem && problem.studentDebugTemplate) {
+        console.log(`使用调试模板初始化问题${problemId}的代码`);
+        return problem.studentDebugTemplate;
+      }
+    } else {
       console.error(`读取问题${problemId}的代码失败:`, error);
     }
     return null;
@@ -538,6 +557,25 @@ ipcMain.handle('dsalab-save-problem-workspace', async (event, problemId: string,
     await ensureDirectoryExists(problemWorkspaceDir);
 
     const codeFilePath = DSALabPaths.getProblemCodePath(problemId);
+    
+    // 如果代码内容为空且文件不存在，尝试使用调试模板初始化
+    if (!codeContent || codeContent.trim() === '') {
+      try {
+        await fs.access(codeFilePath);
+        // 文件存在但内容为空，保持为空
+      } catch (error: any) {
+        if (error.code === 'ENOENT') {
+          // 文件不存在，使用调试模板初始化
+          const problems = await loadPureLocalProblems();
+          const problem = problems.find(p => p.id === problemId);
+          if (problem && problem.studentDebugTemplate) {
+            console.log(`使用调试模板初始化问题${problemId}的代码文件`);
+            codeContent = problem.studentDebugTemplate;
+          }
+        }
+      }
+    }
+    
     await fs.writeFile(codeFilePath, codeContent, 'utf-8');
 
     const audioFilePath = DSALabPaths.getProblemAudioPath(problemId);
@@ -894,6 +932,235 @@ ipcMain.handle('dsalab-save-settings', async (event, settings: DSALabSettings): 
   } catch (error: any) {
     console.error('❌ Failed to save DSALab settings:', error);
     throw error;
+  }
+});
+
+// 函数提取器
+class CppFunctionExtractor {
+  extractStudentFunction(sourceCode: string): {
+    success: boolean;
+    extractedCode: string;
+    error?: string;
+  } {
+    try {
+      // 提取Solution类
+      const classPattern = /class\s+Solution\s*\{[\s\S]*?\};/g;
+      const classMatch = sourceCode.match(classPattern);
+      
+      if (!classMatch) {
+        return {
+          success: false,
+          extractedCode: '',
+          error: '未找到Solution类'
+        };
+      }
+      
+      // 提取头文件
+      const includePattern = /#include\s*[<"][^>"]+[>"]/g;
+      const includes = sourceCode.match(includePattern) || [];
+      
+      // 提取using声明
+      const usingPattern = /using\s+namespace\s+\w+\s*;/g;
+      const usings = sourceCode.match(usingPattern) || [];
+      
+      // 组合提取的代码
+      const extractedCode = [
+        ...includes,
+        '',
+        ...usings,
+        '',
+        classMatch[0]
+      ].join('\n');
+      
+      return {
+        success: true,
+        extractedCode
+      };
+      
+    } catch (error: any) {
+      return {
+        success: false,
+        extractedCode: '',
+        error: `代码解析失败: ${error.message}`
+      };
+    }
+  }
+}
+
+// 编译并运行判题器
+async function compileAndRunJudge(problemId: string, judgeCode: string): Promise<{
+  success: boolean;
+  output: string;
+  error: string;
+}> {
+  const tempDir = DSALabPaths.getTempCppDir();
+  const sourceFile = path.join(tempDir, `${problemId}_judge.cpp`);
+  const executableFile = path.join(tempDir, `${problemId}_judge.exe`);
+  
+  try {
+    await ensureDirectoryExists(tempDir);
+    await fs.writeFile(sourceFile, judgeCode, 'utf-8');
+    
+    // 编译
+    const { exec } = require('child_process');
+    const compileCommand = `g++ "${sourceFile}" -o "${executableFile}"`;
+    
+    return new Promise((resolve) => {
+      exec(compileCommand, { timeout: 10000 }, (compileError: any, compileStdout: string, compileStderr: string) => {
+        if (compileError) {
+          resolve({
+            success: false,
+            output: '',
+            error: `编译失败: ${compileStderr || compileStdout || compileError.message}`
+          });
+          return;
+        }
+        
+        // 运行
+        exec(`"${executableFile}"`, { timeout: 5000 }, (runError: any, runStdout: string, runStderr: string) => {
+          resolve({
+            success: true,
+            output: runStdout || '',
+            error: runStderr || ''
+          });
+        });
+      });
+    });
+    
+  } catch (error: any) {
+    return {
+      success: false,
+      output: '',
+      error: `执行失败: ${error.message}`
+    };
+  }
+}
+
+// 解析测试结果
+function parseTestResult(output: string): {
+  passed: boolean;
+  score: number;
+  passedTests: number;
+  totalTests: number;
+  details: string;
+} {
+  const resultMatch = output.match(/\[RESULT\]\s*(\d+)\/(\d+)\s*tests passed/);
+  const scoreMatch = output.match(/\[SCORE\]\s*(\d+)/);
+  
+  const passedTests = resultMatch ? parseInt(resultMatch[1]) : 0;
+  const totalTests = resultMatch ? parseInt(resultMatch[2]) : 0;
+  const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
+  const passed = passedTests === totalTests && totalTests > 0;
+  
+  return {
+    passed,
+    score,
+    passedTests,
+    totalTests,
+    details: output
+  };
+}
+
+// 更新问题测试状态
+async function updateProblemTestStatus(problemId: string, status: 'passed' | 'failed' | 'not_tested'): Promise<void> {
+  try {
+    const problems = await loadPureLocalProblems();
+    const problemIndex = problems.findIndex(p => p.id === problemId);
+    
+    if (problemIndex !== -1) {
+      problems[problemIndex].testStatus = status;
+      await saveProblemsToFile(problems);
+    }
+  } catch (error: any) {
+    console.error(`更新测试状态失败:`, error);
+  }
+}
+
+// 运行测试的IPC处理器
+ipcMain.handle('dsalab-run-test', async (event, problemId: string) => {
+  try {
+    // 1. 获取问题配置
+    const problems = await loadPureLocalProblems();
+    const problem = problems.find(p => p.id === problemId);
+    
+    if (!problem || !problem.judgeTemplate) {
+      return { 
+        success: false, 
+        error: '该题目未配置测试模板' 
+      };
+    }
+    
+    // 2. 读取学生代码
+    const studentCodePath = DSALabPaths.getProblemCodePath(problemId);
+    let studentCode: string;
+    
+    try {
+      studentCode = await fs.readFile(studentCodePath, 'utf-8');
+    } catch (error: any) {
+      return { 
+        success: false, 
+        error: '未找到学生代码文件' 
+      };
+    }
+    
+    // 3. 提取学生函数
+    const extractor = new CppFunctionExtractor();
+    const extractResult = extractor.extractStudentFunction(studentCode);
+    
+    if (!extractResult.success) {
+      return { 
+        success: false, 
+        error: `函数提取失败: ${extractResult.error}` 
+      };
+    }
+    
+    // 4. 生成完整测试代码
+    const fullJudgeCode = problem.judgeTemplate.replace('{{STUDENT_CODE}}', extractResult.extractedCode);
+    
+    // 5. 编译并运行判题器
+    const runResult = await compileAndRunJudge(problemId, fullJudgeCode);
+    
+    if (!runResult.success) {
+      await updateProblemTestStatus(problemId, 'failed');
+      return { 
+        success: false, 
+        error: runResult.error 
+      };
+    }
+    
+    // 6. 解析测试结果
+    const testResult = parseTestResult(runResult.output);
+    
+    // 7. 更新测试状态
+    await updateProblemTestStatus(problemId, testResult.passed ? 'passed' : 'failed');
+    
+    // 8. 记录历史事件
+    recordHistoryEventInternal({
+      timestamp: Date.now(),
+      problemId,
+      eventType: 'test_completed',
+      testPassed: testResult.passed,
+      score: testResult.score,
+      passedTests: testResult.passedTests,
+      totalTests: testResult.totalTests
+    } as any);
+    
+    return {
+      success: true,
+      passed: testResult.passed,
+      score: testResult.score,
+      passedTests: testResult.passedTests,
+      totalTests: testResult.totalTests,
+      details: testResult.details,
+      output: runResult.output
+    };
+    
+  } catch (error: any) {
+    await updateProblemTestStatus(problemId, 'failed');
+    return { 
+      success: false, 
+      error: error.message 
+    };
   }
 });
 

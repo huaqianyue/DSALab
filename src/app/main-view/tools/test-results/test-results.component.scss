@@ -1,0 +1,118 @@
+.test-results-container {
+  padding: 16px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.test-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+
+  h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+
+    i {
+      margin-right: 8px;
+    }
+  }
+
+  .test-summary {
+    font-size: 14px;
+    font-weight: 500;
+  }
+}
+
+.no-result {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+}
+
+.error-result {
+  margin-bottom: 16px;
+}
+
+.success-result {
+  .test-summary-card {
+    margin-bottom: 16px;
+
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      .label {
+        font-weight: 500;
+        color: #666;
+      }
+
+      .value {
+        font-weight: 600;
+        font-size: 16px;
+      }
+    }
+  }
+
+  .test-output-card {
+    margin-bottom: 16px;
+
+    .test-output {
+      background: #f6f8fa;
+      border: 1px solid #e1e4e8;
+      border-radius: 6px;
+      padding: 12px;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+  }
+
+  .raw-output-card {
+    .raw-output {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      border-radius: 4px;
+      padding: 12px;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      margin: 0;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+  }
+}
+
+// 测试输出中的特殊样式
+::ng-deep .test-output {
+  .test-pass {
+    color: #52c41a;
+    font-weight: bold;
+  }
+
+  .test-fail {
+    color: #ff4d4f;
+    font-weight: bold;
+  }
+
+  .test-info {
+    color: #1890ff;
+    font-weight: bold;
+  }
+}

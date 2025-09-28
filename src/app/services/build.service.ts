@@ -207,6 +207,62 @@ export class BuildService {
     }
   }
 
+  async runTest(): Promise<void> {
+    // 检查当前标签页是否为DSALab问题
+    const activeTab = this.tabsService.getActive().value;
+    if (activeTab && activeTab.key.startsWith('dsalab-')) {
+      try {
+        // 同步编辑器内容到标签页
+        this.tabsService.syncActiveCode();
+        
+        // 更新DSALab服务中的代码内容
+        this.dsalabProblemService.updateCurrentProblemCode(activeTab.code);
+        
+        // 保存当前问题到文件
+        await this.dsalabProblemService.saveCurrentProblem();
+        
+        // 标记标签页为已保存
+        activeTab.saved = true;
+        
+        console.log('DSALab problem saved before testing');
+        
+        // 运行测试
+        const problemId = activeTab.key.replace('dsalab-', '');
+        const result = await this.electronService.ipcRenderer.invoke('dsalab-run-test' as any, problemId) as any;
+        
+        if (result.success) {
+          // 显示测试结果
+          this.router.navigate([{
+            outlets: {
+              tools: 'test-results'
+            }
+          }]);
+          
+          // 通过服务传递测试结果
+          (window as any).lastTestResult = result;
+          
+          this.message.success(`测试完成: ${result.passedTests}/${result.totalTests} 通过`);
+        } else {
+          this.message.error(`测试失败: ${result.error}`);
+          
+          // 也显示测试面板，显示错误信息
+          this.router.navigate([{
+            outlets: {
+              tools: 'test-results'
+            }
+          }]);
+          (window as any).lastTestResult = result;
+        }
+        
+      } catch (error) {
+        console.error('Failed to run DSALab test:', error);
+        this.message.error('测试执行失败');
+      }
+    } else {
+      this.message.warning('当前不是DSALab题目，无法运行测试');
+    }
+  }
+
   async runExe(forceCompile = false): Promise<void> {
     // 检查当前标签页是否为DSALab问题
     const activeTab = this.tabsService.getActive().value;

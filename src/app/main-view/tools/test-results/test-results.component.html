@@ -1,0 +1,66 @@
+<div class="test-results-container">
+  <div class="test-header">
+    <h3>
+      <i nz-icon [nzType]="getOverallStatus().icon" [style.color]="getOverallStatus().color"></i>
+      测试结果
+    </h3>
+    <div class="test-summary" [style.color]="getOverallStatus().color">
+      {{ getOverallStatus().text }}
+    </div>
+  </div>
+
+  <div *ngIf="!testResult" class="no-result">
+    <nz-empty nzNotFoundContent="暂无测试结果"></nz-empty>
+  </div>
+
+  <div *ngIf="testResult && !testResult.success" class="error-result">
+    <nz-alert 
+      nzType="error" 
+      [nzMessage]="'测试执行失败'" 
+      [nzDescription]="testResult.error"
+      nzShowIcon>
+    </nz-alert>
+  </div>
+
+  <div *ngIf="testResult && testResult.success" class="success-result">
+    <!-- 测试摘要 -->
+    <div class="test-summary-card">
+      <nz-card nzTitle="测试摘要" nzSize="small">
+        <div class="summary-item">
+          <span class="label">通过测试:</span>
+          <span class="value" [style.color]="testResult.passed ? '#52c41a' : '#fa8c16'">
+            {{ testResult.passedTests }} / {{ testResult.totalTests }}
+          </span>
+        </div>
+        <div class="summary-item">
+          <span class="label">得分:</span>
+          <span class="value" [style.color]="testResult.score >= 90 ? '#52c41a' : testResult.score >= 60 ? '#fa8c16' : '#ff4d4f'">
+            {{ testResult.score }} 分
+          </span>
+        </div>
+        <div class="summary-item">
+          <span class="label">状态:</span>
+          <nz-tag [nzColor]="testResult.passed ? 'green' : 'orange'">
+            {{ testResult.passed ? '通过' : '未通过' }}
+          </nz-tag>
+        </div>
+      </nz-card>
+    </div>
+
+    <!-- 详细测试输出 -->
+    <div class="test-output-card">
+      <nz-card nzTitle="详细测试输出" nzSize="small">
+        <div class="test-output" [innerHTML]="formatTestOutput(testResult.details)"></div>
+      </nz-card>
+    </div>
+
+    <!-- 原始输出（可折叠） -->
+    <div class="raw-output-card">
+      <nz-collapse>
+        <nz-collapse-panel nzHeader="原始输出" nzExpandIconPosition="right">
+          <pre class="raw-output">{{ testResult.output }}</pre>
+        </nz-collapse-panel>
+      </nz-collapse>
+    </div>
+  </div>
+</div>

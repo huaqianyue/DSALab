@@ -454,4 +454,32 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy, AfterView
     }
   }
 
+  // 格式化题目描述
+  getFormattedDescription(): string {
+    if (!this.currentProblem) return '';
+    
+    let description = this.currentProblem.fullDescription;
+    
+    // 处理换行符
+    description = description.replace(/\\n/g, '\n');
+    
+    // 移除函数签名部分（从 **函数签名：** 到下一个 **标题** 或测试示例）
+    description = description.replace(/\*\*函数签名：\*\*[\s\S]*?(?=\*\*测试示例：\*\*)/g, '');
+    
+    // 转换Markdown格式
+    description = description
+      // 处理粗体 **text**
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      // 处理代码块 ```cpp ... ```（如果还有其他代码块）
+      .replace(/```cpp\n([\s\S]*?)\n```/g, '<pre><code class="language-cpp">$1</code></pre>')
+      // 处理行内代码 `code`
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      // 处理换行符为<br>
+      .replace(/\n/g, '<br>')
+      // 处理缩进
+      .replace(/^(\s+)/gm, (match) => '&nbsp;'.repeat(match.length));
+    
+    return description;
+  }
+
 }

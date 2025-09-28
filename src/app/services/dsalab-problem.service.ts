@@ -206,10 +206,10 @@ export class DSALabProblemService {
       if (problem && problem.Code) {
         console.log(`Loading existing code file for problem ${problemId}`);
         const loadedCode = await this.electronService.ipcRenderer.invoke('dsalab-read-problem-code' as any, problemId);
-        code = loadedCode || this.getWelcomeCode();
+        code = loadedCode || this.getStudentDebugTemplate(problem) || this.getWelcomeCode();
       } else {
-        console.log(`Using default code for problem ${problemId} (no local file)`);
-        code = this.getWelcomeCode();
+        console.log(`Using debug template for problem ${problemId} (no local file)`);
+        code = this.getStudentDebugTemplate(problem) || this.getWelcomeCode();
       }
 
       // 根据本地JSON中的Audio字段决定是否加载本地音频
@@ -451,6 +451,11 @@ int main() {
     return 0;
 }
 `;
+  }
+
+  // 获取学生调试模板
+  private getStudentDebugTemplate(problem: Problem): string | null {
+    return (problem as any).studentDebugTemplate || null;
   }
 
   // 获取所有问题

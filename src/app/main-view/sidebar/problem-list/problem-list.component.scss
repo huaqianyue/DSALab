@@ -90,6 +90,24 @@
 
         span {
           margin-right: 8px;
+          
+          &.test-status {
+            font-weight: 500;
+            padding: 1px 4px;
+            border-radius: 2px;
+            
+            &.test-status-passed {
+              background: #f6ffed;
+              color: #52c41a;
+              border: 1px solid #b7eb8f;
+            }
+            
+            &.test-status-failed {
+              background: #fff2f0;
+              color: #ff4d4f;
+              border: 1px solid #ffccc7;
+            }
+          }
         }
       }
     }

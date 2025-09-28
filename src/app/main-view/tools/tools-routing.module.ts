@@ -22,6 +22,7 @@ import { Routes, RouterModule } from '@angular/router';
 import { ProblemsComponent } from './problems/problems.component'
 import { OutputComponent } from './output/output.component';
 import { DebugComponent } from './debug/debug.component';
+import { TestResultsComponent } from './test-results/test-results.component';
 
 const routes: Routes = [
   {
@@ -37,6 +38,11 @@ const routes: Routes = [
   {
     path: 'debug',
     component: DebugComponent,
+    outlet: 'tools'
+  },
+  {
+    path: 'test-results',
+    component: TestResultsComponent,
     outlet: 'tools'
   }
 ];
