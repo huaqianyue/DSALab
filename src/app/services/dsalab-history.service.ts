@@ -17,7 +17,7 @@
 
 import { Injectable } from '@angular/core';
 import { ElectronService } from '../core/services';
-import { HistoryEvent, SimplifiedContentChange } from './dsalab-types';
+import { HistoryEvent, SimplifiedContentChange, TestStartEvent, TestResultEvent } from './dsalab-types';
 
 /**
  * DSALab历史记录管理服务
@@ -291,9 +291,46 @@ export class DSALabHistoryService {
       'run_start', 'run_end', 'compile_error', 'run_timeout',
       'program_terminated_by_new_run', 'problem_loaded', 
       'problem_saved', 'problem_switched', 'audio_record_start',
-      'audio_record_stop', 'audio_play'
+      'audio_record_stop', 'audio_play', 'test_start', 'test_completed', 'test_failed'
     ];
 
     return immediateFlushEvents.includes(eventType);
+  }
+
+  /**
+   * 记录测试开始事件
+   * @param problemId 问题ID
+   * @param codeSnapshot 代码快照
+   */
+  recordTestStartEvent(problemId: string, codeSnapshot: string): void {
+    const event: TestStartEvent = {
+      timestamp: Date.now(),
+      problemId,
+      eventType: 'test_start',
+      codeSnapshot
+    };
+
+    this.recordHistoryEvent(event);
+  }
+
+  /**
+   * 记录测试结果事件
+   * @param problemId 问题ID
+   * @param testResult 测试结果
+   */
+  recordTestResultEvent(problemId: string, testResult: any): void {
+    const event: TestResultEvent = {
+      timestamp: Date.now(),
+      problemId,
+      eventType: testResult.success ? 'test_completed' : 'test_failed',
+      testPassed: testResult.passed || false,
+      score: testResult.score || 0,
+      passedTests: testResult.passedTests || 0,
+      totalTests: testResult.totalTests || 0,
+      details: testResult.details,
+      errorMessage: testResult.error
+    };
+
+    this.recordHistoryEvent(event);
   }
 }

@@ -34,6 +34,7 @@ interface Problem {
   // 新增测试相关字段
   studentDebugTemplate?: string;
   judgeTemplate?: string;
+  functionSignature?: string;
   testStatus?: 'passed' | 'failed' | 'not_tested';
   testScore?: number; // 测试分数 (0-100)
 }
@@ -142,6 +143,7 @@ interface RawProblem {
   // 新增测试模板字段
   studentDebugTemplate?: string;
   judgeTemplate?: string;
+  functionSignature?: string;
   testStatus?: string;
   testScore?: number | string; // 兼容字符串格式
 }
@@ -165,6 +167,7 @@ function convertToProblem(raw: RawProblem): Problem | null {
       Code: raw.Code || '',
       studentDebugTemplate: raw.studentDebugTemplate || '',
       judgeTemplate: raw.judgeTemplate || '',
+      functionSignature: raw.functionSignature || '',
       testStatus: (raw.testStatus as 'passed' | 'failed' | 'not_tested') || 'not_tested',
       testScore: typeof raw.testScore === 'number' ? raw.testScore : (typeof raw.testScore === 'string' ? parseInt(raw.testScore, 10) : undefined),
     };
@@ -260,6 +263,16 @@ function mergeProblemLists(
         shortDescription: incomingProblem.shortDescription,
         fullDescription: incomingProblem.fullDescription,
         Title: incomingProblem.shortDescription,
+        // 保留本地的工作区数据
+        Audio: existingLocal.Audio,
+        Code: existingLocal.Code,
+        // 保留本地的测试相关数据
+        testStatus: existingLocal.testStatus,
+        testScore: existingLocal.testScore,
+        // 更新模板数据（如果CDN有更新）
+        studentDebugTemplate: incomingProblem.studentDebugTemplate || existingLocal.studentDebugTemplate,
+        judgeTemplate: incomingProblem.judgeTemplate || existingLocal.judgeTemplate,
+        functionSignature: incomingProblem.functionSignature || existingLocal.functionSignature,
         isDelete: false,
       });
       localMap.delete(id);
@@ -268,6 +281,9 @@ function mergeProblemLists(
         ...incomingProblem,
         Audio: '',
         Code: '',
+        // 为新问题设置默认的测试相关字段
+        testStatus: 'not_tested',
+        testScore: undefined,
         isDelete: false,
       });
     }
@@ -433,9 +449,37 @@ ipcMain.handle('dsalab-export-problems', async (event, problemIds: string[], def
     const mainWindow = BrowserWindow.getFocusedWindow();
     if (!mainWindow) throw new Error('No focused window');
 
+    // 获取问题列表以提取测试分数
+    const problems = await loadPureLocalProblems();
+    const selectedProblems = problems.filter(p => problemIds.includes(p.id));
+    
+    // 生成包含测试分数的文件名
+    let enhancedFileName = defaultFileName;
+    if (selectedProblems.length > 0) {
+      const testScores = selectedProblems
+        .map(p => (p as any).testScore !== undefined ? (p as any).testScore : 'N/A')
+        .join('_');
+      
+      // 在文件名中插入测试分数（在时间戳之前）
+      const nameWithoutExt = defaultFileName.replace('.zip', '');
+      
+      // 查找时间戳模式：YYYYMMDD_HHMMSS 或 YYMMDD_HHMMSS
+      const timestampPattern = /_(\d{8}_\d{6})$/;
+      const match = nameWithoutExt.match(timestampPattern);
+      
+      if (match) {
+        const timestamp = match[1];
+        const baseName = nameWithoutExt.replace(timestampPattern, '');
+        enhancedFileName = `${baseName}_${testScores}_${timestamp}.zip`;
+      } else {
+        // 如果没有找到时间戳模式，直接在末尾添加分数
+        enhancedFileName = `${nameWithoutExt}_${testScores}.zip`;
+      }
+    }
+
     // 显示保存对话框，让用户选择 ZIP 文件保存位置
     const saveResult = await dialog.showSaveDialog(mainWindow, {
-      defaultPath: defaultFileName.endsWith('.zip') ? defaultFileName : `${defaultFileName}.zip`,
+      defaultPath: enhancedFileName.endsWith('.zip') ? enhancedFileName : `${enhancedFileName}.zip`,
       filters: [
         { name: 'ZIP Archives', extensions: ['zip'] },
         { name: 'All Files', extensions: ['*'] }
@@ -476,6 +520,7 @@ ipcMain.handle('dsalab-export-problems', async (event, problemIds: string[], def
       const codeFilePath = path.join(problemWorkspaceDir, 'code.cpp');
       const audioFilePath = path.join(problemWorkspaceDir, 'audio.webm');
       const historyFilePath = path.join(problemWorkspaceDir, 'history.json');
+      const testResultFilePath = path.join(problemWorkspaceDir, 'test-result.json');
 
       // 添加代码文件
       try {
@@ -502,6 +547,15 @@ ipcMain.handle('dsalab-export-problems', async (event, problemIds: string[], def
         console.log(`Added history file for problem ${problemId}`);
       } catch (e) {
         console.log(`History file not found for ${problemId}, skipping.`);
+      }
+
+      // 添加测试结果文件
+      try {
+        await fs.access(testResultFilePath);
+        archive.file(testResultFilePath, { name: `${problemId}/test-result.json` });
+        console.log(`Added test result file for problem ${problemId}`);
+      } catch (e) {
+        console.log(`Test result file not found for ${problemId}, skipping.`);
       }
     }
 
@@ -826,6 +880,9 @@ function recordHistoryEventInternal(historyEvent: HistoryEvent): void {
     case 'audio_record_start':
     case 'audio_record_stop':
     case 'audio_play':
+    case 'test_start':
+    case 'test_completed':
+    case 'test_failed':
       buffers.batchBuffer.push(historyEvent);
       // 这些重要事件也要清除编辑缓存
       buffers.lastEditEvent = null;
@@ -945,44 +1002,84 @@ ipcMain.handle('dsalab-save-settings', async (event, settings: DSALabSettings): 
 
 // 函数提取器
 class CppFunctionExtractor {
-  extractStudentFunction(sourceCode: string): {
+  extractStudentFunction(sourceCode: string, functionSignature: string): {
     success: boolean;
     extractedCode: string;
     error?: string;
   } {
     try {
-      // 提取Solution类
-      const classPattern = /class\s+Solution\s*\{[\s\S]*?\};/g;
-      const classMatch = sourceCode.match(classPattern);
-      
-      if (!classMatch) {
+      // 从函数签名中提取函数名
+      const functionNameMatch = functionSignature.match(/(\w+)\s*\(/);
+      if (!functionNameMatch) {
         return {
           success: false,
           extractedCode: '',
-          error: '未找到Solution类'
+          error: '无法从函数签名中提取函数名'
         };
       }
       
-      // 提取头文件
-      const includePattern = /#include\s*[<"][^>"]+[>"]/g;
-      const includes = sourceCode.match(includePattern) || [];
+      const functionName = functionNameMatch[1];
       
-      // 提取using声明
-      const usingPattern = /using\s+namespace\s+\w+\s*;/g;
-      const usings = sourceCode.match(usingPattern) || [];
+      // 使用更精确的括号匹配算法来提取完整的函数定义
+      const functionStartPattern = new RegExp(
+        `(\\w+\\s+${functionName}\\s*\\([^)]*\\)\\s*\\{)`,
+        'g'
+      );
       
-      // 组合提取的代码
-      const extractedCode = [
-        ...includes,
-        '',
-        ...usings,
-        '',
-        classMatch[0]
-      ].join('\n');
+      const functionStartMatch = sourceCode.match(functionStartPattern);
+      
+      if (!functionStartMatch) {
+        return {
+          success: false,
+          extractedCode: '',
+          error: `未找到函数: ${functionName}`
+        };
+      }
+      
+      // 找到函数开始位置
+      const functionStartIndex = sourceCode.search(functionStartPattern);
+      if (functionStartIndex === -1) {
+        return {
+          success: false,
+          extractedCode: '',
+          error: `未找到函数: ${functionName}`
+        };
+      }
+      
+      // 从函数开始位置开始，使用括号匹配算法找到完整的函数
+      let braceCount = 0;
+      let functionEndIndex = functionStartIndex;
+      let inFunction = false;
+      
+      for (let i = functionStartIndex; i < sourceCode.length; i++) {
+        const char = sourceCode[i];
+        
+        if (char === '{') {
+          braceCount++;
+          inFunction = true;
+        } else if (char === '}') {
+          braceCount--;
+          if (inFunction && braceCount === 0) {
+            functionEndIndex = i;
+            break;
+          }
+        }
+      }
+      
+      if (braceCount !== 0) {
+        return {
+          success: false,
+          extractedCode: '',
+          error: `函数 ${functionName} 的括号不匹配`
+        };
+      }
+      
+      // 提取完整的函数定义
+      const extractedCode = sourceCode.substring(functionStartIndex, functionEndIndex + 1);
       
       return {
         success: true,
-        extractedCode
+        extractedCode: extractedCode
       };
       
     } catch (error: any) {
@@ -1143,7 +1240,7 @@ ipcMain.handle('dsalab-run-test', async (event, problemId: string) => {
     
     // 3. 提取学生函数
     const extractor = new CppFunctionExtractor();
-    const extractResult = extractor.extractStudentFunction(studentCode);
+    const extractResult = extractor.extractStudentFunction(studentCode, problem.functionSignature || '');
     
     if (!extractResult.success) {
       return { 

@@ -47,6 +47,7 @@ export function setupExportManager(ipcMain: Electron.IpcMain) {
         const codeFilePath = path.join(problemWorkspaceDir, 'code.cpp');
         const audioFilePath = path.join(problemWorkspaceDir, 'audio.webm');
         const historyFilePath = path.join(problemWorkspaceDir, 'history.json');
+        const testResultFilePath = path.join(problemWorkspaceDir, 'test-result.json');
 
         try {
           await fs.access(codeFilePath);
@@ -67,6 +68,13 @@ export function setupExportManager(ipcMain: Electron.IpcMain) {
           archive.file(historyFilePath, { name: `${problemId}/history.json` });
         } catch (e) {
           console.log(`History file not found for ${problemId}, skipping.`);
+        }
+
+        try {
+          await fs.access(testResultFilePath);
+          archive.file(testResultFilePath, { name: `${problemId}/test-result.json` });
+        } catch (e) {
+          console.log(`Test result file not found for ${problemId}, skipping.`);
         }
       }
 

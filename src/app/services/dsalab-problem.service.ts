@@ -492,4 +492,14 @@ int main() {
   getWorkspaceStructureInfo() {
     return this.pathsService.getWorkspaceStructureInfo();
   }
+
+  // 记录测试开始事件
+  recordTestStartEvent(problemId: string, codeSnapshot: string): void {
+    this.historyService.recordTestStartEvent(problemId, codeSnapshot);
+  }
+
+  // 记录测试结果事件
+  recordTestResultEvent(problemId: string, testResult: any): void {
+    this.historyService.recordTestResultEvent(problemId, testResult);
+  }
 }

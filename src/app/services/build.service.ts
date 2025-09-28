@@ -228,6 +228,10 @@ export class BuildService {
         
         // 运行测试
         const problemId = activeTab.key.replace('dsalab-', '');
+        
+        // 记录测试开始事件
+        this.dsalabProblemService.recordTestStartEvent(problemId, activeTab.code);
+        
         const result = await this.electronService.ipcRenderer.invoke('dsalab-run-test' as any, problemId) as any;
         
         // 显示测试结果面板
@@ -247,6 +251,12 @@ export class BuildService {
             result: result 
           } 
         }));
+        
+        // 记录测试结果事件
+        this.dsalabProblemService.recordTestResultEvent(problemId, result);
+        
+        // 刷新问题列表以显示最新的测试状态
+        await this.dsalabProblemService.refreshProblems();
         
         if (result.success) {
           this.message.success(`测试完成: ${result.passedTests}/${result.totalTests} 通过`);

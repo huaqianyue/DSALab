@@ -71,7 +71,22 @@ export interface AudioEvent extends HistoryEventBase {
   audioSizeKB?: number; // For record_stop
 }
 
-export type HistoryEvent = CodeEditEvent | ProgramRunStartEvent | ProgramOutputEvent | ProgramRunEndEvent | ProblemLifecycleEvent | AudioEvent;
+export interface TestStartEvent extends HistoryEventBase {
+  eventType: 'test_start';
+  codeSnapshot: string; // Full code at the moment of test
+}
+
+export interface TestResultEvent extends HistoryEventBase {
+  eventType: 'test_completed' | 'test_failed';
+  testPassed: boolean;
+  score: number;
+  passedTests: number;
+  totalTests: number;
+  details?: string; // Test output details
+  errorMessage?: string; // For test_failed
+}
+
+export type HistoryEvent = CodeEditEvent | ProgramRunStartEvent | ProgramOutputEvent | ProgramRunEndEvent | ProblemLifecycleEvent | AudioEvent | TestStartEvent | TestResultEvent;
 
 // 定义问题数据结构
 export interface Problem {
@@ -85,6 +100,7 @@ export interface Problem {
   // 新增测试相关字段
   studentDebugTemplate?: string;
   judgeTemplate?: string;
+  functionSignature?: string;
   testStatus?: 'passed' | 'failed' | 'not_tested';
   testScore?: number; // 测试分数 (0-100)
 }
