@@ -29,11 +29,12 @@ export interface SimplifiedContentChange {
   rangeLength: number;
   text: string;
   rangeOffset: number;
+  deletedText?: string; // 被删除的文本（仅用于删除操作）
 }
 
 export interface CodeEditEvent extends HistoryEventBase {
   eventType: 'edit';
-  operationType: 'type' | 'ime_input' | 'paste_insert' | 'paste_replace' | 'delete' | 'other_edit';
+  operationType: 'type' | 'ime_input' | 'paste_insert' | 'paste_replace' | 'delete' | 'undo_redo' | 'other_edit';
   change: SimplifiedContentChange;
   cursorPosition: { lineNumber: number; column: number };
 }

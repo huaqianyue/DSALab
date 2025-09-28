@@ -274,7 +274,7 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
       const minutes = date.getMinutes().toString().padStart(2, '0');
       const seconds = date.getSeconds().toString().padStart(2, '0');
       
-      const defaultFileName = `${this.exportStudentId}_${this.exportUserName}_${year}${month}${day}_${hours}${minutes}${seconds}`;
+      const defaultFileName = `${this.exportStudentId}_${this.exportUserName}_${year}${month}${day}_${hours}${minutes}${seconds}.zip`;
 
       const result = await this.dsalabService.exportProblems(this.selectedProblemIds, defaultFileName);
       

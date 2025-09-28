@@ -18,7 +18,6 @@
           📌 上次打开
         </span>
       </div>
-      <div class="problem-id">ID: {{ problem.id }}</div>
       <div class="problem-content" *ngIf="hasCode(problem) || hasAudio(problem)">
         <span *ngIf="hasCode(problem)">📄 代码</span>
         <span *ngIf="hasAudio(problem)">🎵 音频</span>

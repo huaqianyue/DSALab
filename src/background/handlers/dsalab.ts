@@ -19,7 +19,7 @@ import { ipcMain, app, dialog, BrowserWindow } from 'electron';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import * as https from 'https';
-// import * as archiver from 'archiver';
+import * as archiver from 'archiver';
 import { createWriteStream } from 'fs';
 
 // DSALab 相关类型定义
@@ -101,9 +101,13 @@ const historyBuffers = new Map<string, {
   batchBuffer: HistoryEvent[];
   runEventsBuffer: HistoryEvent[];
   batchTimer: NodeJS.Timeout | null;
+  lastEditEvent: HistoryEvent | null; // 用于字符合并
+  lastEditTime: number; // 最后编辑时间
 }>();
 
-const HISTORY_FLUSH_BATCH_INTERVAL_MS = 5000; // 5秒
+const HISTORY_FLUSH_BATCH_INTERVAL_MS = 20000; // 20秒
+const CHARACTER_MERGE_INTERVAL_MS = 2000; // 2秒内的连续字符操作合并
+const TYPE_MERGE_INTERVAL_MS = 10000; // 10秒内的type操作可以合并（只要没有其他操作打断）
 
 // 初始化DSALab路径
 DSALabPaths.init();
@@ -410,68 +414,89 @@ ipcMain.handle('dsalab-export-problems', async (event, problemIds: string[], def
     const mainWindow = BrowserWindow.getFocusedWindow();
     if (!mainWindow) throw new Error('No focused window');
 
-    // 暂时简化导出功能，选择一个目录来保存文件
-    const result = await dialog.showOpenDialog(mainWindow, {
-      properties: ['openDirectory'],
-      title: '选择导出目录'
+    // 显示保存对话框，让用户选择 ZIP 文件保存位置
+    const saveResult = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: defaultFileName.endsWith('.zip') ? defaultFileName : `${defaultFileName}.zip`,
+      filters: [
+        { name: 'ZIP Archives', extensions: ['zip'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      title: '导出为压缩包'
     });
 
-    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
-      return { success: false, message: 'Export cancelled' };
+    if (saveResult.canceled || !saveResult.filePath) {
+      return { success: false, message: 'Export cancelled by user.' };
     }
 
-    const exportDir = result.filePaths[0];
-    const exportPath = path.join(exportDir, defaultFileName.replace('.zip', ''));
+    // 创建 ZIP 压缩包
+    const output = createWriteStream(saveResult.filePath);
+    const archive = archiver('zip', {
+      zlib: { level: 9 } // 最高压缩级别
+    });
 
-    // 创建导出目录
-    await ensureDirectoryExists(exportPath);
+    // 设置错误处理
+    archive.on('warning', function(err) {
+      if (err.code === 'ENOENT') {
+        console.warn('Archiver warning (file not found):', err.path);
+      } else {
+        console.error('Archiver warning:', err);
+      }
+    });
 
-    // 复制问题文件
+    archive.on('error', function(err) {
+      throw err;
+    });
+
+    // 将压缩包流连接到输出文件
+    archive.pipe(output as any);
+
+    // 添加问题文件到压缩包
     const workspacesRoot = DSALabPaths.getUserWorkspacesRoot();
     for (const problemId of problemIds) {
-      const problemDir = path.join(workspacesRoot, problemId);
-      const targetDir = path.join(exportPath, problemId);
-      
+      const problemWorkspaceDir = path.join(workspacesRoot, problemId);
+      const codeFilePath = path.join(problemWorkspaceDir, 'code.cpp');
+      const audioFilePath = path.join(problemWorkspaceDir, 'audio.webm');
+      const historyFilePath = path.join(problemWorkspaceDir, 'history.json');
+
+      // 添加代码文件
       try {
-        await ensureDirectoryExists(targetDir);
-        
-        // 复制代码文件
-        const codeFile = path.join(problemDir, 'code.cpp');
-        const targetCodeFile = path.join(targetDir, 'code.cpp');
-        try {
-          await fs.copyFile(codeFile, targetCodeFile);
-        } catch (e) {
-          // 文件不存在，跳过
-        }
+        await fs.access(codeFilePath);
+        archive.file(codeFilePath, { name: `${problemId}/code.cpp` });
+        console.log(`Added code file for problem ${problemId}`);
+      } catch (e) {
+        console.log(`Code file not found for ${problemId}, skipping.`);
+      }
 
-        // 复制音频文件
-        const audioFile = path.join(problemDir, 'audio.webm');
-        const targetAudioFile = path.join(targetDir, 'audio.webm');
-        try {
-          await fs.copyFile(audioFile, targetAudioFile);
-        } catch (e) {
-          // 文件不存在，跳过
-        }
+      // 添加音频文件
+      try {
+        await fs.access(audioFilePath);
+        archive.file(audioFilePath, { name: `${problemId}/audio.webm` });
+        console.log(`Added audio file for problem ${problemId}`);
+      } catch (e) {
+        console.log(`Audio file not found for ${problemId}, skipping.`);
+      }
 
-        // 复制历史文件
-        const historyFile = path.join(problemDir, 'history.json');
-        const targetHistoryFile = path.join(targetDir, 'history.json');
-        try {
-          await fs.copyFile(historyFile, targetHistoryFile);
-        } catch (e) {
-          // 文件不存在，跳过
-        }
-      } catch (error) {
-        console.error(`Failed to export problem ${problemId}:`, error);
+      // 添加历史文件
+      try {
+        await fs.access(historyFilePath);
+        archive.file(historyFilePath, { name: `${problemId}/history.json` });
+        console.log(`Added history file for problem ${problemId}`);
+      } catch (e) {
+        console.log(`History file not found for ${problemId}, skipping.`);
       }
     }
 
-    return { success: true, filePath: exportPath };
-  } catch (error) {
-    console.error('Failed to export problems:', error);
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : String(error)
+    // 完成压缩包创建
+    await archive.finalize();
+    console.log(`Export completed: ${saveResult.filePath}`);
+
+    return { success: true, filePath: saveResult.filePath };
+
+  } catch (error: any) {
+    console.error('Failed to export problems to zip:', error);
+    return { 
+      success: false, 
+      message: error.message || 'Unknown error occurred during export' 
     };
   }
 });
@@ -549,7 +574,103 @@ ipcMain.handle('dsalab-save-problem-workspace', async (event, problemId: string,
 
 
 
-// 内部历史事件记录函数（与原始DSALab完全一致）
+// 检查两个编辑事件是否可以合并
+function canMergeEditEvents(lastEvent: any, currentEvent: any): boolean {
+  // 只合并相同操作类型的事件
+  if (lastEvent.operationType !== currentEvent.operationType) {
+    console.log(`🚫 不能合并: 操作类型不同 (${lastEvent.operationType} vs ${currentEvent.operationType})`);
+    return false;
+  }
+  
+  // 只合并 type 和 delete 操作，不合并undo_redo操作
+  if (lastEvent.operationType !== 'type' && lastEvent.operationType !== 'delete') {
+    console.log(`🚫 不能合并: 操作类型不支持合并 (${lastEvent.operationType})`);
+    return false;
+  }
+  
+  // undo_redo操作不应该被合并
+  if (lastEvent.operationType === 'undo_redo' || currentEvent.operationType === 'undo_redo') {
+    console.log(`🚫 不能合并: 包含undo_redo操作`);
+    return false;
+  }
+  
+  // 检查位置是否连续
+  const lastRange = lastEvent.change.range;
+  const currentRange = currentEvent.change.range;
+  
+  if (lastEvent.operationType === 'type') {
+    // 对于输入操作，当前位置应该紧接着上次的结束位置
+    const canMerge = (
+      currentRange.startLineNumber === lastRange.endLineNumber &&
+      currentRange.startColumn === lastRange.endColumn
+    );
+    if (!canMerge) {
+      console.log(`🚫 type操作不能合并: 位置不连续 (上次结束: ${lastRange.endLineNumber}:${lastRange.endColumn}, 当前开始: ${currentRange.startLineNumber}:${currentRange.startColumn})`);
+    } else {
+      console.log(`✅ type操作可以合并: 位置连续`);
+    }
+    return canMerge;
+  } else if (lastEvent.operationType === 'delete') {
+    // 对于删除操作，当前删除位置应该紧接着上次删除的起始位置（向前删除）
+    const canMerge = (
+      currentRange.startLineNumber === lastRange.startLineNumber &&
+      currentRange.endColumn === lastRange.startColumn
+    );
+    if (!canMerge) {
+      console.log(`🚫 delete操作不能合并: 位置不连续 (上次开始: ${lastRange.startLineNumber}:${lastRange.startColumn}, 当前结束: ${currentRange.startLineNumber}:${currentRange.endColumn})`);
+    } else {
+      console.log(`✅ delete操作可以合并: 位置连续`);
+    }
+    return canMerge;
+  }
+  
+  return false;
+}
+
+// 合并两个编辑事件
+function mergeEditEvents(lastEvent: any, currentEvent: any): any {
+  const mergedEvent = { ...lastEvent };
+  
+  if (lastEvent.operationType === 'type') {
+    // 合并输入的文本
+    const mergedText = lastEvent.change.text + currentEvent.change.text;
+    mergedEvent.change = {
+      ...lastEvent.change,
+      text: mergedText,
+      rangeLength: 0, // type操作的rangeLength应该是0
+      range: {
+        ...lastEvent.change.range,
+        endLineNumber: currentEvent.change.range.endLineNumber,
+        endColumn: currentEvent.change.range.endColumn
+      }
+    };
+    console.log(`🔗 type操作合并详情: "${lastEvent.change.text}" + "${currentEvent.change.text}" = "${mergedText}"`);
+  } else if (lastEvent.operationType === 'delete') {
+    // 合并删除的长度，删除范围从当前事件开始到上次事件结束
+    const mergedDeletedText = (currentEvent.change.deletedText || '') + (lastEvent.change.deletedText || '');
+    const totalRangeLength = lastEvent.change.rangeLength + currentEvent.change.rangeLength;
+    mergedEvent.change = {
+      ...lastEvent.change,
+      rangeLength: totalRangeLength,
+      deletedText: mergedDeletedText || undefined,
+      range: {
+        ...currentEvent.change.range,  // 使用当前事件的起始位置
+        endLineNumber: lastEvent.change.range.endLineNumber,
+        endColumn: lastEvent.change.range.endColumn
+      }
+    };
+    console.log(`🔗 delete操作合并详情: 删除"${currentEvent.change.deletedText || ''}" + "${lastEvent.change.deletedText || ''}" = "${mergedDeletedText}", 总长度: ${totalRangeLength}`);
+  }
+  
+  // 更新时间戳为最新时间
+  mergedEvent.timestamp = currentEvent.timestamp;
+  // 更新光标位置为最新位置
+  mergedEvent.cursorPosition = currentEvent.cursorPosition;
+  
+  return mergedEvent;
+}
+
+// 内部历史事件记录函数（增强版，支持字符合并）
 function recordHistoryEventInternal(historyEvent: HistoryEvent): void {
   const { problemId, eventType } = historyEvent;
 
@@ -558,13 +679,67 @@ function recordHistoryEventInternal(historyEvent: HistoryEvent): void {
       batchBuffer: [],
       runEventsBuffer: [],
       batchTimer: null,
+      lastEditEvent: null,
+      lastEditTime: 0,
     });
   }
   const buffers = historyBuffers.get(problemId)!;
 
   switch (eventType) {
     case 'edit':
-      buffers.batchBuffer.push(historyEvent);
+      // 处理字符合并逻辑
+      const currentTime = Date.now();
+      const editEvent = historyEvent as any;
+      
+      // 检查是否可以与上一个编辑事件合并
+      const timeDiff = currentTime - buffers.lastEditTime;
+      
+      // 为type操作使用更宽松的时间限制
+      const mergeTimeLimit = editEvent.operationType === 'type' ? TYPE_MERGE_INTERVAL_MS : CHARACTER_MERGE_INTERVAL_MS;
+      
+      const canMerge = buffers.lastEditEvent && 
+          buffers.lastEditTime > 0 &&
+          timeDiff <= mergeTimeLimit &&
+          canMergeEditEvents(buffers.lastEditEvent as any, editEvent);
+          
+      console.log(`📝 编辑事件分析: 类型=${editEvent.operationType}, 文本="${editEvent.change.text}", 时间差=${timeDiff}ms, 时间限制=${mergeTimeLimit}ms, 可合并=${canMerge}`);
+      
+      if (canMerge) {
+        
+        // 合并事件
+        const mergedEvent = mergeEditEvents(buffers.lastEditEvent as any, editEvent);
+        
+        // 替换缓冲区中的最后一个编辑事件
+        let lastIndex = -1;
+        for (let i = buffers.batchBuffer.length - 1; i >= 0; i--) {
+          const e = buffers.batchBuffer[i];
+          if (e.eventType === 'edit' && 
+              e.problemId === problemId &&
+              e === buffers.lastEditEvent) {
+            lastIndex = i;
+            break;
+          }
+        }
+        
+        if (lastIndex !== -1) {
+          buffers.batchBuffer[lastIndex] = mergedEvent;
+        } else {
+          buffers.batchBuffer.push(mergedEvent);
+        }
+        
+        // 合并日志在mergeEditEvents函数中已经输出，这里不重复
+        
+        buffers.lastEditEvent = mergedEvent;
+        buffers.lastEditTime = currentTime;
+      } else {
+        // 不能合并，添加新事件
+        buffers.batchBuffer.push(historyEvent);
+        buffers.lastEditEvent = historyEvent;
+        buffers.lastEditTime = currentTime;
+        
+        console.log(`📝 新编辑事件: ${editEvent.operationType} - "${editEvent.change.text}"`);
+      }
+      
       if (buffers.batchTimer) {
         clearTimeout(buffers.batchTimer);
       }
@@ -574,6 +749,9 @@ function recordHistoryEventInternal(historyEvent: HistoryEvent): void {
     case 'run_start':
       buffers.runEventsBuffer.length = 0;
       buffers.batchBuffer.push(historyEvent);
+      // 清除编辑缓存，因为运行开始是一个重要的分界点
+      buffers.lastEditEvent = null;
+      buffers.lastEditTime = 0;
       flushHistoryBuffer(problemId, 'batch');
       break;
 
@@ -590,6 +768,9 @@ function recordHistoryEventInternal(historyEvent: HistoryEvent): void {
       buffers.runEventsBuffer.push(historyEvent);
       buffers.batchBuffer.push(...buffers.runEventsBuffer);
       buffers.runEventsBuffer.length = 0;
+      // 程序运行结束也要清除编辑缓存
+      buffers.lastEditEvent = null;
+      buffers.lastEditTime = 0;
       flushHistoryBuffer(problemId, 'batch');
       break;
 
@@ -600,6 +781,9 @@ function recordHistoryEventInternal(historyEvent: HistoryEvent): void {
     case 'audio_record_stop':
     case 'audio_play':
       buffers.batchBuffer.push(historyEvent);
+      // 这些重要事件也要清除编辑缓存
+      buffers.lastEditEvent = null;
+      buffers.lastEditTime = 0;
       flushHistoryBuffer(problemId, 'batch');
       break;
 

@@ -66,6 +66,9 @@ export class EditorService {
   private editor: monaco.editor.IStandaloneCodeEditor;
   private editorText = new BehaviorSubject<string>("");
   editorText$ = this.editorText.asObservable();
+  private previousModelContent = ''; // 用于记录编辑前的内容
+  private lastUndoRedoTime = 0; // 记录最后一次撤销/重做的时间
+  private isUndoRedo = false; // 标记当前是否为撤销/重做操作
 
   private modelInfos: { [uri: string]: ModelInfo } = {};
   private breakpointInfos = new BehaviorSubject<EditorBreakpointInfo[]>([]);
@@ -133,6 +136,33 @@ export class EditorService {
     };
   }
 
+  // 添加键盘事件监听器来检测撤销/重做操作
+  private addKeyboardListeners() {
+    this.editor.onKeyDown((e) => {
+      // 检测Ctrl+Z (撤销) 或 Ctrl+Y/Ctrl+Shift+Z (重做)
+      if (e.ctrlKey && !e.altKey && !e.metaKey) {
+        if (e.keyCode === monaco.KeyCode.KEY_Z && !e.shiftKey) {
+          // Ctrl+Z - 撤销
+          console.log('🔄 检测到Ctrl+Z撤销操作');
+          this.isUndoRedo = true;
+          this.lastUndoRedoTime = Date.now();
+          setTimeout(() => {
+            this.isUndoRedo = false;
+          }, 200);
+        } else if (e.keyCode === monaco.KeyCode.KEY_Y || 
+                  (e.keyCode === monaco.KeyCode.KEY_Z && e.shiftKey)) {
+          // Ctrl+Y 或 Ctrl+Shift+Z - 重做
+          console.log('🔄 检测到重做操作');
+          this.isUndoRedo = true;
+          this.lastUndoRedoTime = Date.now();
+          setTimeout(() => {
+            this.isUndoRedo = false;
+          }, 200);
+        }
+      }
+    });
+  }
+
   // https://github.com/microsoft/monaco-editor/issues/2195#issuecomment-711471692
   private addMissingActions() {
     this.editor.addAction({
@@ -140,7 +170,14 @@ export class EditorService {
       label: 'Undo',
       run: () => {
         this.editor?.focus();
+        // 标记为撤销操作
+        this.isUndoRedo = true;
+        this.lastUndoRedoTime = Date.now();
         (this.editor.getModel() as any).undo();
+        // 短暂延迟后重置标志
+        setTimeout(() => {
+          this.isUndoRedo = false;
+        }, 100);
       },
     });
     this.editor.addAction({
@@ -148,7 +185,14 @@ export class EditorService {
       label: 'Redo',
       run: () => {
         this.editor?.focus();
+        // 标记为重做操作
+        this.isUndoRedo = true;
+        this.lastUndoRedoTime = Date.now();
         (this.editor.getModel() as any).redo();
+        // 短暂延迟后重置标志
+        setTimeout(() => {
+          this.isUndoRedo = false;
+        }, 100);
       },
     });
     this.editor.addAction({
@@ -250,6 +294,7 @@ export class EditorService {
     
     this.interceptOpenEditor();
     this.addMissingActions();
+    this.addKeyboardListeners();
     this.editor.onMouseDown(this.mouseDownListener);
     
     // 添加IME输入检测（复刻DSALab逻辑）
@@ -324,11 +369,19 @@ export class EditorService {
 
       // 处理每个内容变化
       for (const change of contentChangeEvent.changes) {
-        // 判断操作类型（完全复刻DSALab逻辑）
-        let operationType: 'type' | 'ime_input' | 'paste_insert' | 'paste_replace' | 'delete' | 'other_edit' = 'other_edit';
+        // 判断操作类型（增强版，支持撤销/重做检测）
+        let operationType: 'type' | 'ime_input' | 'paste_insert' | 'paste_replace' | 'delete' | 'undo_redo' | 'other_edit' = 'other_edit';
+        
+        // 检查是否为撤销/重做操作（优先级最高）
+        const currentTime = Date.now();
+        const isRecentUndoRedo = this.isUndoRedo || (currentTime - this.lastUndoRedoTime < 300);
         
         if (this.isComposing) {
           operationType = 'ime_input';
+        } else if (isRecentUndoRedo) {
+          // 撤销/重做操作使用专门的类型
+          operationType = 'undo_redo';
+          console.log(`🔄 撤销/重做操作被正确识别，文本长度: ${change.text.length}, 范围长度: ${change.rangeLength}`);
         } else if (change.text.length > 0 && change.rangeLength === 0) {
           // 插入操作：单字符为type，多字符为paste_insert
           operationType = change.text.length === 1 ? 'type' : 'paste_insert';
@@ -340,30 +393,81 @@ export class EditorService {
           operationType = 'paste_replace';
         }
 
-        console.log(`📝 Code edit detected: ${operationType} | text: "${change.text}" (${change.text.length} chars) | rangeLength: ${change.rangeLength}`);
+        // 获取被删除的文本（对于删除和替换操作）
+        let deletedText = '';
+        if ((operationType === 'delete' || operationType === 'paste_replace') && change.rangeLength > 0) {
+          try {
+            // 使用之前保存的内容和范围信息来计算被删除的文本
+            if (this.previousModelContent) {
+              const startOffset = change.rangeOffset;
+              const endOffset = change.rangeOffset + change.rangeLength;
+              if (startOffset >= 0 && endOffset <= this.previousModelContent.length) {
+                deletedText = this.previousModelContent.substring(startOffset, endOffset);
+                console.log(`🗑️ 捕获到被删除的文本: "${deletedText}"`);
+              } else {
+                deletedText = `[已删除${change.rangeLength}个字符]`;
+              }
+            } else {
+              deletedText = `[已删除${change.rangeLength}个字符]`;
+            }
+          } catch (error) {
+            console.warn('获取删除文本时出错:', error);
+            deletedText = `[已删除${change.rangeLength}个字符]`;
+          }
+        }
+
+        console.log(`📝 Code edit detected: ${operationType} | text: "${change.text}" (${change.text.length} chars) | rangeLength: ${change.rangeLength}${deletedText ? ` | deletedText: "${deletedText}"` : ''}`);
 
         // 构造简化的内容变化对象
+        // 修正Monaco编辑器的范围计算问题
+        let correctedRange = { ...change.range };
+        if (operationType === 'type' && change.text.length > 0) {
+          // 对于type操作，endColumn应该是startColumn + text.length
+          correctedRange.endColumn = correctedRange.startColumn + change.text.length;
+          console.log(`📐 范围修正: type操作 "${change.text}" 原始范围=${change.range.startColumn}-${change.range.endColumn}, 修正范围=${correctedRange.startColumn}-${correctedRange.endColumn}`);
+        }
+        
         const simplifiedChange: SimplifiedContentChange = {
           range: {
-            startLineNumber: change.range.startLineNumber,
-            startColumn: change.range.startColumn,
-            endLineNumber: change.range.endLineNumber,
-            endColumn: change.range.endColumn
+            startLineNumber: correctedRange.startLineNumber,
+            startColumn: correctedRange.startColumn,
+            endLineNumber: correctedRange.endLineNumber,
+            endColumn: correctedRange.endColumn
           },
           rangeLength: change.rangeLength,
           text: change.text,
-          rangeOffset: change.rangeOffset
+          rangeOffset: change.rangeOffset,
+          deletedText: deletedText || undefined
         };
 
         // 记录历史事件
+        // 对于type操作，光标位置应该是修正后range的结束位置
+        // 对于delete操作，光标位置应该是range的开始位置
+        let correctCursorPosition;
+        if (operationType === 'type' || operationType === 'paste_insert' || operationType === 'paste_replace') {
+          correctCursorPosition = {
+            lineNumber: correctedRange.endLineNumber,
+            column: correctedRange.endColumn
+          };
+        } else if (operationType === 'delete') {
+          correctCursorPosition = {
+            lineNumber: correctedRange.startLineNumber,
+            column: correctedRange.startColumn
+          };
+        } else {
+          correctCursorPosition = {
+            lineNumber: currentPosition.lineNumber,
+            column: currentPosition.column
+          };
+        }
+        
+        console.log(`📍 光标位置修正: 操作=${operationType}, 原始=${currentPosition.lineNumber}:${currentPosition.column}, 修正=${correctCursorPosition.lineNumber}:${correctCursorPosition.column}`);
+        
         dsalabService.getHistoryService().recordCodeEditEvent(
           problemId,
           operationType,
           simplifiedChange,
-          {
-            lineNumber: currentPosition.lineNumber,
-            column: currentPosition.column
-          }
+          correctCursorPosition
         );
       }
     } catch (error) {
@@ -398,14 +502,22 @@ export class EditorService {
       // DSALab标签页始终使用C++语言，其他文件根据扩展名判断
       const language = tab.key.startsWith('dsalab-') ? 'cpp' : (isCpp(tab.title) ? 'cpp' : 'text');
       newModel = monaco.editor.createModel(tab.code, language, uri);
+      // 初始化时保存当前内容
+      this.previousModelContent = newModel.getValue();
+      
       newModel.onDidChangeContent((e) => {
         tab.saved = false;
-        this.editorText.next(newModel.getValue());
         
-        // 记录DSALab问题的代码编辑历史
+        // 记录DSALab问题的代码编辑历史（使用之前保存的内容来获取删除文本）
         if (tab.key.startsWith('dsalab-')) {
           this.recordDSALabCodeEditHistory(tab, e);
         }
+        
+        // 更新内容状态
+        this.editorText.next(newModel.getValue());
+        
+        // 更新previousModelContent为当前内容（用于下次变化时获取删除的文本）
+        this.previousModelContent = newModel.getValue();
       });
       this.modelInfos[newUri] = {
         cursor: { column: 1, lineNumber: 1 },
@@ -428,6 +540,10 @@ export class EditorService {
       }
     }
     this.editor.setModel(newModel);
+    
+    // 切换模型时更新previousModelContent
+    this.previousModelContent = newModel ? newModel.getValue() : '';
+    
     console.log('switch to ', newUri, tab);
     if (replace) {
       oldModel.dispose();

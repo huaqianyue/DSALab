@@ -15,7 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Dev-C++ 7.  If not, see <http://www.gnu.org/licenses/>.
 
-import 'monaco-languageclient';
 
 export const cppLangConf: monaco.languages.LanguageConfiguration = {
   comments: {

@@ -116,6 +116,10 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy, AfterView
       this.isRecording = false;
       this.isPaused = false;
       this.recordingTime = 0;
+      // 重置时间相关变量
+      this.recordingStartTime = null;
+      this.pausedTime = 0;
+      this.lastResumeTime = null;
     } else {
       console.log('📌 Same problem, keeping recording state');
     }
@@ -186,7 +190,7 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy, AfterView
         this.isPaused = false;
         this.recordingStartTime = Date.now();
         this.pausedTime = 0;
-        this.lastResumeTime = Date.now();
+        this.lastResumeTime = null; // 只在暂停/恢复时使用
         
         // 开始录制时间跟踪
         this.startRecordingTimer();
@@ -218,11 +222,8 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy, AfterView
       this.mediaRecorder?.pause();
       this.isPaused = true;
       
-      // 计算本次暂停前的录制时间并累加到总暂停时间
-      if (this.lastResumeTime) {
-        this.pausedTime += Date.now() - this.lastResumeTime;
-        this.lastResumeTime = null;
-      }
+      // 记录暂停开始时间，用于后续计算暂停时长
+      this.lastResumeTime = Date.now();
       
       console.log('🎵 Recording paused');
       
@@ -234,9 +235,14 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy, AfterView
       // 继续录制
       this.mediaRecorder?.resume();
       this.isPaused = false;
-      this.lastResumeTime = Date.now();
       
-      console.log('🎵 Recording resumed');
+      // 计算本次暂停的时长并累加到总暂停时间
+      if (this.lastResumeTime) {
+        this.pausedTime += Date.now() - this.lastResumeTime;
+        this.lastResumeTime = null;
+      }
+      
+      console.log('🎵 Recording resumed, total paused time:', this.pausedTime, 'ms');
       
       this.dsalabService.recordAudioEvent(
         this.currentProblem!.id,
@@ -367,8 +373,12 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy, AfterView
     this.recordingTime = 0;
     
     this.recordingInterval = setInterval(() => {
-      if (this.isRecording && !this.isPaused) {
-        this.recordingTime += 0.1; // 每100ms增加0.1秒
+      if (this.isRecording && !this.isPaused && this.recordingStartTime) {
+        // 使用与历史记录相同的计算方式：基于实际时间差
+        const currentTime = Date.now();
+        const totalElapsed = currentTime - this.recordingStartTime;
+        const actualElapsed = totalElapsed - this.pausedTime;
+        this.recordingTime = Math.max(0, actualElapsed / 1000); // 转换为秒
         this.cdr.markForCheck();
       }
     }, 100); // 100ms更新一次，显示更精确

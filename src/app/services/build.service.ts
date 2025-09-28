@@ -170,11 +170,34 @@ export class BuildService {
     // 检查当前标签页是否为DSALab问题
     const activeTab = this.tabsService.getActive().value;
     if (activeTab && activeTab.key.startsWith('dsalab-')) {
-      // DSALab问题：直接使用路径，不调用saveOnNeed避免标题被改变
-      if (activeTab.path) {
-        this.sendBuildRequest(activeTab.path);
-      } else {
-        console.error('DSALab tab has no path');
+      // DSALab问题：需要先保存当前编辑器内容到文件，然后再编译
+      try {
+        // 同步编辑器内容到标签页
+        this.tabsService.syncActiveCode();
+        
+        // 更新DSALab服务中的代码内容
+        this.dsalabProblemService.updateCurrentProblemCode(activeTab.code);
+        
+        // 保存当前问题到文件
+        await this.dsalabProblemService.saveCurrentProblem();
+        
+        // 标记标签页为已保存
+        activeTab.saved = true;
+        
+        console.log('DSALab problem saved before compilation');
+        
+        // 现在编译
+        if (activeTab.path) {
+          this.sendBuildRequest(activeTab.path);
+        } else {
+          console.error('DSALab tab has no path');
+        }
+      } catch (error) {
+        console.error('Failed to save DSALab problem before compilation:', error);
+        // 即使保存失败，也尝试编译（使用旧的文件内容）
+        if (activeTab.path) {
+          this.sendBuildRequest(activeTab.path);
+        }
       }
     } else {
       // 普通文件：使用原有逻辑
@@ -188,21 +211,50 @@ export class BuildService {
     // 检查当前标签页是否为DSALab问题
     const activeTab = this.tabsService.getActive().value;
     if (activeTab && activeTab.key.startsWith('dsalab-')) {
-      // DSALab问题：记录程序运行开始历史
-      const problemId = activeTab.key.replace('dsalab-', '');
-      const workspaceData = this.dsalabProblemService.getCurrentProblemWorkspaceData();
-      if (workspaceData) {
+      // DSALab问题：需要先保存当前编辑器内容到文件，然后再运行
+      try {
+        // 同步编辑器内容到标签页
+        this.tabsService.syncActiveCode();
+        
+        // 更新DSALab服务中的代码内容
+        this.dsalabProblemService.updateCurrentProblemCode(activeTab.code);
+        
+        // 保存当前问题到文件
+        await this.dsalabProblemService.saveCurrentProblem();
+        
+        // 标记标签页为已保存
+        activeTab.saved = true;
+        
+        console.log('DSALab problem saved before running');
+        
+        // 记录程序运行开始历史（使用最新的代码内容）
+        const problemId = activeTab.key.replace('dsalab-', '');
         this.dsalabProblemService.getHistoryService().recordProgramRunStartEvent(
           problemId, 
-          workspaceData.content
+          activeTab.code
         );
-      }
-      
-      // 直接使用路径，不调用saveOnNeed避免标题被改变
-      if (activeTab.path) {
-        this.sendRunExeRequest(activeTab.path, forceCompile);
-      } else {
-        console.error('DSALab tab has no path');
+        
+        // 现在运行
+        if (activeTab.path) {
+          this.sendRunExeRequest(activeTab.path, forceCompile);
+        } else {
+          console.error('DSALab tab has no path');
+        }
+      } catch (error) {
+        console.error('Failed to save DSALab problem before running:', error);
+        // 即使保存失败，也尝试运行（使用旧的文件内容）
+        const problemId = activeTab.key.replace('dsalab-', '');
+        const workspaceData = this.dsalabProblemService.getCurrentProblemWorkspaceData();
+        if (workspaceData) {
+          this.dsalabProblemService.getHistoryService().recordProgramRunStartEvent(
+            problemId, 
+            workspaceData.content
+          );
+        }
+        
+        if (activeTab.path) {
+          this.sendRunExeRequest(activeTab.path, forceCompile);
+        }
       }
     } else {
       // 普通文件：使用原有逻辑

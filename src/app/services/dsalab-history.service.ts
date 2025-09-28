@@ -39,12 +39,12 @@ export class DSALabHistoryService {
    */
   recordCodeEditEvent(
     problemId: string,
-    operationType: 'type' | 'ime_input' | 'paste_insert' | 'paste_replace' | 'delete' | 'other_edit',
+    operationType: 'type' | 'ime_input' | 'paste_insert' | 'paste_replace' | 'delete' | 'undo_redo' | 'other_edit',
     change: SimplifiedContentChange,
     cursorPosition: { lineNumber: number; column: number }
   ): void {
     const event: HistoryEvent = {
-      timestamp: Date.now(),
+      timestamp: new Date().getTime(), // 使用真实时间戳
       problemId,
       eventType: 'edit',
       operationType,
@@ -62,7 +62,7 @@ export class DSALabHistoryService {
    */
   recordProgramRunStartEvent(problemId: string, codeSnapshot: string): void {
     const event: HistoryEvent = {
-      timestamp: Date.now(),
+      timestamp: new Date().getTime(),
       problemId,
       eventType: 'run_start',
       codeSnapshot
@@ -85,7 +85,7 @@ export class DSALabHistoryService {
     outputType: 'log' | 'error' | 'user-input' | 'info' | 'result'
   ): void {
     const event: HistoryEvent = {
-      timestamp: Date.now(),
+      timestamp: new Date().getTime(),
       problemId,
       eventType,
       data,
@@ -115,7 +115,7 @@ export class DSALabHistoryService {
     errorMessage?: string
   ): void {
     const event: HistoryEvent = {
-      timestamp: Date.now(),
+      timestamp: new Date().getTime(),
       problemId,
       eventType,
       success,
@@ -142,7 +142,7 @@ export class DSALabHistoryService {
     audioState?: 'present' | 'absent' | 'modified'
   ): void {
     const event: HistoryEvent = {
-      timestamp: Date.now(),
+      timestamp: new Date().getTime(),
       problemId,
       eventType,
       codeSnapshot,
@@ -166,7 +166,7 @@ export class DSALabHistoryService {
     audioSizeKB?: number
   ): void {
     const event: HistoryEvent = {
-      timestamp: Date.now(),
+      timestamp: new Date().getTime(),
       problemId,
       eventType,
       durationMs,
@@ -218,6 +218,25 @@ export class DSALabHistoryService {
   }
 
   /**
+   * 获取操作类型的中文描述
+   * @param operationType 操作类型
+   * @returns 中文描述
+   */
+  getOperationTypeDescription(operationType: string): string {
+    const descriptions: { [key: string]: string } = {
+      'type': '字符输入',
+      'ime_input': 'IME输入',
+      'paste_insert': '粘贴插入',
+      'paste_replace': '粘贴替换',
+      'delete': '删除',
+      'undo_redo': '撤销/重做',
+      'other_edit': '其他编辑'
+    };
+
+    return descriptions[operationType] || operationType;
+  }
+
+  /**
    * 格式化历史事件为可读字符串
    * @param event 历史事件
    * @returns 格式化字符串
@@ -227,7 +246,39 @@ export class DSALabHistoryService {
     const timeStr = date.toLocaleString('zh-CN');
     const typeDesc = this.getEventTypeDescription(event.eventType);
     
-    return `[${timeStr}] ${typeDesc} - 问题 ${event.problemId}`;
+    let details = '';
+    if (event.eventType === 'edit') {
+      const editEvent = event as any;
+      const opTypeDesc = this.getOperationTypeDescription(editEvent.operationType);
+      if (editEvent.operationType === 'delete' && editEvent.change.deletedText) {
+        details = ` (${opTypeDesc}: "${editEvent.change.deletedText}")`;
+      } else if (editEvent.operationType === 'type' && editEvent.change.text) {
+        details = ` (${opTypeDesc}: "${editEvent.change.text}")`;
+      } else if (editEvent.operationType === 'undo_redo') {
+        details = ` (${opTypeDesc})`;
+      } else if (editEvent.operationType && editEvent.operationType !== 'other_edit') {
+        details = ` (${opTypeDesc})`;
+      }
+    }
+    
+    return `[${timeStr}] ${typeDesc}${details} - 问题 ${event.problemId}`;
+  }
+
+  /**
+   * 格式化时间戳为可读时间
+   * @param timestamp 时间戳
+   * @returns 格式化的时间字符串
+   */
+  formatTimestamp(timestamp: number): string {
+    const date = new Date(timestamp);
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
   }
 
   /**
