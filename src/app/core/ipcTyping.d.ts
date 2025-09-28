@@ -67,14 +67,14 @@ type FileOpenResult = {
   error: any;
 };
 
-interface DirectorySelectOptions {
+interface FileOpenDirectoryDialogOptions {
   title?: string;
   defaultPath?: string;
 }
-type DirectorySelectResult = {
+type FileOpenDirectoryDialogResult = {
   success: true;
   canceled: boolean;
-  filePaths?: string[];
+  filePaths: string[];
 } | {
   success: false;
   error: any;
@@ -200,7 +200,7 @@ export type IpcCommands = {
   'file/save': (options: FileSaveOptions) => FileSaveResult;
   'file/saveAs': (options: FileSaveAsOptions) => FileSaveAsResult;
   'file/open': (options: FileOpenOptions) => FileOpenResult;
-  'file/openDirectoryDialog': (options: DirectorySelectOptions) => DirectorySelectResult;
+  'file/openDirectoryDialog': (options: FileOpenDirectoryDialogOptions) => FileOpenDirectoryDialogResult;
 
   'build/build': (options: BuildOptions) => void;
   'build/runExe': (options: RunExeOptions) => void;

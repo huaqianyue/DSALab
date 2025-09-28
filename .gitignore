@@ -134,10 +134,3 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
-
-# MinGW compiler (too large for git, users should install separately)
-src/extraResources/mingw64/*
-!src/extraResources/mingw64/README.txt
-
-# Build output
-release/

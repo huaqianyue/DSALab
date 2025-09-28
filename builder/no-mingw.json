@@ -17,7 +17,7 @@
   "files": [
     "dist/**/*"
   ],
-  "artifactName": "${productName} ${version} no-mingw.${ext}",
+  "artifactName": "${productName}-${version}-no-mingw.${ext}",
   "nsis": {
     "oneClick": false,
     "perMachine": true,

@@ -42,28 +42,3 @@ nz-button-group {
   }
 }
 
-// 深色主题适配
-[data-theme="dark"] {
-  .compact-button {
-    background: #1f1f1f !important;
-    border-color: #434343 !important;
-    color: #f0f0f0 !important;
-    
-    &:hover {
-      background: #262626 !important;
-      border-color: #40a9ff !important;
-    }
-    
-    &:active {
-      background: #262626 !important;
-      border-color: #096dd9 !important;
-    }
-    
-    &:disabled {
-      background: #1a1a1a !important;
-      border-color: #434343 !important;
-      color: rgba(255, 255, 255, 0.25) !important;
-    }
-  }
-}
-

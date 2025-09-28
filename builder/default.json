@@ -16,7 +16,6 @@
   "files": [
     "dist/**/*"
   ],
-  "artifactName": "${productName} ${version} Setup.${ext}",
   "nsis": {
     "oneClick": false,
     "perMachine": true,
