@@ -83,6 +83,11 @@ export class MainViewComponent implements OnInit {
       title: '调试',
       url: 'debug',
       disabled: false
+    },
+    {
+      title: '测试',
+      url: 'test-results',
+      disabled: false
     }
   ];
 

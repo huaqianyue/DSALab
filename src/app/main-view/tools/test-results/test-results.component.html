@@ -10,7 +10,13 @@
   </div>
 
   <div *ngIf="!testResult" class="no-result">
-    <nz-empty nzNotFoundContent="暂无测试结果"></nz-empty>
+    <nz-empty 
+      [nzNotFoundContent]="currentProblemId ? '当前题目暂无测试结果' : '请先选择一个题目'"
+      [nzNotFoundImage]="currentProblemId ? 'simple' : 'default'">
+    </nz-empty>
+    <div *ngIf="currentProblemId" class="no-result-tip">
+      <p>点击"测试"按钮运行测试，结果将显示在这里</p>
+    </div>
   </div>
 
   <div *ngIf="testResult && !testResult.success" class="error-result">

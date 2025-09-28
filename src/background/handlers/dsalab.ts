@@ -35,6 +35,7 @@ interface Problem {
   studentDebugTemplate?: string;
   judgeTemplate?: string;
   testStatus?: 'passed' | 'failed' | 'not_tested';
+  testScore?: number; // 测试分数 (0-100)
 }
 
 interface DSALabSettings {
@@ -95,6 +96,11 @@ class DSALabPaths {
   static getProblemHistoryPath(problemId: string): string {
     return path.join(this.getProblemWorkspaceDir(problemId), 'history.json');
   }
+
+  // 获取问题测试结果文件路径
+  static getProblemTestResultPath(problemId: string): string {
+    return path.join(this.getProblemWorkspaceDir(problemId), 'test-result.json');
+  }
 }
 
 // CDN 问题列表 URL（与原始DSALab一致）
@@ -137,6 +143,7 @@ interface RawProblem {
   studentDebugTemplate?: string;
   judgeTemplate?: string;
   testStatus?: string;
+  testScore?: number | string; // 兼容字符串格式
 }
 
 // 转换原始问题数据为标准格式
@@ -159,6 +166,7 @@ function convertToProblem(raw: RawProblem): Problem | null {
       studentDebugTemplate: raw.studentDebugTemplate || '',
       judgeTemplate: raw.judgeTemplate || '',
       testStatus: (raw.testStatus as 'passed' | 'failed' | 'not_tested') || 'not_tested',
+      testScore: typeof raw.testScore === 'number' ? raw.testScore : (typeof raw.testScore === 'string' ? parseInt(raw.testScore, 10) : undefined),
     };
   }
   return null;
@@ -1062,17 +1070,47 @@ function parseTestResult(output: string): {
 }
 
 // 更新问题测试状态
-async function updateProblemTestStatus(problemId: string, status: 'passed' | 'failed' | 'not_tested'): Promise<void> {
+async function updateProblemTestStatus(problemId: string, status: 'passed' | 'failed' | 'not_tested', score?: number): Promise<void> {
   try {
     const problems = await loadPureLocalProblems();
     const problemIndex = problems.findIndex(p => p.id === problemId);
     
     if (problemIndex !== -1) {
       problems[problemIndex].testStatus = status;
+      if (score !== undefined) {
+        problems[problemIndex].testScore = score;
+      }
       await saveProblemsToFile(problems);
     }
   } catch (error: any) {
     console.error(`更新测试状态失败:`, error);
+  }
+}
+
+// 保存测试结果到文件
+async function saveTestResultToFile(problemId: string, testResult: any): Promise<void> {
+  try {
+    const testResultPath = DSALabPaths.getProblemTestResultPath(problemId);
+    const testResultDir = path.dirname(testResultPath);
+    await ensureDirectoryExists(testResultDir);
+    await fs.writeFile(testResultPath, JSON.stringify(testResult, null, 2), 'utf-8');
+    console.log(`测试结果已保存到: ${testResultPath}`);
+  } catch (error: any) {
+    console.error(`保存测试结果失败:`, error);
+  }
+}
+
+// 读取测试结果文件
+async function loadTestResultFromFile(problemId: string): Promise<any | null> {
+  try {
+    const testResultPath = DSALabPaths.getProblemTestResultPath(problemId);
+    const content = await fs.readFile(testResultPath, 'utf-8');
+    return JSON.parse(content);
+  } catch (error: any) {
+    if (error.code !== 'ENOENT') {
+      console.error(`读取测试结果失败:`, error);
+    }
+    return null;
   }
 }
 
@@ -1121,7 +1159,7 @@ ipcMain.handle('dsalab-run-test', async (event, problemId: string) => {
     const runResult = await compileAndRunJudge(problemId, fullJudgeCode);
     
     if (!runResult.success) {
-      await updateProblemTestStatus(problemId, 'failed');
+      await updateProblemTestStatus(problemId, 'failed', 0);
       return { 
         success: false, 
         error: runResult.error 
@@ -1131,10 +1169,22 @@ ipcMain.handle('dsalab-run-test', async (event, problemId: string) => {
     // 6. 解析测试结果
     const testResult = parseTestResult(runResult.output);
     
-    // 7. 更新测试状态
-    await updateProblemTestStatus(problemId, testResult.passed ? 'passed' : 'failed');
+    // 7. 更新测试状态和分数
+    await updateProblemTestStatus(problemId, testResult.passed ? 'passed' : 'failed', testResult.score);
     
-    // 8. 记录历史事件
+    // 8. 保存测试结果到文件
+    await saveTestResultToFile(problemId, {
+      success: true,
+      passed: testResult.passed,
+      score: testResult.score,
+      passedTests: testResult.passedTests,
+      totalTests: testResult.totalTests,
+      details: testResult.details,
+      output: runResult.output,
+      timestamp: Date.now()
+    });
+    
+    // 9. 记录历史事件
     recordHistoryEventInternal({
       timestamp: Date.now(),
       problemId,
@@ -1161,6 +1211,17 @@ ipcMain.handle('dsalab-run-test', async (event, problemId: string) => {
       success: false, 
       error: error.message 
     };
+  }
+});
+
+// 读取测试结果的IPC处理器
+ipcMain.handle('dsalab-read-test-result', async (event, problemId: string) => {
+  try {
+    const testResult = await loadTestResultFromFile(problemId);
+    return testResult;
+  } catch (error: any) {
+    console.error(`读取测试结果失败:`, error);
+    return null;
   }
 });
 

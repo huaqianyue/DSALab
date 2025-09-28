@@ -132,6 +132,12 @@
                       <nz-tag nzColor="green" *ngIf="problem.Audio !== ''">
                         <i nz-icon nzType="sound"></i> 音频
                       </nz-tag>
+                      <nz-tag [nzColor]="getTestScoreTagColor(problem)" *ngIf="hasTestScore(problem)">
+                        <i nz-icon nzType="experiment"></i> {{ getTestScoreText(problem) }}
+                      </nz-tag>
+                      <nz-tag [nzColor]="getTestStatusTagColor(problem)" *ngIf="hasTestStatus(problem)">
+                        {{ getTestStatusText(problem) }}
+                      </nz-tag>
                       <nz-tag nzColor="orange" *ngIf="!hasProblemContent(problem) && (problem.Code !== '' || problem.Audio !== '')">
                         <i nz-icon nzType="warning"></i> 缺少{{ problem.Code === '' ? '代码' : '音频' }}
                       </nz-tag>

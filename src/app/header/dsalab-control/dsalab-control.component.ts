@@ -395,4 +395,58 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
       console.error('Failed to save DSALab problem:', error);
     }
   }
+
+  // 检查问题是否有测试状态
+  hasTestStatus(problem: Problem): boolean {
+    return !!(problem as any).testStatus && (problem as any).testStatus !== 'not_tested';
+  }
+
+  // 检查问题是否有测试分数
+  hasTestScore(problem: Problem): boolean {
+    return typeof (problem as any).testScore === 'number';
+  }
+
+  // 获取测试状态文本
+  getTestStatusText(problem: Problem): string {
+    const testStatus = (problem as any).testStatus;
+    switch (testStatus) {
+      case 'passed':
+        return '✅ 通过';
+      case 'failed':
+        return '❌ 失败';
+      default:
+        return '';
+    }
+  }
+
+  // 获取测试分数文本
+  getTestScoreText(problem: Problem): string {
+    const testScore = (problem as any).testScore;
+    if (typeof testScore === 'number') {
+      return `${testScore}分`;
+    }
+    return '';
+  }
+
+  // 获取测试状态标签颜色
+  getTestStatusTagColor(problem: Problem): string {
+    const testStatus = (problem as any).testStatus;
+    switch (testStatus) {
+      case 'passed': return 'success';
+      case 'failed': return 'error';
+      default: return 'default';
+    }
+  }
+
+  // 获取测试分数标签颜色
+  getTestScoreTagColor(problem: Problem): string {
+    const testScore = (problem as any).testScore;
+    if (typeof testScore === 'number') {
+      if (testScore >= 90) return 'success';
+      if (testScore >= 70) return 'warning';
+      if (testScore >= 60) return 'processing';
+      return 'error';
+    }
+    return 'default';
+  }
 }

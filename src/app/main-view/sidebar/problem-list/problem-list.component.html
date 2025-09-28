@@ -18,12 +18,19 @@
           📌 上次打开
         </span>
       </div>
-      <div class="problem-content" *ngIf="hasCode(problem) || hasAudio(problem) || hasTestStatus(problem)">
-        <span *ngIf="hasCode(problem)">📄 代码</span>
-        <span *ngIf="hasAudio(problem)">🎵 音频</span>
-        <span *ngIf="hasTestStatus(problem)" class="test-status" [ngClass]="getTestStatusClass(problem)">
+      <div class="problem-content" *ngIf="hasCode(problem) || hasAudio(problem) || hasTestStatus(problem) || hasTestScore(problem)">
+        <nz-tag nzColor="blue" *ngIf="hasCode(problem)">
+          <i nz-icon nzType="code"></i> 代码
+        </nz-tag>
+        <nz-tag nzColor="green" *ngIf="hasAudio(problem)">
+          <i nz-icon nzType="sound"></i> 音频
+        </nz-tag>
+        <nz-tag [nzColor]="getTestScoreTagColor(problem)" *ngIf="hasTestScore(problem)">
+          <i nz-icon nzType="experiment"></i> {{ getTestScoreText(problem) }}
+        </nz-tag>
+        <nz-tag [nzColor]="getTestStatusTagColor(problem)" *ngIf="hasTestStatus(problem)">
           {{ getTestStatusText(problem) }}
-        </span>
+        </nz-tag>
       </div>
     </div>
   </div>

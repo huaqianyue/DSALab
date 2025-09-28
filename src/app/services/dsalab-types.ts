@@ -82,6 +82,11 @@ export interface Problem {
   isDelete: boolean;
   Audio: string;
   Code: string;
+  // 新增测试相关字段
+  studentDebugTemplate?: string;
+  judgeTemplate?: string;
+  testStatus?: 'passed' | 'failed' | 'not_tested';
+  testScore?: number; // 测试分数 (0-100)
 }
 
 // 定义每个问题的工作区数据结构

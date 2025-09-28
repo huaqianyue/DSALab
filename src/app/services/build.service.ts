@@ -230,28 +230,28 @@ export class BuildService {
         const problemId = activeTab.key.replace('dsalab-', '');
         const result = await this.electronService.ipcRenderer.invoke('dsalab-run-test' as any, problemId) as any;
         
+        // 显示测试结果面板
+        this.router.navigate([{
+          outlets: {
+            tools: 'test-results'
+          }
+        }]);
+        
+        // 更新全局测试结果（用于新运行的测试）
+        (window as any).lastTestResult = result;
+        
+        // 触发自定义事件通知测试结果组件更新
+        window.dispatchEvent(new CustomEvent('testResultUpdated', { 
+          detail: { 
+            problemId: problemId, 
+            result: result 
+          } 
+        }));
+        
         if (result.success) {
-          // 显示测试结果
-          this.router.navigate([{
-            outlets: {
-              tools: 'test-results'
-            }
-          }]);
-          
-          // 通过服务传递测试结果
-          (window as any).lastTestResult = result;
-          
           this.message.success(`测试完成: ${result.passedTests}/${result.totalTests} 通过`);
         } else {
           this.message.error(`测试失败: ${result.error}`);
-          
-          // 也显示测试面板，显示错误信息
-          this.router.navigate([{
-            outlets: {
-              tools: 'test-results'
-            }
-          }]);
-          (window as any).lastTestResult = result;
         }
         
       } catch (error) {
