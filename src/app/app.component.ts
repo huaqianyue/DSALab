@@ -81,21 +81,6 @@ export class AppComponent implements OnInit, OnDestroy {
       this.setEnvModal = true;
     }
 
-    // 监听应用关闭事件
-    if (this.electronService.isElectron) {
-      this.electronService.ipcRenderer.on('app-before-quit', async () => {
-        console.log('Renderer: Received app-before-quit, saving last opened problem ID...');
-        try {
-          await this.dsalabProblemService.saveLastOpenedProblemId();
-          console.log('Renderer: Last opened problem ID saved successfully');
-        } catch (error) {
-          console.error('Renderer: Failed to save last opened problem ID:', error);
-        } finally {
-          // 发送确认消息给主进程
-          this.electronService.ipcRenderer.send('app-quit-acknowledged');
-        }
-      });
-    }
   }
 
   setEnvModal = false;
@@ -109,10 +94,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    // 移除事件监听器
-    if (this.electronService.isElectron) {
-      this.electronService.ipcRenderer.removeAllListeners('app-before-quit');
-    }
+    // 组件销毁时的清理工作
   }
 
 }

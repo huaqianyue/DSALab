@@ -163,13 +163,12 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy, AfterView
           const actualDuration = totalDuration - this.pausedTime;
           
           // 记录历史事件
-          this.dsalabService.recordHistoryEvent({
-            timestamp: Date.now(),
-            problemId: this.currentProblem!.id,
-            eventType: 'audio_record_stop',
-            durationMs: actualDuration,
-            audioSizeKB: Math.round(audioBlob.size / 1024),
-          });
+          this.dsalabService.recordAudioEvent(
+            this.currentProblem!.id,
+            'audio_record_stop',
+            actualDuration,
+            Math.round(audioBlob.size / 1024)
+          );
           
           this.recordingStartTime = null;
           this.pausedTime = 0;
@@ -195,11 +194,10 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy, AfterView
         console.log('🎵 Recording started');
         
         // 记录开始录音事件
-        this.dsalabService.recordHistoryEvent({
-          timestamp: Date.now(),
-          problemId: this.currentProblem!.id,
-          eventType: 'audio_record_start',
-        });
+        this.dsalabService.recordAudioEvent(
+          this.currentProblem!.id,
+          'audio_record_start'
+        );
 
         this.cdr.detectChanges();
       } catch (err) {
@@ -228,11 +226,10 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy, AfterView
       
       console.log('🎵 Recording paused');
       
-      this.dsalabService.recordHistoryEvent({
-        timestamp: Date.now(),
-        problemId: this.currentProblem!.id,
-        eventType: 'audio_record_pause',
-      });
+      this.dsalabService.recordAudioEvent(
+        this.currentProblem!.id,
+        'audio_record_pause'
+      );
     } else {
       // 继续录制
       this.mediaRecorder?.resume();
@@ -241,11 +238,10 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy, AfterView
       
       console.log('🎵 Recording resumed');
       
-      this.dsalabService.recordHistoryEvent({
-        timestamp: Date.now(),
-        problemId: this.currentProblem!.id,
-        eventType: 'audio_record_resume',
-      });
+      this.dsalabService.recordAudioEvent(
+        this.currentProblem!.id,
+        'audio_record_resume'
+      );
     }
 
     this.cdr.detectChanges();
@@ -437,6 +433,15 @@ export class ProblemDescriptionComponent implements OnInit, OnDestroy, AfterView
   onAudioPlayStateChange(isPlaying: boolean): void {
     this.audioIsPlaying = isPlaying;
     console.log('🎵 Howler.js - Play state changed:', isPlaying);
+    
+    // 记录音频播放历史（只在开始播放时记录）
+    if (isPlaying && this.currentProblem) {
+      this.dsalabService.recordAudioEvent(
+        this.currentProblem.id,
+        'audio_play',
+        Math.round(this.audioDuration * 1000)
+      );
+    }
   }
 
 }

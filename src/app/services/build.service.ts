@@ -25,6 +25,7 @@ import { FileService } from './file.service';
 import { ProblemsService } from './problems.service';
 import { TabsService } from './tabs.service';
 import { BehaviorSubject } from 'rxjs';
+import { DSALabProblemService } from './dsalab-problem.service';
 
 @Injectable({
   providedIn: 'root'
@@ -43,7 +44,8 @@ export class BuildService {
     private message: NzMessageService,
     private fileService: FileService,
     private problemsService: ProblemsService,
-    private tabsService: TabsService
+    private tabsService: TabsService,
+    private dsalabProblemService: DSALabProblemService
   ) {
     this.electronService.ipcRenderer.on("ng:build/buildStarted", (_) => {
       this.isBuilding$.next(true);
@@ -61,6 +63,22 @@ export class BuildService {
           this.message.warning("编译成功，但存在警告");
         }
       } else {
+        // 记录DSALab问题的编译错误历史
+        const activeTab = this.tabsService.getActive().value;
+        if (activeTab && activeTab.key.startsWith('dsalab-')) {
+          const problemId = activeTab.key.replace('dsalab-', '');
+          const errorMessage = result.diagnostics.map(d => d.message).join('\n');
+          this.dsalabProblemService.getHistoryService().recordProgramRunEndEvent(
+            problemId,
+            'compile_error',
+            false,
+            null,
+            null,
+            undefined,
+            errorMessage
+          );
+        }
+        
         switch (result.stage) {
           case "compile":
             this.showProblems(result.diagnostics);
@@ -76,6 +94,39 @@ export class BuildService {
             this.message.error("未知错误");
             break;
         }
+      }
+    });
+
+    // 监听程序运行结束事件（用于DSALab历史记录）
+    this.electronService.ipcRenderer.on('ng:program/exit', (_, data) => {
+      const activeTab = this.tabsService.getActive().value;
+      if (activeTab && activeTab.key.startsWith('dsalab-') && activeTab.path === data.path) {
+        const problemId = activeTab.key.replace('dsalab-', '');
+        this.dsalabProblemService.getHistoryService().recordProgramRunEndEvent(
+          problemId,
+          'run_end',
+          data.exitCode === 0,
+          data.exitCode,
+          data.signal,
+          data.durationMs
+        );
+      }
+    });
+
+    // 监听程序运行错误事件（用于DSALab历史记录）
+    this.electronService.ipcRenderer.on('ng:program/error', (_, data) => {
+      const activeTab = this.tabsService.getActive().value;
+      if (activeTab && activeTab.key.startsWith('dsalab-') && activeTab.path === data.path) {
+        const problemId = activeTab.key.replace('dsalab-', '');
+        this.dsalabProblemService.getHistoryService().recordProgramRunEndEvent(
+          problemId,
+          'run_end',
+          false,
+          null,
+          null,
+          data.durationMs,
+          data.error
+        );
       }
     });
   }
@@ -137,7 +188,17 @@ export class BuildService {
     // 检查当前标签页是否为DSALab问题
     const activeTab = this.tabsService.getActive().value;
     if (activeTab && activeTab.key.startsWith('dsalab-')) {
-      // DSALab问题：直接使用路径，不调用saveOnNeed避免标题被改变
+      // DSALab问题：记录程序运行开始历史
+      const problemId = activeTab.key.replace('dsalab-', '');
+      const workspaceData = this.dsalabProblemService.getCurrentProblemWorkspaceData();
+      if (workspaceData) {
+        this.dsalabProblemService.getHistoryService().recordProgramRunStartEvent(
+          problemId, 
+          workspaceData.content
+        );
+      }
+      
+      // 直接使用路径，不调用saveOnNeed避免标题被改变
       if (activeTab.path) {
         this.sendRunExeRequest(activeTab.path, forceCompile);
       } else {

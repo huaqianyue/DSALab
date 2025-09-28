@@ -131,6 +131,10 @@ export class DSALabProblemService {
 
       console.log(`🔄 Switching from ${currentProblem?.id || 'none'} to ${problemId}`);
 
+      // 立即保存最后打开的题目ID（学习DSALab的策略）
+      await this.settingsService.updateLastOpenedProblemId(problemId);
+      console.log(`💾 Saved last opened problem ID: ${problemId}`);
+
       // 如果正在调试，先停止调试
       if (this.debugService.isDebugging$.value) {
         console.log('🛑 Stopping debug session before switching problems');
@@ -325,14 +329,6 @@ export class DSALabProblemService {
     return currentProblem ? currentProblem.id : null;
   }
 
-  // 保存最后打开的题目ID（仅在应用关闭时调用）
-  async saveLastOpenedProblemId(): Promise<void> {
-    const currentProblemId = this.getCurrentProblemId();
-    if (currentProblemId) {
-      await this.settingsService.updateLastOpenedProblemId(currentProblemId);
-      console.log(`Saved last opened problem ID: ${currentProblemId}`);
-    }
-  }
 
   // 更新当前问题的代码内容
   updateCurrentProblemCode(code: string): void {

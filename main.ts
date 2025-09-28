@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Dev-C++ 7.  If not, see <http://www.gnu.org/licenses/>.
 
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain } from 'electron';
 import * as path from 'path';
 import * as url from 'url';
 
@@ -80,6 +80,7 @@ try {
       createWindow();
     }
   });
+
 
 } catch (e) {
   // Catch Error

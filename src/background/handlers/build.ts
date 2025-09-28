@@ -175,6 +175,8 @@ typedIpcMain.handle('build/runExe', async (_, arg) => {
     if (!result.success) return;
   }
   const cpPath = path.join(extraResourcesPath, 'bin/ConsolePauser.exe');
+  const startTime = Date.now();
+  
   // https://github.com/nodejs/node/issues/7367#issuecomment-229721296
   const result = spawn(JSON.stringify(cpPath), [
     getExecutablePath(arg.path)
@@ -184,6 +186,23 @@ typedIpcMain.handle('build/runExe', async (_, arg) => {
     cwd: path.dirname(arg.path)
   });
   console.log(result.pid);
-  result.on('error', console.error);
-  result.on('exit', () => console.log('exit'));
+  result.on('error', (error) => {
+    console.error('Program execution error:', error);
+    // 通知前端程序运行错误（用于DSALab历史记录）
+    getWebContents().send('ng:program/error', {
+      path: arg.path,
+      error: error.message,
+      durationMs: Date.now() - startTime
+    });
+  });
+  result.on('exit', (code: number | null, signal: NodeJS.Signals | null) => {
+    console.log('Program exited with code:', code, 'signal:', signal);
+    // 通知前端程序运行结束（用于DSALab历史记录）
+    getWebContents().send('ng:program/exit', {
+      path: arg.path,
+      exitCode: code,
+      signal: signal,
+      durationMs: Date.now() - startTime
+    });
+  });
 });

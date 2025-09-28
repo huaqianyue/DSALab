@@ -224,8 +224,7 @@ export type IpcEvents = {
   'ng:debug/notify': (response: GdbResponse) => void;
   'ng:debug/result': (response: GdbResponse) => void;
 
-  // App lifecycle events
-  'app-before-quit': () => void;
-  'app-quit-acknowledged': () => void;
+  'ng:program/error': (data: { path: string; error: string; durationMs: number }) => void;
+  'ng:program/exit': (data: { path: string; exitCode: number | null; signal: NodeJS.Signals | null; durationMs: number }) => void;
 
 };

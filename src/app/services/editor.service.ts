@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Dev-C++ 7.  If not, see <http://www.gnu.org/licenses/>.
 
-import { Injectable } from '@angular/core';
+import { Injectable, Injector, inject } from '@angular/core';
 import { MonacoEditorLoaderService } from '@materia-ui/ngx-monaco-editor';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, filter, take } from 'rxjs/operators';
@@ -23,6 +23,7 @@ import { debounceTime, distinctUntilChanged, filter, take } from 'rxjs/operators
 import { Tab } from './tabs.service';
 import { ElectronService } from '../core/services';
 import { cppLang, cppLangConf } from '../configs/cppLanguageConfig';
+import { SimplifiedContentChange } from './dsalab-types';
 
 // All standard C++ headers filename
 const stdCppHeaders = [
@@ -73,7 +74,14 @@ export class EditorService {
   private traceDecoration: string[];
   private lastTraceUri: monaco.Uri = null;
 
-  constructor(private monacoEditorLoaderService: MonacoEditorLoaderService, private electronService: ElectronService) {
+  private dsalabProblemService: any; // 延迟加载以避免循环依赖
+  private isComposing = false; // 用于识别IME输入
+
+  constructor(
+    private monacoEditorLoaderService: MonacoEditorLoaderService, 
+    private electronService: ElectronService,
+    private injector: Injector
+  ) {
     this.editorText.pipe(
       debounceTime(300),
       distinctUntilChanged()
@@ -243,6 +251,13 @@ export class EditorService {
     this.interceptOpenEditor();
     this.addMissingActions();
     this.editor.onMouseDown(this.mouseDownListener);
+    
+    // 添加IME输入检测（复刻DSALab逻辑）
+    const editorDom = this.editor.getDomNode();
+    if (editorDom) {
+      editorDom.addEventListener('compositionstart', () => { this.isComposing = true; });
+      editorDom.addEventListener('compositionend', () => { this.isComposing = false; });
+    }
     this.editor.onDidChangeModel((e) => {
       if (e.newModelUrl) {
         const model = monaco.editor.getModel(e.newModelUrl);
@@ -265,6 +280,95 @@ export class EditorService {
     this.editorText.next("");
     this.editor = null;
     this.isInit = false;
+  }
+
+  /**
+   * 获取DSALab问题服务（延迟加载）
+   */
+  private getDSALabProblemService() {
+    if (!this.dsalabProblemService) {
+      try {
+        // 尝试从全局注入器获取服务
+        const DSALabProblemService = require('./dsalab-problem.service').DSALabProblemService;
+        this.dsalabProblemService = this.injector.get(DSALabProblemService, null);
+      } catch (error) {
+        // 如果获取失败，暂时跳过历史记录
+        console.warn('DSALabProblemService not available for history recording:', error);
+        return null;
+      }
+    }
+    return this.dsalabProblemService;
+  }
+
+  /**
+   * 记录DSALab问题的代码编辑历史
+   */
+  private recordDSALabCodeEditHistory(tab: Tab, contentChangeEvent: monaco.editor.IModelContentChangedEvent): void {
+    try {
+      const problemId = tab.key.replace('dsalab-', '');
+      console.log('🔍 Attempting to record code edit history for problem:', problemId);
+      
+      const currentPosition = this.editor?.getPosition();
+      if (!currentPosition) {
+        console.log('❌ No current position available');
+        return;
+      }
+
+      const dsalabService = this.getDSALabProblemService();
+      if (!dsalabService) {
+        console.log('❌ DSALabProblemService not available');
+        return;
+      }
+      
+      console.log('✅ DSALabProblemService loaded successfully');
+
+      // 处理每个内容变化
+      for (const change of contentChangeEvent.changes) {
+        // 判断操作类型（完全复刻DSALab逻辑）
+        let operationType: 'type' | 'ime_input' | 'paste_insert' | 'paste_replace' | 'delete' | 'other_edit' = 'other_edit';
+        
+        if (this.isComposing) {
+          operationType = 'ime_input';
+        } else if (change.text.length > 0 && change.rangeLength === 0) {
+          // 插入操作：单字符为type，多字符为paste_insert
+          operationType = change.text.length === 1 ? 'type' : 'paste_insert';
+        } else if (change.text.length === 0 && change.rangeLength > 0) {
+          // 删除操作
+          operationType = 'delete';
+        } else if (change.text.length > 0 && change.rangeLength > 0) {
+          // 替换操作：即粘贴替换
+          operationType = 'paste_replace';
+        }
+
+        console.log(`📝 Code edit detected: ${operationType} | text: "${change.text}" (${change.text.length} chars) | rangeLength: ${change.rangeLength}`);
+
+        // 构造简化的内容变化对象
+        const simplifiedChange: SimplifiedContentChange = {
+          range: {
+            startLineNumber: change.range.startLineNumber,
+            startColumn: change.range.startColumn,
+            endLineNumber: change.range.endLineNumber,
+            endColumn: change.range.endColumn
+          },
+          rangeLength: change.rangeLength,
+          text: change.text,
+          rangeOffset: change.rangeOffset
+        };
+
+        // 记录历史事件
+        dsalabService.getHistoryService().recordCodeEditEvent(
+          problemId,
+          operationType,
+          simplifiedChange,
+          {
+            lineNumber: currentPosition.lineNumber,
+            column: currentPosition.column
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Failed to record DSALab code edit history:', error);
+    }
   }
 
   setEditorTheme(theme: monaco.editor.IStandaloneThemeData): void {
@@ -294,9 +398,14 @@ export class EditorService {
       // DSALab标签页始终使用C++语言，其他文件根据扩展名判断
       const language = tab.key.startsWith('dsalab-') ? 'cpp' : (isCpp(tab.title) ? 'cpp' : 'text');
       newModel = monaco.editor.createModel(tab.code, language, uri);
-      newModel.onDidChangeContent(_ => {
+      newModel.onDidChangeContent((e) => {
         tab.saved = false;
         this.editorText.next(newModel.getValue());
+        
+        // 记录DSALab问题的代码编辑历史
+        if (tab.key.startsWith('dsalab-')) {
+          this.recordDSALabCodeEditHistory(tab, e);
+        }
       });
       this.modelInfos[newUri] = {
         cursor: { column: 1, lineNumber: 1 },
