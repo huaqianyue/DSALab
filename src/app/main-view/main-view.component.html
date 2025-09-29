@@ -24,7 +24,7 @@
             <router-outlet name="tools"></router-outlet>
         </as-split-area>
     </as-split>
-    <nz-button-group>
+    <nz-button-group class="bottom-toolbar">
         <button nz-button *ngFor="let i of toolsItems" [disabled]="i.disabled" (click)="showTools(i.url)"
             [nzType]="currentOutletUrl('tools') == i.url ? 'primary' : 'default'">
             {{ i.title }}

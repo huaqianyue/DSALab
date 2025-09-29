@@ -20,6 +20,8 @@
   }
 
   nz-footer {
+    margin-bottom: 20px; // 为底部工具栏留出空间
+    padding-bottom: 10px; // 额外的内边距
     button {
       margin-right: 8px;
     }

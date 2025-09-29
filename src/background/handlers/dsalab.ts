@@ -462,11 +462,26 @@ ipcMain.handle('dsalab-export-problems', async (event, problemIds: string[], def
     const problems = await loadPureLocalProblems();
     const selectedProblems = problems.filter(p => problemIds.includes(p.id));
     
+    // 验证并修复文件名
+    let sanitizedFileName = defaultFileName;
+    if (!sanitizedFileName || sanitizedFileName.trim() === '' || sanitizedFileName.startsWith('_') || sanitizedFileName === '.zip') {
+      const date = new Date();
+      const timestamp = date.toISOString().replace(/[:.]/g, '-').substring(0, 19);
+      sanitizedFileName = `DSALab_Export_${timestamp}.zip`;
+    }
+    
     // 生成包含测试分数的文件名
-    let enhancedFileName = defaultFileName;
+    let enhancedFileName = sanitizedFileName;
     if (selectedProblems.length > 0) {
       const testScores = selectedProblems
-        .map(p => (p as any).testScore !== undefined ? (p as any).testScore : 'N/A')
+        .map(p => {
+          const score = (p as any).testScore;
+          if (score !== undefined && score !== null && score !== '') {
+            return String(score).replace(/[/\\:*?"<>|]/g, '_'); // 替换所有无效文件名字符
+          } else {
+            return 'NA'; // 使用 NA 而不是 N/A
+          }
+        })
         .join('_');
       
       // 在文件名中插入测试分数（在时间戳之前）
@@ -486,9 +501,29 @@ ipcMain.handle('dsalab-export-problems', async (event, problemIds: string[], def
       }
     }
 
+    // 添加调试日志
+    console.log('🔍 Export Debug Info:');
+    console.log('  - Original defaultFileName:', defaultFileName);
+    console.log('  - Sanitized fileName:', sanitizedFileName);
+    console.log('  - Enhanced fileName:', enhancedFileName);
+
+    // 确保文件名以.zip结尾并清理无效字符
+    let finalFileName = enhancedFileName.endsWith('.zip') ? enhancedFileName : `${enhancedFileName}.zip`;
+    
+    // 清理文件名中的所有无效字符
+    finalFileName = finalFileName.replace(/[/\\:*?"<>|]/g, '_');
+    
+    // 构建完整的默认路径 - 使用用户的下载目录
+    const os = require('os');
+    const downloadsPath = path.join(os.homedir(), 'Downloads');
+    const fullDefaultPath = path.join(downloadsPath, finalFileName);
+    
+    console.log('  - Final fileName:', finalFileName);
+    console.log('  - Full defaultPath:', fullDefaultPath);
+
     // 显示保存对话框，让用户选择 ZIP 文件保存位置
     const saveResult = await dialog.showSaveDialog(mainWindow, {
-      defaultPath: enhancedFileName.endsWith('.zip') ? enhancedFileName : `${enhancedFileName}.zip`,
+      defaultPath: fullDefaultPath,
       filters: [
         { name: 'ZIP Archives', extensions: ['zip'] },
         { name: 'All Files', extensions: ['*'] }

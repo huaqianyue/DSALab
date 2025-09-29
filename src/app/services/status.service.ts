@@ -180,13 +180,13 @@ export class StatusService {
         enabled: () => true,
         run: () => this.settingsService.openSetting('editor')
       },
-      'help.about': {
-        name: '关于 DSALab',
-        icon: 'codicon-info',
+      'help.welcome': {
+        name: '欢迎使用 DSALab',
+        icon: 'codicon-home',
         shortcut: null,
         enabled: () => true,
-        run: () => this.showAboutDialog()
-      }
+        run: () => this.openWelcomePage()
+      },
     };
 
   constructor(
@@ -257,8 +257,23 @@ export class StatusService {
     }
   }
 
-  private showAboutDialog(): void {
-    // 暂时使用简单的alert，后续可以替换为更美观的对话框
-    alert('DSALab - 数据结构与算法实验室环境\n\n版本: 1.0.0\n\n一个专为数据结构与算法学习设计的集成开发环境。');
+  private openWelcomePage(): void {
+    // 检查是否已经存在欢迎标签页
+    const existingTab = this.tabsService.getByKey('welcome-tab');
+    if (existingTab.value === null) {
+      // 如果不存在，创建欢迎页面标签页
+      this.tabsService.add({
+        key: 'welcome-tab',
+        type: 'welcome',
+        title: '欢迎使用DSALab',
+        code: '',
+        path: null,
+        saved: true
+      });
+    }
+    
+    // 激活欢迎页面标签页
+    this.tabsService.changeActive('welcome-tab');
   }
+
 }

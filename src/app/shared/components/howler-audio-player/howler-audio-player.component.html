@@ -36,7 +36,7 @@
         [min]="0" 
         [max]="duration" 
         [value]="currentTime"
-        (input)="seek(+($event.target as HTMLInputElement).value)"
+        (input)="onSeekInput($event)"
         [disabled]="!sound || isLoading">
       <div class="progress-fill" [style.width.%]="(currentTime / duration) * 100"></div>
     </div>

@@ -1,0 +1,246 @@
+<div class="welcome-container">
+  <!-- 头部标题 -->
+  <div class="welcome-header">
+    <div class="logo-section">
+      <img src="assets/icons/favicon.png" alt="DSALab" class="logo">
+      <h1>欢迎使用 DSALab</h1>
+    </div>
+    <p class="subtitle">面向数据结构与算法学习的综合性 C++ 开发环境</p>
+  </div>
+
+  <!-- 功能介绍卡片 -->
+  <div class="features-grid">
+    
+    <!-- 题目导入与管理 -->
+    <div class="feature-card">
+      <div class="feature-icon">
+        <i nz-icon nzType="import" nzTheme="outline"></i>
+      </div>
+      <h3>题目导入与管理</h3>
+      <div class="feature-content">
+        <p>云端导入和合并您的算法题目</p>
+        <ul>
+          <li><i nz-icon nzType="file-add"></i> 支持 JSON 格式题目导入</li>
+          <li><i nz-icon nzType="database"></i> 本地存储，支持离线使用</li>
+          <li><i nz-icon nzType="filter"></i> 智能过滤，确保题目准确</li>
+          <li><i nz-icon nzType="reload"></i> 自动合并本地和远程题库</li>
+        </ul>
+        <div class="how-to">
+          <strong>如何使用：</strong>点击顶部工具栏的 <i nz-icon nzType="import"></i> "导入" 按钮，选择 JSON 题目文件
+        </div>
+      </div>
+    </div>
+
+    <!-- 题目描述与导航 -->
+    <div class="feature-card">
+      <div class="feature-icon">
+        <i nz-icon nzType="file-text" nzTheme="outline"></i>
+      </div>
+      <h3>题目描述与导航</h3>
+      <div class="feature-content">
+        <p>清晰展示题目内容，快速切换题目</p>
+        <ul>
+          <li><i nz-icon nzType="highlight"></i> 富文本显示，支持代码高亮</li>
+          <li><i nz-icon nzType="experiment"></i> 智能解析函数签名和测试示例</li>
+          <li><i nz-icon nzType="swap"></i> 便捷的上一题/下一题导航</li>
+          <li><i nz-icon nzType="sync"></i> 与编辑器状态实时同步</li>
+        </ul>
+        <div class="how-to">
+          <strong>如何使用：</strong>点击左侧边栏的 <i nz-icon nzType="ordered-list"></i> "题目列表" 选择题目，或在题目描述页面使用导航按钮
+        </div>
+      </div>
+    </div>
+
+    <!-- 音频录制与讲解 -->
+    <div class="feature-card">
+      <div class="feature-icon">
+        <i nz-icon nzType="audio" nzTheme="outline"></i>
+      </div>
+      <h3>音频录制与讲解</h3>
+      <div class="feature-content">
+        <p>录制您的解题思路和讲解过程</p>
+        <ul>
+          <li><i nz-icon nzType="customer-service"></i> 高质量音频录制</li>
+          <li><i nz-icon nzType="pause-circle"></i> 支持暂停、继续录制</li>
+          <li><i nz-icon nzType="play-circle"></i> 实时回放和进度控制</li>
+          <li><i nz-icon nzType="save"></i> 自动保存到题目工作区</li>
+        </ul>
+        <div class="how-to">
+          <strong>如何使用：</strong>在题目描述页面底部的音频面板中，点击 <i class="fas fa-microphone-alt"></i> "录制" 按钮开始录音
+        </div>
+      </div>
+    </div>
+
+    <!-- 编译运行系统 -->
+    <div class="feature-card">
+      <div class="feature-icon">
+        <i nz-icon nzType="build" nzTheme="outline"></i>
+      </div>
+      <h3>编译运行系统</h3>
+      <div class="feature-content">
+        <p>支持 C++ 编译和运行环境</p>
+        <ul>
+          <li><i nz-icon nzType="code"></i> 支持 C++20 标准</li>
+          <li><i nz-icon nzType="play-circle"></i> 一键编译运行</li>
+          <li><i nz-icon nzType="bug"></i> 详细的错误诊断信息</li>
+          <li><i nz-icon nzType="console-sql"></i> 集成控制台输出显示</li>
+        </ul>
+        <div class="how-to">
+          <strong>如何使用：</strong>使用顶部工具栏的 <i nz-icon nzType="build"></i> "编译" 或 <i nz-icon nzType="play-circle"></i> "运行" 按钮
+        </div>
+      </div>
+    </div>
+
+    <!-- 调试功能 -->
+    <div class="feature-card">
+      <div class="feature-icon">
+        <i nz-icon nzType="bug" nzTheme="outline"></i>
+      </div>
+      <h3>可视化调试</h3>
+      <div class="feature-content">
+        <p>专业的调试工具，帮助您排查程序问题</p>
+        <ul>
+          <li><i nz-icon nzType="aim"></i> 断点管理和可视化</li>
+          <li><i nz-icon nzType="eye"></i> 实时变量监控</li>
+          <li><i nz-icon nzType="step-forward"></i> 单步执行和步进控制</li>
+          <li><i nz-icon nzType="function"></i> 表达式求值</li>
+        </ul>
+        <div class="how-to">
+          <strong>如何使用：</strong>在编辑器中设置断点，然后点击底部工具栏的 <i nz-icon nzType="bug"></i> "调试" 开始调试
+        </div>
+      </div>
+    </div>
+
+    <!-- 自动测试与评分 -->
+    <div class="feature-card">
+      <div class="feature-icon">
+        <i nz-icon nzType="experiment" nzTheme="outline"></i>
+      </div>
+      <h3>自动测试与评分</h3>
+      <div class="feature-content">
+        <p>智能测试您的代码，自动给出分数</p>
+        <ul>
+          <li><i nz-icon nzType="robot"></i> 自动提取和测试函数</li>
+          <li><i nz-icon nzType="like"></i> 实时评分和通过率</li>
+          <li><i nz-icon nzType="history"></i> 测试结果历史记录</li>
+          <li><i nz-icon nzType="file-text"></i> 详细的测试报告</li>
+        </ul>
+        <div class="how-to">
+          <strong>如何使用：</strong>编写完代码后，点击顶部工具栏的 <i nz-icon nzType="experiment"></i> "测试" 按钮运行自动测试
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据导出 -->
+    <div class="feature-card">
+      <div class="feature-icon">
+        <i nz-icon nzType="export" nzTheme="outline"></i>
+      </div>
+      <h3>工作成果导出</h3>
+      <div class="feature-content">
+        <p>导出您的编程作业和学习成果</p>
+        <ul>
+          <li><i nz-icon nzType="file-zip"></i> 打包为 ZIP 文件</li>
+          <li><i nz-icon nzType="star"></i> 包含测试分数信息</li>
+          <li><i nz-icon nzType="check-square"></i> 选择性导出完成的题目</li>
+          <li><i nz-icon nzType="history"></i> 包含学习历史记录</li>
+        </ul>
+        <div class="how-to">
+          <strong>如何使用：</strong>点击顶部工具栏的 <i nz-icon nzType="export"></i> "导出" 按钮，选择要导出的题目
+        </div>
+      </div>
+    </div>
+
+    <!-- 编译器设置 -->
+    <div class="feature-card">
+      <div class="feature-icon">
+        <i nz-icon nzType="setting" nzTheme="outline"></i>
+      </div>
+      <h3>编译器设置</h3>
+      <div class="feature-content">
+        <p>灵活配置编译环境和选项</p>
+        <ul>
+          <li><i nz-icon nzType="code"></i> 编译标准和优化级别</li>
+          <li><i nz-icon nzType="folder"></i> MinGW 路径管理</li>
+          <li><i nz-icon nzType="font-colors"></i> 编码和警告控制</li>
+          <li><i nz-icon nzType="thunderbolt"></i> 编译字符设置</li>
+        </ul>
+        <div class="how-to">
+          <strong>如何使用：</strong>点击菜单栏 "工具" → "编译设置" 进行配置。如遇中文显示问题，可尝试设置编译字符。
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 快速开始指南 -->
+  <div class="quick-start-section">
+    <h2><i nz-icon nzType="rocket"></i> 快速开始指南</h2>
+    <div class="steps-container">
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h4>导入题目</h4>
+          <p>云端自动导入或点击 <i nz-icon nzType="import"></i> "导入" 按钮，选择包含算法题目的 JSON 文件</p>
+        </div>
+      </div>
+      
+      <div class="step-arrow">
+        <i nz-icon nzType="arrow-right"></i>
+      </div>
+      
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h4>选择题目</h4>
+          <p>在左侧 <i nz-icon nzType="ordered-list"></i> "题目列表" 中选择要解答的题目</p>
+        </div>
+      </div>
+      
+      <div class="step-arrow">
+        <i nz-icon nzType="arrow-right"></i>
+      </div>
+      
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h4>编写代码</h4>
+          <p>在编辑器中编写 C++ 代码，使用 <i nz-icon nzType="build"></i> "编译" 和 <i nz-icon nzType="play-circle"></i> "运行" 测试</p>
+        </div>
+      </div>
+      
+      <div class="step-arrow">
+        <i nz-icon nzType="arrow-right"></i>
+      </div>
+      
+      <div class="step">
+        <div class="step-number">4</div>
+        <div class="step-content">
+          <h4>录制讲解</h4>
+          <p>在题目描述页面底部录制您的解题思路和讲解</p>
+        </div>
+      </div>
+      
+      <div class="step-arrow">
+        <i nz-icon nzType="arrow-right"></i>
+      </div>
+      
+      <div class="step">
+        <div class="step-number">5</div>
+        <div class="step-content">
+          <h4>测试和导出</h4>
+          <p>使用 <i nz-icon nzType="experiment"></i> "测试" 验证代码，最后 <i nz-icon nzType="export"></i> "导出" 您的成果</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 底部提示 -->
+  <div class="welcome-footer">
+    <div class="footer-content">
+      <p><i nz-icon nzType="info-circle"></i> 提示：您可以随时通过菜单栏 "帮助" → "欢迎使用 DSALab" 重新打开此欢迎页面</p>
+      <p><i nz-icon nzType="github"></i> DSALab v1.0.0 - 专为编程学习设计</p>
+    </div>
+  </div>
+</div>

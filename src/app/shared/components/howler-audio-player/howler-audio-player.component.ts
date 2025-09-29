@@ -254,6 +254,12 @@ export class HowlerAudioPlayerComponent implements OnInit, OnDestroy, OnChanges 
     this.currentTime = position;
   }
 
+  onSeekInput(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    const position = +target.value;
+    this.seek(position);
+  }
+
   setVolume(volume: number): void {
     if (!this.sound) return;
     this.sound.volume(Math.max(0, Math.min(1, volume)));

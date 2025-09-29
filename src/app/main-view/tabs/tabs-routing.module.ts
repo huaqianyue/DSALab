@@ -9,11 +9,16 @@ import { EnvSettingComponent } from './settings/build-setting/env-setting/env-se
 import { SettingsGuard } from '../../services/settings.service';
 import { EditorSettingComponent } from './settings/editor-setting/editor-setting.component';
 import { ThemeSettingComponent } from './settings/editor-setting/theme-setting/theme-setting.component';
+import { WelcomeComponent } from './welcome/welcome.component';
 
 const routes: Routes = [
   {
     path: 'empty',
     component: EmptyPageComponent
+  },
+  {
+    path: 'welcome/:key',
+    component: WelcomeComponent
   },
   {
     path: 'file/:key',

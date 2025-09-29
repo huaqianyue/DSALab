@@ -27,13 +27,14 @@ import { EnvSettingComponent } from './settings/build-setting/env-setting/env-se
 
 import { EditorSettingComponent } from './settings/editor-setting/editor-setting.component';
 import { ThemeSettingComponent } from './settings/editor-setting/theme-setting/theme-setting.component';
+import { WelcomeComponent } from './welcome/welcome.component';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 
 @NgModule({
   declarations: [
     TabsComponent, EditorComponent,
     BuildSettingComponent, SfbSettingComponent, EnvSettingComponent,
-    EditorSettingComponent, ThemeSettingComponent
+    EditorSettingComponent, ThemeSettingComponent, WelcomeComponent
   ],
   imports: [
     CommonModule,

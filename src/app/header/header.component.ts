@@ -53,7 +53,7 @@ export class HeaderComponent implements OnInit {
   ];
 
   helpMenuId: DropdownList = [
-    "help.about"
+    "help.welcome"
   ];
 
   constructor() {

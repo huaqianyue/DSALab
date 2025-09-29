@@ -257,7 +257,19 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
       const minutes = date.getMinutes().toString().padStart(2, '0');
       const seconds = date.getSeconds().toString().padStart(2, '0');
       
-      const defaultFileName = `${this.exportStudentId}_${this.exportUserName}_${year}${month}${day}_${hours}${minutes}${seconds}.zip`;
+      // 确保用户信息不为空，使用默认值，并清理无效字符
+      const studentId = (this.exportStudentId.trim() || 'Student').replace(/[/\\:*?"<>|]/g, '_');
+      const userName = (this.exportUserName.trim() || 'User').replace(/[/\\:*?"<>|]/g, '_');
+      
+      const defaultFileName = `${studentId}_${userName}_${year}${month}${day}_${hours}${minutes}${seconds}.zip`;
+
+      // 添加调试日志
+      console.log('🔍 Frontend Export Debug:');
+      console.log('  - exportStudentId:', JSON.stringify(this.exportStudentId));
+      console.log('  - exportUserName:', JSON.stringify(this.exportUserName));
+      console.log('  - studentId (processed):', JSON.stringify(studentId));
+      console.log('  - userName (processed):', JSON.stringify(userName));
+      console.log('  - defaultFileName:', JSON.stringify(defaultFileName));
 
       const result = await this.dsalabService.exportProblems(this.selectedProblemIds, defaultFileName);
       

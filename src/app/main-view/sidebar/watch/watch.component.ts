@@ -1,5 +1,5 @@
 import { Component, OnInit, ViewEncapsulation } from '@angular/core';
-import { TreeControl } from '@angular/cdk/tree';
+import { FlatTreeControl } from '@angular/cdk/tree';
 import { NzTreeNodeOptions } from 'ng-zorro-antd/tree';
 import { Observable } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
@@ -16,7 +16,7 @@ export class WatchComponent implements OnInit {
 
   localVariables$: Observable<NzTreeNodeOptions[]>;
   isDebugging$: Observable<boolean>;
-  treeControl: TreeControl<GdbVarInfoNode>;
+  treeControl: FlatTreeControl<GdbVarInfoNode>;
   dataSource: DynamicDatasource;
   editingNodeId: string | null = null;
   editingValue: string = "";
@@ -60,5 +60,9 @@ export class WatchComponent implements OnInit {
 
   clearAll() {
     this.watchService.clearAllNode();
+  }
+
+  getTreeControl(): any {
+    return this.treeControl;
   }
 }

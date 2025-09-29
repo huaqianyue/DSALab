@@ -3,7 +3,7 @@
     <button nz-button nzType="default" (click)="clearAll()"><i nz-icon nzType="delete" title="删除全部"></i></button>
 </nz-button-group>
 <div id="watchVarTreeWrapper">
-    <nz-tree-view [nzTreeControl]="treeControl" [nzDataSource]="dataSource">
+    <nz-tree-view [nzTreeControl]="getTreeControl()" [nzDataSource]="dataSource">
         <nz-tree-node *nzTreeNodeDef="let node" nzTreeNodePadding>
             <ng-container *ngIf="node.value !== null && node.expandable; else noopToggle">
                 <nz-tree-node-toggle *ngIf="!node.loading">

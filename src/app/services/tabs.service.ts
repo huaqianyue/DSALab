@@ -5,7 +5,7 @@ import { EditorService } from './editor.service';
 
 export interface Tab {
   key: string, // An unique udid for each tab
-  type: "file" | "setting",
+  type: "file" | "setting" | "welcome",
   title: string,
   code: string,
   path: string,
@@ -23,10 +23,11 @@ const nullEnum: Enumerate<any> = {
 
 interface TabOptions {
   key: string,
-  type: "file" | "setting",
+  type: "file" | "setting" | "welcome",
   title: string,
   code?: string,
-  path?: string
+  path?: string,
+  saved?: boolean
 }
 
 // const initTab: Tab[] = [{
@@ -64,11 +65,34 @@ export class TabsService {
         this.getActive();
       }
     });
+
+    // 延迟初始化欢迎标签页，确保路由系统已准备好
+    setTimeout(() => {
+      this.initializeWelcomeTab();
+    }, 500);
+  }
+
+  private initializeWelcomeTab(): void {
+    // 添加欢迎标签页
+    this.add({
+      key: 'welcome-tab',
+      type: 'welcome',
+      title: '欢迎使用DSALab',
+      code: '',
+      path: null,
+      saved: true
+    });
+    
+    // 立即激活欢迎标签页
+    setTimeout(() => {
+      this.changeActive('welcome-tab');
+    }, 100);
   }
 
   syncActiveCode() {
     if (!this.editorService.isInit) return;
     if (this.getActive().value === null) return;
+    if (this.getActive().value.type !== "file") return; // 只对文件类型标签页同步代码
     this.getActive().value.code = this.editorService.getCode();
   }
 
@@ -119,7 +143,7 @@ export class TabsService {
       type: options.type,
       title: options.title,
       code: options.code ?? "",
-      saved: true, // !(options.type === "file" && typeof options.path === "undefined") // use this if create unsaved new file
+      saved: options.saved ?? (!(options.type === "file" && typeof options.path === "undefined")), // 使用传入的saved值，如果没有则根据文件类型判断
       path: options.path ?? null
     };
     this.tabList.push(newTab);
