@@ -184,11 +184,37 @@ function sortProblemsById(problems: Problem[]): Problem[] {
 async function fetchProblemsFromCDN(): Promise<RawProblem[]> {
   console.log('正在从CDN获取题目列表...');
   try {
-    const response = await fetch(CDN_PROBLEMS_URL);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
+    const https = require('https');
+    const http = require('http');
+    const { URL } = require('url');
+    
+    const url = new URL(CDN_PROBLEMS_URL);
+    const client = url.protocol === 'https:' ? https : http;
+    
+    const response = await new Promise<{ statusCode: number; statusMessage: string; data: string }>((resolve, reject) => {
+      const req = client.request(url, (res: any) => {
+        let data = '';
+        res.on('data', (chunk: any) => data += chunk);
+        res.on('end', () => resolve({
+          statusCode: res.statusCode,
+          statusMessage: res.statusMessage,
+          data: data
+        }));
+      });
+      
+      req.on('error', (error: any) => reject(error));
+      req.setTimeout(10000, () => {
+        req.destroy();
+        reject(new Error('Request timeout'));
+      });
+      req.end();
+    });
+    
+    if (response.statusCode !== 200) {
+      throw new Error(`HTTP error! status: ${response.statusCode} - ${response.statusMessage}`);
     }
-    const cdnProblems = await response.json();
+    
+    const cdnProblems = JSON.parse(response.data);
     console.log('从CDN成功获取题目列表');
     return cdnProblems;
   } catch (error: any) {

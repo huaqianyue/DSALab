@@ -197,12 +197,12 @@ export class StatusService {
         enabled: () => true,
         run: () => this.settingsService.openSetting('editor')
       },
-      'window.toggleDevtools': {
-        name: '切换 DevTools',
-        icon: 'codicon-debug-console',
+      'help.about': {
+        name: '关于 DSALab',
+        icon: 'codicon-info',
         shortcut: null,
         enabled: () => true,
-        run: () => this.electronService.ipcRenderer.invoke('window/toggleDevTools')
+        run: () => this.showAboutDialog()
       }
     };
 
@@ -272,5 +272,10 @@ export class StatusService {
     } catch (error) {
       console.error('Failed to save DSALab problem:', error);
     }
+  }
+
+  private showAboutDialog(): void {
+    // 暂时使用简单的alert，后续可以替换为更美观的对话框
+    alert('DSALab - 数据结构与算法实验室环境\n\n版本: 1.0.0\n\n一个专为数据结构与算法学习设计的集成开发环境。');
   }
 }

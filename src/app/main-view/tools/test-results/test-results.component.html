@@ -59,14 +59,5 @@
         <div class="test-output" [innerHTML]="formatTestOutput(testResult.details)"></div>
       </nz-card>
     </div>
-
-    <!-- 原始输出（可折叠） -->
-    <div class="raw-output-card">
-      <nz-collapse>
-        <nz-collapse-panel nzHeader="原始输出" nzExpandIconPosition="right">
-          <pre class="raw-output">{{ testResult.output }}</pre>
-        </nz-collapse-panel>
-      </nz-collapse>
-    </div>
   </div>
 </div>

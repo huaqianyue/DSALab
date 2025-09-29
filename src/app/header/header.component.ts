@@ -66,12 +66,11 @@ export class HeaderComponent implements OnInit {
   ];
 
   toolMenuId: DropdownList = [
-    "tool.openBuildSetting",
-    "tool.openEditorSetting"
+    "tool.openBuildSetting"
   ];
 
   helpMenuId: DropdownList = [
-    "window.toggleDevtools"
+    "help.about"
   ];
 
   constructor() {

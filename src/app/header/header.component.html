@@ -6,8 +6,7 @@
         <button nz-button nz-dropdown nzType="text" [nzDropdownMenu]="editMenu">编辑</button>
         <button nz-button nz-dropdown nzType="text" [nzDropdownMenu]="runMenu">运行</button>
         <button nz-button nz-dropdown nzType="text" [nzDropdownMenu]="toolMenu">工具</button>
-        <!-- 隐藏帮助菜单 -->
-        <!-- <button nz-button nz-dropdown nzType="text" [nzDropdownMenu]="helpMenu">帮助</button> -->
+        <button nz-button nz-dropdown nzType="text" [nzDropdownMenu]="helpMenu">帮助</button>
         <button nz-button nz-dropdown nzType="text"></button>
     </nz-button-group>
 </div>
@@ -37,7 +36,6 @@
 <nz-dropdown-menu nzNoAnimation #toolMenu>
     <app-header-dropdown [data]="toolMenuId"></app-header-dropdown>
 </nz-dropdown-menu>
-<!-- 隐藏帮助菜单的下拉内容 -->
-<!-- <nz-dropdown-menu nzNoAnimation #helpMenu>
+<nz-dropdown-menu nzNoAnimation #helpMenu>
     <app-header-dropdown [data]="helpMenuId"></app-header-dropdown>
-</nz-dropdown-menu> -->
+</nz-dropdown-menu>

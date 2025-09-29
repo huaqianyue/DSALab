@@ -56,7 +56,7 @@ export const store = new Store<Configurations>({
     'env.mingwPath': '',
     'env.useBundledMingw': fs.existsSync(path.join(extraResourcesPath, "mingw64")),
     'advanced.ioEncoding': 'cp936',
-    'theme.active': 'classic'
+    'theme.active': 'Light_plus'
   },
   accessPropertiesByDotNotation: false
 });

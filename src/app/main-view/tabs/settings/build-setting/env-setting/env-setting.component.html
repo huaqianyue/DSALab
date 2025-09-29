@@ -16,9 +16,9 @@
   <div nz-row [nzGutter]="16">
     <div nz-col [nzSpan]="24">
       <h3>MinGW 路径</h3>
-        <nz-input-group nzSuffix>
+        <nz-input-group [nzAddOnAfter]="folderButtonTemplate">
           <input nz-input type="text" [(ngModel)]="currentEnvOptions.mingwPath" (ngModelChange)="onChange()" placeholder="请选择MinGW路径">
-          <ng-template #suffixTemplate>
+          <ng-template #folderButtonTemplate>
             <button nz-button nzType="text" nzSize="small" (click)="selectMingwPath()" nz-tooltip nzTooltipTitle="选择文件夹">
               <i nz-icon nzType="folder-open"></i>
             </button>
