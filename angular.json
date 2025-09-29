@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "devcpp7": {
+    "dsalab": {
       "root": "",
       "sourceRoot": "src",
       "projectType": "application",
@@ -96,24 +96,24 @@
         "serve": {
           "builder": "@angular-builders/custom-webpack:dev-server",
           "options": {
-            "browserTarget": "devcpp7:build"
+            "browserTarget": "dsalab:build"
           },
           "configurations": {
             "dev": {
-              "browserTarget": "devcpp7:build:dev"
+              "browserTarget": "dsalab:build:dev"
             },
             "web": {
-              "browserTarget": "devcpp7:build:web"
+              "browserTarget": "dsalab:build:web"
             },
             "production": {
-              "browserTarget": "devcpp7:build:production"
+              "browserTarget": "dsalab:build:production"
             }
           }
         },
         "extract-i18n": {
           "builder": "@angular-devkit/build-angular:extract-i18n",
           "options": {
-            "browserTarget": "devcpp7:build"
+            "browserTarget": "dsalab:build"
           }
         },
         "test": {
@@ -151,7 +151,7 @@
       }
     }
   },
-  "defaultProject": "devcpp7",
+  "defaultProject": "dsalab",
   "schematics": {
     "@schematics/angular:component": {
       "prefix": "app",

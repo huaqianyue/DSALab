@@ -1,11 +1,9 @@
 $WITH_MINGW = $false;
-$WITH_CLANGD = $true;
 
 $GENERATE_ANON_WS = $true;
 
 $MINGW_VERSION = "11.2.0";
 $MINGW_REV = "1"
-$CLANGD_VERSION = "12.0.0";
 
 $DEFAULT_COMPILE_FLAGS = @(
   "-xc++",
@@ -22,12 +20,6 @@ foreach ($arg in $args) {
   if ($arg -eq "--no-mingw") {
     $WITH_MINGW = $false;
   }
-  if ($arg -eq "--clangd") {
-    $WITH_CLANGD = $true;
-  }
-  if ($arg -eq "--no-clangd") {
-    $WITH_CLANGD = $false;
-  }
   if ($arg -eq "--anon-ws") {
     $GENERATE_ANON_WS = $true;
   }
@@ -38,7 +30,7 @@ foreach ($arg in $args) {
 
 Import-Module BitsTransfer;
 
-if ($WITH_MINGW || $WITH_CLANGD) {
+if ($WITH_MINGW) {
   $env:Path += ";C:\\Program Files\\7-zip";
   Get-Command "7z" -ErrorAction SilentlyContinue;
   if (!$?) {
@@ -52,12 +44,6 @@ if ($WITH_MINGW) {
   7z x -y mingw.7z
   Remove-Item -Path "mingw.7z";
   Remove-Variable -Name DASH_REV, US_REV;
-}
-if ($WITH_CLANGD) {
-  Start-BitsTransfer -Source "https://github.com/clangd/clangd/releases/download/$CLANGD_VERSION/clangd-windows-$CLANGD_VERSION.zip" -Destination "clangd.zip";
-  7z x -y clangd.zip
-  Rename-Item -Path "clangd_$CLANGD_VERSION" -NewName "clangd";
-  Remove-Item -Path "clangd.zip";
 }
 if ($GENERATE_ANON_WS) {
   Remove-Item -Path "anon_workspace" -Recurse;

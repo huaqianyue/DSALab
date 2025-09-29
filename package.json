@@ -1,6 +1,6 @@
 {
-  "name": "devcpp7",
-  "version": "7.2109.1",
+  "name": "dsalab",
+  "version": "1.0.0",
   "description": "DSALab - Data Structures and Algorithms Laboratory Environment",
   "author": "Guyutongxue <guyutongxue@163.com>",
   "main": "dist/background-bundle.js",
@@ -19,6 +19,7 @@
     "electron:rebuild": "npx electron-rebuild -o chcp -v 11.1.0",
     "build": "npm run ngwithpack:prod && electron-builder build --config=builder/default.json --publish=never",
     "build:no-mingw": "npm run ngwithpack:prod && electron-builder build --config=builder/no-mingw.json --publish=never",
+    "build:mingw-zip": "npm run ngwithpack:prod && electron-builder build --config=builder/with-mingw-zip.json --publish=never",
     "test": "ng test --watch=false",
     "test:watch": "ng test",
     "version": "conventional-changelog -i CHANGELOG.md -s -r 0 && git add CHANGELOG.md",

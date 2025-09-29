@@ -16,12 +16,7 @@
   "files": [
     "dist/**/*"
   ],
-  "nsis": {
-    "oneClick": false,
-    "perMachine": true,
-    "allowElevation": true,
-    "allowToChangeInstallationDirectory": true
-  },
+  "artifactName": "${productName}-${version}-with-mingw.${ext}",
   "win": {
     "icon": "dist/assets/icons/favicon.ico",
     "fileAssociations": {
@@ -29,7 +24,7 @@
       "description": "C++ source file"
     },
     "target": [
-      "nsis"
+      "zip"
     ]
   }
 }

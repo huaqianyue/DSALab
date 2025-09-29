@@ -28,11 +28,10 @@
     "icon": "dist/assets/icons/favicon.ico",
     "fileAssociations": {
       "ext": ["cc", "cxx", "cpp", "h"],
-      "description": "C++ source file",
-      "icon": "dist/assets/icons/cpp.ico"
+      "description": "C++ source file"
     },
     "target": [
-      "7z"
+      "zip"
     ]
   }
 }

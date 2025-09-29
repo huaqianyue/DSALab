@@ -1,7 +1,7 @@
 # Dev-C++ 7
 
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/Guyutongxue/devcpp7/Yarn%20CI)
-![LGTM Grade](https://img.shields.io/lgtm/grade/javascript/github/Guyutongxue/devcpp7?label=code%20quality)
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/Guyutongxue/DSALab/Yarn%20CI)
+![LGTM Grade](https://img.shields.io/lgtm/grade/javascript/github/Guyutongxue/DSALab?label=code%20quality)
 
 <p align="center">
 <img src="./src/assets/icons/favicon.png" height="70" alt="Dev C++ 7"> =
@@ -9,12 +9,11 @@
 <img src="https://s3.ax1x.com/2021/01/22/somL4I.png" height="70" alt="Electron">+
 <img src="https://s3.ax1x.com/2021/01/22/som7HH.png" height="70" alt="Monaco Editor">+
 <img src="https://s3.ax1x.com/2021/01/22/somqUA.png" height="70" alt="MinGW-w64">+
-<img src="https://s3.ax1x.com/2021/01/22/somXCt.png" height="70" alt="Clangd">
 </p>
 
 ## Info
 
-A project simulating legacy Dev-C++, a tiny C++ IDE, powered by Angular, Electron, Monaco Editor, MinGW-w64 and Clangd.
+A project simulating legacy Dev-C++, a tiny C++ IDE, powered by Angular, Electron, Monaco Editor and MinGW-w64.
 
 **This repository has no relationship to Bloodshed's Dev-C++.**
 
@@ -37,7 +36,7 @@ Current features:
 - **WON'T** test on any system lower than Windows 10.
 - **MAY NOT** support C project or file.
 - **MAY NOT** support i18n. (Only Simplified Chinese now.)
-- **PRETTY LARGER** than legacy Dev-C++ (because of Electron, Clangd and so on).
+- **PRETTY LARGER** than legacy Dev-C++ (because of Electron and so on).
 
 ## Build instructions
 

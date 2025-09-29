@@ -49,7 +49,7 @@ The entry point of this whole project is also the entry point of the background 
 
 First, it will open an Electron window (here, a foreground process will start). Then It will hook all handles of IPC, and listening to request from the renderer. This part of the code is located at `src/background/background.ts`.
 
-When it received a start-language-server request, it will start an Express Server in a new process through `child_process.fork`. The Server will run on a runtime-determined port (3000 is preferred) and send the port info back to the foreground. The Language Server - Clangd is *inside* the compiler set (or it won't find header files).
+When it received a start-language-server request, it will start an Express Server in a new process through `child_process.fork`. The Server will run on a runtime-determined port (3000 is preferred) and send the port info back to the foreground.
 
 When it received a compile (or run) request, it will execute the compiler in the `extraResource` folder.
 

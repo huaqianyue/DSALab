@@ -19,7 +19,7 @@ export class HowlerAudioPlayerComponent implements OnInit, OnDestroy, OnChanges 
   @Output() durationLoaded = new EventEmitter<number>();
   @Output() playStateChange = new EventEmitter<boolean>();
 
-  private sound: any = null;
+  sound: any = null;
   private howlerLoaded = false;
 
   // 播放器状态
