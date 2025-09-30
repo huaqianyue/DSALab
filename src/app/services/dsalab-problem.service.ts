@@ -7,6 +7,8 @@ import { DSALabHistoryService } from './dsalab-history.service';
 import { DebugService } from './debug.service';
 import { DSALabSettingsService } from './dsalab-settings.service';
 
+type AutoRefreshStatus = 'idle' | 'loading' | 'success' | 'failed';
+
 @Injectable({
   providedIn: 'root'
 })
@@ -14,10 +16,12 @@ export class DSALabProblemService {
   private problemsSubject = new BehaviorSubject<Problem[]>([]);
   private currentProblemSubject = new BehaviorSubject<Problem | null>(null);
   private workspaceDataMap = new Map<string, ProblemWorkspaceData>();
+  private autoRefreshStatusSubject = new BehaviorSubject<AutoRefreshStatus>('idle');
 
   public problems$ = this.problemsSubject.asObservable();
   public currentProblem$ = this.currentProblemSubject.asObservable();
   public settings$ = this.settingsService.settings$;
+  public autoRefreshStatus$ = this.autoRefreshStatusSubject.asObservable();
 
   constructor(
     private electronService: ElectronService,
@@ -27,6 +31,7 @@ export class DSALabProblemService {
     private settingsService: DSALabSettingsService
   ) {
     this.initializeService();
+    this.setupCDNLoadedListener();
   }
 
   private async initializeService() {
@@ -35,6 +40,32 @@ export class DSALabProblemService {
     } catch (error) {
       console.error('Failed to initialize DSALab service:', error);
     }
+  }
+
+  // 监听 CDN 加载相关事件
+  private setupCDNLoadedListener(): void {
+    // 监听开始加载
+    this.electronService.ipcRenderer.on('ng:dsalab/cdn-loading', () => {
+      console.log('🌐 开始自动获取题目...');
+      this.autoRefreshStatusSubject.next('loading');
+    });
+
+    // 监听加载完成
+    this.electronService.ipcRenderer.on('ng:dsalab/cdn-loaded', (event, mergedProblems: Problem[]) => {
+      console.log('✅ CDN 加载完成，自动刷新题目列表');
+      this.problemsSubject.next(mergedProblems);
+      this.autoRefreshStatusSubject.next('success');
+      // 3秒后重置状态
+      setTimeout(() => this.autoRefreshStatusSubject.next('idle'), 3000);
+    });
+
+    // 监听加载失败
+    this.electronService.ipcRenderer.on('ng:dsalab/cdn-failed', () => {
+      console.log('⚠️ CDN 加载失败，继续使用本地题目');
+      this.autoRefreshStatusSubject.next('failed');
+      // 3秒后重置状态
+      setTimeout(() => this.autoRefreshStatusSubject.next('idle'), 3000);
+    });
   }
 
   // 加载问题列表（与原始DSALab一致）

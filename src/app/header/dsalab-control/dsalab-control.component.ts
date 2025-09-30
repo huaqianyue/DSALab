@@ -18,6 +18,7 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
   isRefreshing = false;
   isExporting = false;
   isSaving = false;
+  isAutoRefreshing = false;
   problems: Problem[] = [];
   settings: DSALabSettings = { userName: '', studentId: '', lastOpenedProblemId: null };
   currentProblem: Problem | null = null;
@@ -29,6 +30,7 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
   exportStudentId = '';
   
   private destroy$ = new Subject<void>();
+  private autoRefreshMessageId: string | null = null;
 
   constructor(
     private dsalabService: DSALabProblemService,
@@ -60,6 +62,35 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(problem => {
         this.currentProblem = problem;
+      });
+
+    // 订阅自动刷新状态变化，显示通知
+    this.dsalabService.autoRefreshStatus$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(status => {
+        if (status === 'loading') {
+          // 开始自动获取
+          this.isAutoRefreshing = true;
+          this.autoRefreshMessageId = this.message.loading('题目自动获取中...', { nzDuration: 0 }).messageId;
+        } else if (status === 'success') {
+          // 自动获取成功
+          this.isAutoRefreshing = false;
+          if (this.autoRefreshMessageId) {
+            this.message.remove(this.autoRefreshMessageId);
+            this.autoRefreshMessageId = null;
+          }
+          this.message.success('题目自动获取成功');
+        } else if (status === 'failed') {
+          // 自动获取失败
+          this.isAutoRefreshing = false;
+          if (this.autoRefreshMessageId) {
+            this.message.remove(this.autoRefreshMessageId);
+            this.autoRefreshMessageId = null;
+          }
+          this.message.warning('题目自动获取失败，使用本地题目');
+        } else if (status === 'idle') {
+          this.isAutoRefreshing = false;
+        }
       });
   }
 

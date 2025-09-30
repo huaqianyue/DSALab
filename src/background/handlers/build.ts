@@ -62,13 +62,16 @@ async function execCompiler(srcPath: string, noLink: boolean, debugInfo: boolean
       srcPath,
       '-o',
       outputFileName,
+      '-static-libgcc',
+      '-static-libstdc++',
     ];
   }
   return new Promise((resolve) => {
     const mingwPath = getMingwPath();
     const gxxPath = path.join(mingwPath, 'bin/g++.exe');
     if (!fs.existsSync(gxxPath)) {
-      resolve({ success: false, stderr: '编译器 g++.exe 在当前 Mingw 路径下未找到。' });
+      resolve({ success: false, stderr: `编译器 g++.exe 在路径下未找到: ${gxxPath}\n请检查MinGW安装路径是否正确` });
+      return;
     }
     execFile(path.join(mingwPath, 'bin/g++.exe'), args, {
       cwd: cwd,
@@ -101,12 +104,26 @@ export async function doCompile(srcPath: string, debugInfo = false): Promise<Bui
   // generate .o
   const compileResult = await execCompiler(srcPath, true, debugInfo);
   let diagnostics: GccDiagnostics = [];
+  
+  // 检查是否是编译器不存在的情况
+  if (!compileResult.success && compileResult.stderr.includes('编译器 g++.exe 在路径下未找到')) {
+    return {
+      success: false,
+      stage: "compiler_not_found",
+      diagnostics: [],
+      what: {
+        error: "编译器未找到",
+        stderr: compileResult.stderr
+      }
+    };
+  }
+  
   try {
     diagnostics = JSON.parse(compileResult.stderr);
   } catch (e) {
     return {
       success: false,
-      stage: "unknown",
+      stage: "parse_error",
       diagnostics: diagnostics,
       what: {
         error: e,
@@ -149,16 +166,53 @@ typedIpcMain.handle('build/build', async (_, arg) => {
   getWebContents().send('ng:build/buildComplete', result);
 });
 
+// 保存当前运行的进程，用于取消运行
+let currentRunningProcess: any = null;
+
 typedIpcMain.handle('build/runExe', async (_, arg) => {
-  console.log(arg.path);
-  console.log(getExecutablePath(arg.path));
-  if (arg.forceCompile || !isCompiled(arg.path)) {
-    const result = await doCompile(arg.path);
-    getWebContents().send('ng:build/buildComplete', result);
-    if (!result.success) return;
+  console.log('运行请求 - 源文件路径:', arg.path);
+  
+  const exePath = getExecutablePath(arg.path);
+  console.log('期望的exe路径:', exePath);
+  console.log('exe文件是否存在:', fs.existsSync(exePath));
+  
+  // 如果 exe 不存在，或者源文件比 exe 新，则先编译
+  if (!fs.existsSync(exePath) || 
+      (fs.existsSync(arg.path) && fs.statSync(arg.path).mtime > fs.statSync(exePath).mtime)) {
+    console.log('🔨 需要编译，开始编译...');
+    const compileResult = await doCompile(arg.path);
+    getWebContents().send('ng:build/buildComplete', compileResult);
+    
+    if (!compileResult.success) {
+      console.warn('❌ 编译失败，取消运行');
+      // 根据编译失败的原因提供更友好的错误消息
+      let errorMessage = '编译失败';
+      if (compileResult.stage === 'compiler_not_found') {
+        errorMessage = '编译器未找到，请检查MinGW安装';
+      } else if (compileResult.stage === 'parse_error') {
+        errorMessage = '编译输出解析失败';
+      } else if (compileResult.stage === 'compile') {
+        errorMessage = '编译错误';
+      } else if (compileResult.stage === 'link') {
+        errorMessage = '链接错误';
+      }
+      
+      // 编译失败，通知前端重置运行状态
+      getWebContents().send('ng:program/error', {
+        path: arg.path,
+        error: errorMessage,
+        durationMs: 0
+      });
+      return;
+    }
+    console.log('✅ 编译成功，准备运行');
   }
+  
   const cpPath = path.join(extraResourcesPath, 'bin/ConsolePauser.exe');
   const startTime = Date.now();
+  
+  console.log('🚀 开始启动程序，ConsolePauser路径:', cpPath);
+  console.log('🚀 可执行文件路径:', getExecutablePath(arg.path));
   
   // https://github.com/nodejs/node/issues/7367#issuecomment-229721296
   const result = spawn(JSON.stringify(cpPath), [
@@ -168,9 +222,15 @@ typedIpcMain.handle('build/runExe', async (_, arg) => {
     shell: true,
     cwd: path.dirname(arg.path)
   });
-  console.log(result.pid);
+  
+  // 保存当前进程
+  currentRunningProcess = result;
+  
+  console.log('✅ 进程已启动，PID:', result.pid);
+  
   result.on('error', (error) => {
-    console.error('Program execution error:', error);
+    console.error('❌ Program execution error:', error);
+    currentRunningProcess = null;
     // 通知前端程序运行错误（用于DSALab历史记录）
     getWebContents().send('ng:program/error', {
       path: arg.path,
@@ -178,8 +238,10 @@ typedIpcMain.handle('build/runExe', async (_, arg) => {
       durationMs: Date.now() - startTime
     });
   });
+  
   result.on('exit', (code: number | null, signal: NodeJS.Signals | null) => {
-    console.log('Program exited with code:', code, 'signal:', signal);
+    console.log('🏁 Exit event: Program exited with code:', code, 'signal:', signal);
+    currentRunningProcess = null;
     // 通知前端程序运行结束（用于DSALab历史记录）
     getWebContents().send('ng:program/exit', {
       path: arg.path,
@@ -188,4 +250,51 @@ typedIpcMain.handle('build/runExe', async (_, arg) => {
       durationMs: Date.now() - startTime
     });
   });
+  
+  result.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
+    console.log('🔒 Close event: Program closed with code:', code, 'signal:', signal);
+    // close 事件在所有 stdio 流关闭后触发，对 detached 进程更可靠
+    if (currentRunningProcess) {
+      currentRunningProcess = null;
+      // 如果 exit 事件没有触发，用 close 事件作为后备
+      getWebContents().send('ng:program/exit', {
+        path: arg.path,
+        exitCode: code,
+        signal: signal,
+        durationMs: Date.now() - startTime
+      });
+    }
+  });
+});
+
+// 取消运行
+typedIpcMain.handle('build/cancelRun' as any, async (_, arg) => {
+  if (currentRunningProcess && currentRunningProcess.pid) {
+    console.log('取消运行，终止进程树 PID:', currentRunningProcess.pid);
+    
+    try {
+      // 在 Windows 上使用 taskkill 强制终止进程树
+      if (process.platform === 'win32') {
+        const { exec } = require('child_process');
+        exec(`taskkill /pid ${currentRunningProcess.pid} /T /F`, (error) => {
+          if (error) {
+            console.error('taskkill 失败:', error);
+          } else {
+            console.log('✅ 进程树已终止');
+          }
+        });
+      } else {
+        // 非 Windows 平台使用 kill
+        currentRunningProcess.kill('SIGKILL');
+      }
+      
+      currentRunningProcess = null;
+      return { success: true };
+    } catch (error) {
+      console.error('终止进程失败:', error);
+      currentRunningProcess = null;
+      return { success: false, message: '终止进程失败' };
+    }
+  }
+  return { success: false, message: '没有正在运行的程序' };
 });

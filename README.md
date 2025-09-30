@@ -121,7 +121,7 @@ npm run electron:rebuild # 重新构建 node 模块以匹配 electron 版本
 
 ### 版本信息
 
-- **当前版本**：1.0.0
+- **当前版本**：1.1.0
 - **基于框架**：Angular + Electron
 - **编译器**：MinGW-w64
 - **编辑器**：Monaco Editor

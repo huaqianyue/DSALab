@@ -108,7 +108,7 @@ export type GccDiagnostics = GccDiagnostic[];
 export interface BuildResult {
   success: boolean;
   output?: string;
-  stage?: "compile" | "link" | "unknown";
+  stage?: "compile" | "link" | "unknown" | "compiler_not_found" | "parse_error";
   diagnostics: GccDiagnostics;
   linkerr?: string;
   what?: {
@@ -187,6 +187,7 @@ export type IpcCommands = {
 
   'build/build': (options: BuildOptions) => void;
   'build/runExe': (options: RunExeOptions) => void;
+  'build/cancelRun': (options: any) => { success: boolean; message?: string };
 
 
   'debug/start': (options: DebugStartOptions) => DebugStartResult;
@@ -223,5 +224,9 @@ export type IpcEvents = {
 
   'ng:program/error': (data: { path: string; error: string; durationMs: number }) => void;
   'ng:program/exit': (data: { path: string; exitCode: number | null; signal: NodeJS.Signals | null; durationMs: number }) => void;
+
+  'ng:dsalab/cdn-loading': () => void;
+  'ng:dsalab/cdn-loaded': (problems: any[]) => void;
+  'ng:dsalab/cdn-failed': () => void;
 
 };

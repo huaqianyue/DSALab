@@ -16,6 +16,9 @@ import { DSALabProblemService } from './dsalab-problem.service';
 export class BuildService {
 
   isBuilding$: BehaviorSubject<boolean> = new BehaviorSubject(false);
+  isCompiling$: BehaviorSubject<boolean> = new BehaviorSubject(false);
+  isRunning$: BehaviorSubject<boolean> = new BehaviorSubject(false);
+  isTesting$: BehaviorSubject<boolean> = new BehaviorSubject(false);
   private notifyOption: NzNotificationDataOptions = {
     nzDuration: 3000
   };
@@ -32,9 +35,11 @@ export class BuildService {
   ) {
     this.electronService.ipcRenderer.on("ng:build/buildStarted", (_) => {
       this.isBuilding$.next(true);
+      this.isCompiling$.next(true);
     });
     this.electronService.ipcRenderer.on("ng:build/buildComplete", (_, result) => {
       this.isBuilding$.next(false);
+      this.isCompiling$.next(false);
       console.log("Compile result: ", result);
       if (result.success) {
         if (result.diagnostics.length === 0) {
@@ -72,6 +77,14 @@ export class BuildService {
             this.message.error("链接错误");
             this.showOutput(result);
             break;
+          case "compiler_not_found":
+            this.showOutput(result);
+            this.message.error("编译器未找到，请检查MinGW安装");
+            break;
+          case "parse_error":
+            this.showOutput(result);
+            this.message.error("编译输出解析失败");
+            break;
           default:
             this.showOutput(result);
             this.message.error("未知错误");
@@ -82,6 +95,9 @@ export class BuildService {
 
     // 监听程序运行结束事件（用于DSALab历史记录）
     this.electronService.ipcRenderer.on('ng:program/exit', (_, data) => {
+      // 重置运行状态
+      this.isRunning$.next(false);
+      
       const activeTab = this.tabsService.getActive().value;
       if (activeTab && activeTab.key.startsWith('dsalab-') && activeTab.path === data.path) {
         const problemId = activeTab.key.replace('dsalab-', '');
@@ -98,6 +114,9 @@ export class BuildService {
 
     // 监听程序运行错误事件（用于DSALab历史记录）
     this.electronService.ipcRenderer.on('ng:program/error', (_, data) => {
+      // 重置运行状态
+      this.isRunning$.next(false);
+      
       const activeTab = this.tabsService.getActive().value;
       if (activeTab && activeTab.key.startsWith('dsalab-') && activeTab.path === data.path) {
         const problemId = activeTab.key.replace('dsalab-', '');
@@ -149,6 +168,21 @@ export class BuildService {
     });
   }
 
+  async cancelRun(): Promise<void> {
+    try {
+      const result = await this.electronService.ipcRenderer.invoke("build/cancelRun" as any, {}) as any;
+      if (result.success) {
+        this.message.info('已取消运行');
+        this.isRunning$.next(false);
+      } else {
+        this.message.warning(result.message || '取消失败');
+      }
+    } catch (error) {
+      console.error('Failed to cancel run:', error);
+      this.message.error('取消运行失败');
+    }
+  }
+
   async compile(): Promise<void> {
     // 检查当前标签页是否为DSALab问题
     const activeTab = this.tabsService.getActive().value;
@@ -195,6 +229,10 @@ export class BuildService {
     const activeTab = this.tabsService.getActive().value;
     if (activeTab && activeTab.key.startsWith('dsalab-')) {
       try {
+        // 设置测试中状态
+        this.isTesting$.next(true);
+        const testingMessage = this.message.loading('测试中...', { nzDuration: 0 });
+        
         // 同步编辑器内容到标签页
         this.tabsService.syncActiveCode();
         
@@ -216,6 +254,10 @@ export class BuildService {
         this.dsalabProblemService.recordTestStartEvent(problemId, activeTab.code);
         
         const result = await this.electronService.ipcRenderer.invoke('dsalab-run-test' as any, problemId) as any;
+        
+        // 关闭测试中消息
+        this.message.remove(testingMessage.messageId);
+        this.isTesting$.next(false);
         
         // 显示测试结果面板
         this.router.navigate([{
@@ -249,6 +291,7 @@ export class BuildService {
         
       } catch (error) {
         console.error('Failed to run DSALab test:', error);
+        this.isTesting$.next(false);
         this.message.error('测试执行失败');
       }
     } else {
@@ -257,6 +300,8 @@ export class BuildService {
   }
 
   async runExe(forceCompile = false): Promise<void> {
+    // 设置运行状态
+    this.isRunning$.next(true);
     // 检查当前标签页是否为DSALab问题
     const activeTab = this.tabsService.getActive().value;
     if (activeTab && activeTab.key.startsWith('dsalab-')) {

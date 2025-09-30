@@ -141,7 +141,7 @@ export class StatusService {
         run: () => this.buildService.compile()
       },
       'build.run': {
-        name: '运行',
+        name: '编译并运行',
         icon: 'codicon-play',
         shortcut: 'f10',
         enabled: () => this.saveEnabled,

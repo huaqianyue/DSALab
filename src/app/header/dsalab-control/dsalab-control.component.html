@@ -4,10 +4,11 @@
     nz-button 
     nzType="default" 
     nzSize="small"
-    [nzLoading]="isRefreshing"
+    [nzLoading]="isRefreshing || isAutoRefreshing"
+    [disabled]="isAutoRefreshing"
     (click)="refreshProblems()" 
     nz-tooltip 
-    nzTooltipTitle="刷新题目列表"
+    [nzTooltipTitle]="isAutoRefreshing ? '题目自动获取中，请稍候...' : '刷新题目列表'"
     class="compact-button">
     <i nz-icon nzType="reload"></i> 刷新
   </button>

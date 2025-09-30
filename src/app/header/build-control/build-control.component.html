@@ -1,11 +1,25 @@
 <nz-button-group>
-    <button [disabled]="!enabled" nz-button nzType="default" nzSize="small" (click)="compile()" title="编译" class="compact-button">
-        <i nz-icon nzType="build"></i> 编译
+    <button 
+        [disabled]="!enabled || isTesting"
+        nz-button 
+        nzType="default" 
+        nzSize="small" 
+        (click)="runExe()" 
+        nz-tooltip
+        [nzTooltipTitle]="isRunning ? '点击取消运行' : '编译并运行'"
+        class="compact-button">
+        <span *ngIf="isRunning"><i nz-icon nzType="loading"></i></span>
+        <span *ngIf="!isRunning"><i nz-icon nzType="play-circle"></i></span> 运行
     </button>
-    <button [disabled]="!enabled" nz-button nzType="default" nzSize="small" (click)="runExe()" title="运行" class="compact-button">
-        <i nz-icon nzType="play-circle"></i> 运行
-    </button>
-    <button [disabled]="!enabled || !isDSALabTab" nz-button nzType="default" nzSize="small" (click)="runTest()" title="测试评分" class="compact-button test-button">
+    <button 
+        [disabled]="!enabled || !isDSALabTab || isRunning" 
+        [nzLoading]="isTesting"
+        nz-button 
+        nzType="default" 
+        nzSize="small" 
+        (click)="runTest()" 
+        title="测试评分" 
+        class="compact-button test-button">
         <i nz-icon nzType="experiment"></i> 测试
     </button>
 </nz-button-group>

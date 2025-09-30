@@ -1,8 +1,8 @@
 {
   "name": "dsalab",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "DSALab - Data Structures and Algorithms Laboratory Environment",
-  "author": "Guyutongxue <guyutongxue@163.com>",
+  "author": "huaqianyue <wmx_0121@outlook.com>",
   "main": "dist/background-bundle.js",
   "private": true,
   "scripts": {

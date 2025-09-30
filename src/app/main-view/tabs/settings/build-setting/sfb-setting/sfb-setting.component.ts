@@ -44,14 +44,17 @@ export class SfbSettingComponent implements OnInit {
   }
 
   customSubmit(value: string): void {
-    const index = this.currentOptions.other.indexOf(value);
+    const trimmedValue = value.trim();
+    // 忽略空值
+    if (!trimmedValue) return;
+    
+    const index = this.currentOptions.other.indexOf(trimmedValue);
     if (index === -1) {
-      this.currentOptions.other.push(value);
+      this.currentOptions.other.push(trimmedValue);
       this.onChange();
     }
   }
   customRemove(value: string): void {
-    this.onChange();
     const index = this.currentOptions.other.indexOf(value);
     if (index !== -1) {
       this.currentOptions.other.splice(index, 1);

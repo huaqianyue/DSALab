@@ -40,9 +40,7 @@ export class HeaderComponent implements OnInit {
     "file.save"  // 将保存移动到编辑菜单中
   ];
   runMenuId: DropdownList = [
-    "build.build",
     "build.run",
-    "build.buildRun",
     "#divider",
     "debug.start",
     "debug.exit"

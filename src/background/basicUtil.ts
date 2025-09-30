@@ -45,9 +45,20 @@ export const store = new Store<Configurations>({
 });
 
 export function getMingwPath(): string {
-  if (store.get('env.useBundledMingw')) {
-    return path.join(extraResourcesPath, 'mingw64');
+  const useBundledMingw = store.get('env.useBundledMingw');
+  const customMingwPath = store.get('env.mingwPath');
+  
+  console.log('🔧 MinGW路径配置检查:');
+  console.log('  - 使用内置MinGW:', useBundledMingw);
+  console.log('  - 自定义MinGW路径:', customMingwPath);
+  
+  if (useBundledMingw) {
+    const bundledPath = path.join(extraResourcesPath, 'mingw64');
+    console.log('  - 选择内置MinGW路径:', bundledPath);
+    return bundledPath;
+  } else {
+    console.log('  - 选择自定义MinGW路径:', customMingwPath);
+    return customMingwPath;
   }
-  return store.get('env.mingwPath');
 }
 

@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as https from 'https';
 import * as archiver from 'archiver';
 import { createWriteStream } from 'fs';
+import { getWebContents } from '../basicUtil';
 
 // DSALab 相关类型定义
 interface Problem {
@@ -87,8 +88,12 @@ class DSALabPaths {
   }
 }
 
-// CDN 问题列表 URL（与原始DSALab一致）
-const CDN_PROBLEMS_URL = 'https://raw.githubusercontent.com/huaqianyue/DSALab/refs/heads/main/problem.json';
+// CDN 问题列表 URL（支持多个备用CDN）
+const CDN_PROBLEMS_URLS = [
+  'https://raw.githubusercontent.com/huaqianyue/DSALab/refs/heads/main/problem.json',
+  'https://cdn.jsdmirror.com/gh/huaqianyue/DSALab@main/problem.json',
+  'https://cdn.jsdmirror.cn/gh/huaqianyue/DSALab@main/problem.json'
+];
 
 // 历史记录缓冲区
 const historyBuffers = new Map<string, {
@@ -163,48 +168,69 @@ function sortProblemsById(problems: Problem[]): Problem[] {
   return problems.sort((a, b) => a.id.localeCompare(b.id));
 }
 
-// 从CDN获取问题列表
-async function fetchProblemsFromCDN(): Promise<RawProblem[]> {
-  console.log('正在从CDN获取题目列表...');
-  try {
-    const https = require('https');
-    const http = require('http');
-    const { URL } = require('url');
-    
-    const url = new URL(CDN_PROBLEMS_URL);
-    const client = url.protocol === 'https:' ? https : http;
-    
-    const response = await new Promise<{ statusCode: number; statusMessage: string; data: string }>((resolve, reject) => {
-      const req = client.request(url, (res: any) => {
-        let data = '';
-        res.on('data', (chunk: any) => data += chunk);
-        res.on('end', () => resolve({
-          statusCode: res.statusCode,
-          statusMessage: res.statusMessage,
-          data: data
-        }));
-      });
-      
-      req.on('error', (error: any) => reject(error));
-      req.setTimeout(10000, () => {
-        req.destroy();
-        reject(new Error('Request timeout'));
-      });
-      req.end();
+// 从单个CDN URL获取问题列表
+async function fetchFromSingleCDN(cdnUrl: string): Promise<RawProblem[]> {
+  const https = require('https');
+  const http = require('http');
+  const { URL } = require('url');
+  
+  const url = new URL(cdnUrl);
+  const client = url.protocol === 'https:' ? https : http;
+  
+  const response = await new Promise<{ statusCode: number; statusMessage: string; data: string }>((resolve, reject) => {
+    const req = client.request(url, (res: any) => {
+      let data = '';
+      res.on('data', (chunk: any) => data += chunk);
+      res.on('end', () => resolve({
+        statusCode: res.statusCode,
+        statusMessage: res.statusMessage,
+        data: data
+      }));
     });
     
-    if (response.statusCode !== 200) {
-      throw new Error(`HTTP error! status: ${response.statusCode} - ${response.statusMessage}`);
-    }
-    
-    const cdnProblems = JSON.parse(response.data);
-    console.log('从CDN成功获取题目列表');
-    return cdnProblems;
-  } catch (error: any) {
-    console.error('从CDN获取题目失败:', error);
-    // CDN获取失败时抛出错误，让调用方处理
-    throw error;
+    req.on('error', (error: any) => reject(error));
+    req.setTimeout(8000, () => {
+      req.destroy();
+      reject(new Error('Request timeout'));
+    });
+    req.end();
+  });
+  
+  if (response.statusCode !== 200) {
+    throw new Error(`HTTP error! status: ${response.statusCode} - ${response.statusMessage}`);
   }
+  
+  return JSON.parse(response.data);
+}
+
+// 从CDN获取问题列表（支持多个备用CDN自动重试）
+async function fetchProblemsFromCDN(): Promise<RawProblem[]> {
+  console.log('正在从CDN获取题目列表...');
+  const errors: string[] = [];
+  
+  // 依次尝试每个CDN
+  for (let i = 0; i < CDN_PROBLEMS_URLS.length; i++) {
+    const cdnUrl = CDN_PROBLEMS_URLS[i];
+    try {
+      console.log(`📡 尝试 CDN ${i + 1}/${CDN_PROBLEMS_URLS.length}: ${cdnUrl}`);
+      const cdnProblems = await fetchFromSingleCDN(cdnUrl);
+      console.log(`✅ 从 CDN ${i + 1} 成功获取题目列表`);
+      return cdnProblems;
+    } catch (error: any) {
+      const errorMsg = `CDN ${i + 1} 失败: ${error.message}`;
+      console.warn(`⚠️ ${errorMsg}`);
+      errors.push(errorMsg);
+      // 如果不是最后一个CDN，继续尝试下一个
+      if (i < CDN_PROBLEMS_URLS.length - 1) {
+        console.log('🔄 尝试下一个备用 CDN...');
+      }
+    }
+  }
+  
+  // 所有CDN都失败了
+  const allErrors = errors.join('; ');
+  console.error('❌ 所有CDN都获取失败:', allErrors);
+  throw new Error(`所有CDN都获取失败: ${allErrors}`);
 }
 
 // 只读取本地problems.json（与原始DSALab一致）
@@ -364,30 +390,41 @@ async function flushAllHistoryBuffers(): Promise<void> {
   }
 }
 
-// IPC 处理器注册（与原始DSALab完全一致）
+// IPC 处理器注册 - 优化：立即返回本地题目，后台异步加载CDN
 ipcMain.handle('dsalab-get-problems', async (event): Promise<Problem[]> => {
   await ensureDirectoryExists(path.dirname(DSALabPaths.getLocalProblemsJsonPath()));
   await ensureDirectoryExists(DSALabPaths.getUserWorkspacesRoot());
 
-  let localProblems: Problem[] = await loadPureLocalProblems();
-  let cdnProblems: RawProblem[] = [];
+  // 立即加载并返回本地题目
+  const localProblems: Problem[] = await loadPureLocalProblems();
+  
+  // 在后台异步加载 CDN，不阻塞返回
+  (async () => {
+    try {
+      console.log('🌐 开始后台加载 CDN 题目...');
+      // 通知前端开始自动获取题目
+      getWebContents().send('ng:dsalab/cdn-loading' as any);
+      
+      const cdnProblems = await fetchProblemsFromCDN();
+      
+      // 重新加载最新的本地题目（可能用户已经修改）
+      const currentLocalProblems = await loadPureLocalProblems();
+      const mergedProblems = mergeProblemLists(currentLocalProblems, cdnProblems, true);
 
-  try {
-    cdnProblems = await fetchProblemsFromCDN();
-  } catch (cdnError) {
-    console.warn('CDN获取失败，仅返回本地问题');
-    return localProblems;
-  }
+      await saveProblemsToFile(mergedProblems);
+      
+      console.log('✅ CDN 题目加载成功，通知前端刷新');
+      // 通知前端 CDN 加载完成，自动刷新题目列表
+      getWebContents().send('ng:dsalab/cdn-loaded' as any, mergedProblems);
+    } catch (cdnError) {
+      console.warn('⚠️ 后台 CDN 加载失败，前端继续使用本地题目:', cdnError);
+      // 通知前端加载失败
+      getWebContents().send('ng:dsalab/cdn-failed' as any);
+    }
+  })();
 
-  const mergedProblems = mergeProblemLists(localProblems, cdnProblems, true);
-
-  try {
-    await saveProblemsToFile(mergedProblems);
-    return mergedProblems;
-  } catch (saveError: any) {
-    console.error('初始加载时保存合并问题到本地失败:', saveError);
-    return mergedProblems;
-  }
+  // 立即返回本地题目，不等待 CDN
+  return localProblems;
 });
 
 ipcMain.handle('dsalab-refresh-problems', async (event): Promise<Problem[]> => {
@@ -1150,12 +1187,34 @@ async function compileAndRunJudge(problemId: string, judgeCode: string): Promise
     await ensureDirectoryExists(tempDir);
     await fs.writeFile(sourceFile, judgeCode, 'utf-8');
     
+    // 获取MinGW路径并使用完整的g++路径
+    const { getMingwPath } = require('../basicUtil');
+    const mingwPath = getMingwPath();
+    const gxxPath = path.join(mingwPath, 'bin', 'g++.exe');
+    
+    // 检查编译器是否存在
+    if (!require('fs').existsSync(gxxPath)) {
+      return {
+        success: false,
+        output: '',
+        error: `编译器不存在: ${gxxPath}\n请检查MinGW安装路径是否正确`
+      };
+    }
+    
     // 编译
     const { exec } = require('child_process');
-    const compileCommand = `g++ "${sourceFile}" -o "${executableFile}"`;
+    const compileCommand = `"${gxxPath}" "${sourceFile}" -o "${executableFile}" -static-libgcc -static-libstdc++`;
+    
+    console.log('测试编译命令:', compileCommand);
     
     return new Promise((resolve) => {
-      exec(compileCommand, { timeout: 10000 }, (compileError: any, compileStdout: string, compileStderr: string) => {
+      exec(compileCommand, { 
+        timeout: 10000,
+        env: {
+          ...process.env,
+          Path: process.env.Path + path.delimiter + path.join(mingwPath, 'bin')
+        }
+      }, (compileError: any, compileStdout: string, compileStderr: string) => {
         if (compileError) {
           resolve({
             success: false,
