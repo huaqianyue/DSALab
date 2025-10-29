@@ -47,7 +47,7 @@
         </div>
         <div id="tabContentWrapper">
             <div *ngIf="selectedIndex === 0" id="console" class="tab-content" (click)="cInput.focus();">
-                <div id="consoleOutput" #cOutput>{{consoleOutput$ | async}}</div>
+                <pre id="consoleOutput" #cOutput>{{consoleOutput$ | async}}</pre>
                 <div id="consoleInput">
                     <i nz-icon nzType="right"
                         [ngStyle]="{ color: (enabled && (isDebugging$ | async) ? promptColor : '#262626' ) }"></i>

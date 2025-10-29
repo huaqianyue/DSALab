@@ -64,6 +64,7 @@
                     border        : 1px solid lightgray;
                     border-radius : 2px;
                     font-family   : var(--monospace-font);
+                    user-select: text; /* 覆盖全局的user-select: none设置 */
 
                     #consoleOutput {
                         flex-grow    : 1;
@@ -71,6 +72,9 @@
                         padding      : 4px 11px;
                         white-space  : pre-wrap;
                         overflow-y   : scroll;
+                        margin: 0; /* 添加这个属性确保pre标签没有默认边距 */
+                        font-family: inherit; /* 确保字体继承自父元素 */
+                        user-select: text; /* 确保文本可以选择 */
                     }
 
                     #consoleInput {

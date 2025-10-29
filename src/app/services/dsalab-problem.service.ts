@@ -303,13 +303,13 @@ export class DSALabProblemService {
           }
         }
 
-        // 记录历史事件（使用专用服务）
-        this.recordProblemLifecycleEvent(
-          problemId, 
-          'problem_saved', 
-          workspaceData.content, 
-          workspaceData.audioBlob ? 'present' : 'absent'
-        );
+        // 注意：不再在这里记录历史事件，因为后端已经在 dsalab-save-problem-workspace 中记录了
+        // this.recordProblemLifecycleEvent(
+        //   problemId, 
+        //   'problem_saved', 
+        //   workspaceData.content, 
+        //   workspaceData.audioBlob ? 'present' : 'absent'
+        // );
       } else {
         throw new Error('Failed to save problem workspace');
       }
