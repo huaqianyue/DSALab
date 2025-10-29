@@ -136,11 +136,6 @@ export class ProblemListComponent implements OnInit, OnDestroy {
     return !!problem.Audio;
   }
 
-  // 检查问题是否被删除
-  isDeleted(problem: Problem): boolean {
-    return problem.isDelete;
-  }
-
   // 检查是否为当前问题
   isCurrentProblem(problem: Problem): boolean {
     return this.currentProblem?.id === problem.id;

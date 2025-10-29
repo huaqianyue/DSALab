@@ -124,7 +124,6 @@ export interface Problem {
   Title: string;
   shortDescription: string;
   fullDescription: string;
-  isDelete: boolean;
   Audio: string;
   Code: string;
   // 新增测试相关字段

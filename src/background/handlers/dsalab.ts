@@ -12,7 +12,6 @@ interface Problem {
   Title: string;
   shortDescription: string;
   fullDescription: string;
-  isDelete: boolean;
   Audio: string;
   Code: string;
   // 新增测试相关字段
@@ -125,7 +124,6 @@ interface RawProblem {
   id: string;
   shortDescription: string;
   fullDescription: string;
-  isDelete?: string | boolean;
   Audio?: string;
   Code?: string;
   // 新增测试模板字段
@@ -150,7 +148,6 @@ function convertToProblem(raw: RawProblem): Problem | null {
       Title: raw.shortDescription,
       shortDescription: raw.shortDescription,
       fullDescription: raw.fullDescription,
-      isDelete: raw.isDelete === true || raw.isDelete === 'true',
       Audio: raw.Audio || '',
       Code: raw.Code || '',
       studentDebugTemplate: raw.studentDebugTemplate || '',
@@ -308,7 +305,6 @@ function mergeProblemLists(
         studentDebugTemplate: incomingProblem.studentDebugTemplate || existingLocal.studentDebugTemplate,
         judgeTemplate: incomingProblem.judgeTemplate || existingLocal.judgeTemplate,
         functionSignature: incomingProblem.functionSignature || existingLocal.functionSignature,
-        isDelete: false,
       });
       localMap.delete(id);
     } else {
@@ -319,17 +315,13 @@ function mergeProblemLists(
         // 为新问题设置默认的测试相关字段
         testStatus: 'not_tested',
         testScore: undefined,
-        isDelete: false,
       });
     }
   }
 
+  // 保留本地题目
   for (const [id, localProblem] of localMap.entries()) {
-    if (sourceIsCDN) {
-      finalProblemsMap.set(id, { ...localProblem, isDelete: true });
-    } else {
-      finalProblemsMap.set(id, { ...localProblem });
-    }
+    finalProblemsMap.set(id, { ...localProblem });
   }
 
   return sortProblemsById(Array.from(finalProblemsMap.values()));

@@ -119,9 +119,8 @@
             <ng-template #problemItem let-problem>
               <nz-list-item 
                 class="problem-item"
-                [class.disabled]="problem.isDelete || !hasProblemContent(problem)"
-                [attr.data-problem-id]="problem.id"
-                *ngIf="!problem.isDelete">
+                [class.disabled]="!hasProblemContent(problem)"
+                [attr.data-problem-id]="problem.id">
                 
                 <nz-list-item-meta>
                   <nz-list-item-meta-title>

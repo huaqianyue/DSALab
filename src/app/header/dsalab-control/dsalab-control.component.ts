@@ -174,9 +174,6 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
 
     // 过滤出有内容的题目（完全按照DSALab的逻辑）
     const exportableProblems = this.problems.filter(problem => {
-      // 不导出已删除的题目
-      if (problem.isDelete) return false;
-      
       // DSALab要求：必须同时有代码、音频和测试结果才能导出
       const hasCode = problem.Code !== '';
       const hasAudio = problem.Audio !== '';
@@ -331,7 +328,7 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
     const problem = this.problems.find(p => p.id === problemId);
     
     // 只允许选择有内容的题目
-    if (!problem || problem.isDelete || !this.hasProblemContent(problem)) {
+    if (!problem || !this.hasProblemContent(problem)) {
       console.warn('❌ Problem cannot be selected:', problemId, 'hasContent:', this.hasProblemContent(problem));
       this.message.warning('该题目没有可导出的内容（需要同时有代码、音频和测试结果）');
       return;
@@ -351,7 +348,7 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
 
   // 全选/全不选
   toggleSelectAll(): void {
-    const exportableProblems = this.problems.filter(p => !p.isDelete && this.hasProblemContent(p));
+    const exportableProblems = this.problems.filter(p => this.hasProblemContent(p));
     const exportableIds = exportableProblems.map(p => p.id);
     
     if (this.selectedProblemIds.length === exportableIds.length) {
@@ -365,13 +362,13 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
 
   // 检查是否全选
   isAllSelected(): boolean {
-    const exportableProblems = this.problems.filter(p => !p.isDelete && this.hasProblemContent(p));
+    const exportableProblems = this.problems.filter(p => this.hasProblemContent(p));
     return exportableProblems.length > 0 && this.selectedProblemIds.length === exportableProblems.length;
   }
 
   // 检查是否部分选择
   isIndeterminate(): boolean {
-    const exportableProblems = this.problems.filter(p => !p.isDelete && this.hasProblemContent(p));
+    const exportableProblems = this.problems.filter(p => this.hasProblemContent(p));
     return this.selectedProblemIds.length > 0 && this.selectedProblemIds.length < exportableProblems.length;
   }
 
@@ -382,8 +379,6 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
 
   // 检查问题是否有内容可导出（完全按照DSALab逻辑）
   hasProblemContent(problem: Problem): boolean {
-    if (problem.isDelete) return false;
-    
     // DSALab要求：必须同时有代码、音频和测试结果才能导出
     const hasCode = problem.Code !== '';
     const hasAudio = problem.Audio !== '';
@@ -396,7 +391,7 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
 
   // 获取可导出的问题数量
   getExportableProblemsCount(): number {
-    return this.problems.filter(p => !p.isDelete && this.hasProblemContent(p)).length;
+    return this.problems.filter(p => this.hasProblemContent(p)).length;
   }
 
   // 保存当前问题
