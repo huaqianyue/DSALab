@@ -5,6 +5,8 @@ import { tap } from 'rxjs/operators';
 import { DebugService, FrameInfo } from '../../../services/debug.service';
 import { EditorBreakpointInfo } from '../../../services/editor.service';
 import { FileService } from '../../../services/file.service';
+import { DSALabHistoryService } from '../../../services/dsalab-history.service';
+import { DSALabProblemService } from '../../../services/dsalab-problem.service';
 
 @Component({
   selector: 'app-debug',
@@ -15,7 +17,9 @@ export class DebugComponent implements OnInit, AfterViewChecked {
 
   constructor(
     private fileService: FileService,
-    private debugService: DebugService) { }
+    private debugService: DebugService,
+    private historyService: DSALabHistoryService,
+    private problemService: DSALabProblemService) { }
 
   @ViewChild("cOutput") private cOutput: ElementRef;
 
@@ -60,6 +64,17 @@ export class DebugComponent implements OnInit, AfterViewChecked {
   }
 
   startDebug() {
+    // 立即记录用户点击调试按钮事件（无论编译成功与否都记录点击）
+    this.problemService.currentProblem$.subscribe(currentProblem => {
+      if (currentProblem) {
+        this.historyService.recordDebugControlEvent(
+          currentProblem.id,
+          'debug_button_clicked'
+        );
+      }
+    }).unsubscribe();
+    
+    // 调用调试服务（成功时会记录 debug_start）
     this.debugService.startDebug();
   }
 
@@ -115,11 +130,21 @@ export class DebugComponent implements OnInit, AfterViewChecked {
     this.currentEditBkptline = data.line;
   }
   stopEditBkpt(data: EditorBreakpointInfo) {
-    if (this.currentEditValue.trim() !== "") {
-      this.debugService.changeBkptCondition(data.id, this.currentEditValue);
-    } else {
-      this.debugService.changeBkptCondition(data.id, null);
+    const newCondition = this.currentEditValue.trim() !== "" ? this.currentEditValue : null;
+    const oldCondition = data.expression;
+    
+    // 只有在条件发生变化时才记录
+    if (newCondition !== oldCondition) {
+      this.debugService.changeBkptCondition(data.id, newCondition);
+      
+      // 记录断点条件修改
+      this.debugService.recordBreakpointConditionChange(
+        data.line,
+        this.fileService.currentFileName(),
+        newCondition
+      );
     }
+    
     this.currentEditBkptline = null;
   }
 }

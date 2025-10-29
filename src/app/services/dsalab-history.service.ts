@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { ElectronService } from '../core/services';
-import { HistoryEvent, SimplifiedContentChange, TestStartEvent, TestResultEvent } from './dsalab-types';
+import { HistoryEvent, SimplifiedContentChange, TestStartEvent, TestResultEvent, DebugControlEvent, DebugStepEvent, DebugBreakpointEvent, DebugConsoleOutputEvent, DebugStateChangeEvent, DebugExpressionEvalEvent, DebugCommandEvent } from './dsalab-types';
 
 /**
  * DSALab历史记录管理服务
@@ -194,7 +194,21 @@ export class DSALabHistoryService {
       'audio_record_pause': '暂停录音',
       'audio_record_resume': '恢复录音',
       'audio_record_stop': '停止录音',
-      'audio_play': '播放音频'
+      'audio_play': '播放音频',
+      // 调试相关事件
+      'debug_button_clicked': '点击调试按钮',
+      'debug_start': '调试成功启动',
+      'debug_exit': '退出调试',
+      'debug_step': '调试单步执行',
+      'breakpoint_add': '添加断点',
+      'breakpoint_remove': '删除断点',
+      'breakpoint_condition_change': '修改断点条件',
+      'debug_console_output': '调试控制台输出',
+      'debug_program_running': '程序运行中',
+      'debug_program_stopped': '程序已停止',
+      'debug_program_exited': '程序已退出',
+      'debug_expr_eval': '表达式求值',
+      'debug_command_sent': '发送调试命令'
     };
 
     return descriptions[eventType] || eventType;
@@ -274,7 +288,11 @@ export class DSALabHistoryService {
       'run_start', 'run_end', 'compile_error', 'run_timeout',
       'program_terminated_by_new_run', 'problem_loaded', 
       'problem_saved', 'problem_switched', 'audio_record_start',
-      'audio_record_stop', 'audio_play', 'test_start', 'test_completed', 'test_failed'
+      'audio_record_stop', 'audio_play', 'test_start', 'test_completed', 'test_failed',
+      // 调试相关重要事件
+      'debug_button_clicked', 'debug_start', 'debug_exit', 'debug_step', 
+      'debug_program_stopped', 'debug_program_exited',
+      'breakpoint_add', 'breakpoint_remove'
     ];
 
     return immediateFlushEvents.includes(eventType);
@@ -312,6 +330,164 @@ export class DSALabHistoryService {
       totalTests: testResult.totalTests || 0,
       details: testResult.details,
       errorMessage: testResult.error
+    };
+
+    this.recordHistoryEvent(event);
+  }
+
+  /**
+   * 记录调试控制事件
+   * @param problemId 问题ID
+   * @param eventType 事件类型
+   * @param codeSnapshot 代码快照（仅在 debug_start 时提供）
+   */
+  recordDebugControlEvent(
+    problemId: string,
+    eventType: 'debug_button_clicked' | 'debug_start' | 'debug_exit',
+    codeSnapshot?: string
+  ): void {
+    const event: DebugControlEvent = {
+      timestamp: Date.now(),
+      problemId,
+      eventType,
+      codeSnapshot
+    };
+
+    this.recordHistoryEvent(event);
+  }
+
+  /**
+   * 记录调试单步执行事件（合并操作和结果）
+   * @param problemId 问题ID
+   * @param stepType 单步类型
+   * @param stopReason 停止原因
+   * @param stopLocation 停止位置
+   * @param exitCode 退出代码
+   */
+  recordDebugStepEvent(
+    problemId: string,
+    stepType: 'continue' | 'stepover' | 'stepinto' | 'stepout' | 'restart',
+    stopReason?: string,
+    stopLocation?: { file: string; line: number; code?: string },
+    exitCode?: number
+  ): void {
+    const event: DebugStepEvent = {
+      timestamp: Date.now(),
+      problemId,
+      eventType: 'debug_step',
+      stepType,
+      stopReason,
+      stopLocation,
+      exitCode
+    };
+
+    this.recordHistoryEvent(event);
+  }
+
+  /**
+   * 记录断点事件
+   * @param problemId 问题ID
+   * @param eventType 事件类型
+   * @param line 行号
+   * @param fileName 文件名
+   * @param condition 断点条件
+   * @param hitCount 命中次数
+   */
+  recordDebugBreakpointEvent(
+    problemId: string,
+    eventType: 'breakpoint_add' | 'breakpoint_remove' | 'breakpoint_condition_change',
+    line: number,
+    fileName: string,
+    condition?: string,
+    hitCount?: number
+  ): void {
+    const event: DebugBreakpointEvent = {
+      timestamp: Date.now(),
+      problemId,
+      eventType,
+      line,
+      fileName,
+      condition,
+      hitCount
+    };
+
+    this.recordHistoryEvent(event);
+  }
+
+  /**
+   * 记录调试控制台输出事件
+   * @param problemId 问题ID
+   * @param outputData 输出数据
+   */
+  recordDebugConsoleOutputEvent(problemId: string, outputData: string): void {
+    const event: DebugConsoleOutputEvent = {
+      timestamp: Date.now(),
+      problemId,
+      eventType: 'debug_console_output',
+      outputData
+    };
+
+    this.recordHistoryEvent(event);
+  }
+
+  /**
+   * 记录调试状态变化事件
+   * @param problemId 问题ID
+   * @param eventType 事件类型
+   * @param stopReason 停止原因
+   * @param stopLocation 停止位置（包含该行代码）
+   * @param exitCode 退出代码
+   */
+  recordDebugStateChangeEvent(
+    problemId: string,
+    eventType: 'debug_program_running' | 'debug_program_stopped' | 'debug_program_exited',
+    stopReason?: string,
+    stopLocation?: { file: string; line: number; code?: string },
+    exitCode?: number
+  ): void {
+    const event: DebugStateChangeEvent = {
+      timestamp: Date.now(),
+      problemId,
+      eventType,
+      stopReason,
+      stopLocation,
+      exitCode
+    };
+
+    this.recordHistoryEvent(event);
+  }
+
+  /**
+   * 记录表达式求值事件
+   * @param problemId 问题ID
+   * @param expression 表达式
+   * @param result 求值结果
+   */
+  recordDebugExpressionEvalEvent(problemId: string, expression: string, result: string): void {
+    const event: DebugExpressionEvalEvent = {
+      timestamp: Date.now(),
+      problemId,
+      eventType: 'debug_expr_eval',
+      expression,
+      result
+    };
+
+    this.recordHistoryEvent(event);
+  }
+
+  /**
+   * 记录调试命令事件
+   * @param problemId 问题ID
+   * @param command 命令
+   * @param success 是否成功
+   */
+  recordDebugCommandEvent(problemId: string, command: string, success: boolean): void {
+    const event: DebugCommandEvent = {
+      timestamp: Date.now(),
+      problemId,
+      eventType: 'debug_command_sent',
+      command,
+      success
     };
 
     this.recordHistoryEvent(event);

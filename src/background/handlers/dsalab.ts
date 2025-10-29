@@ -971,6 +971,35 @@ function recordHistoryEventInternal(historyEvent: HistoryEvent): void {
       flushHistoryBuffer(problemId, 'batch');
       break;
 
+    // 调试相关事件
+    case 'debug_button_clicked':
+    case 'debug_start':
+    case 'debug_exit':
+    case 'debug_step':
+    case 'debug_program_stopped':
+    case 'debug_program_exited':
+    case 'breakpoint_add':
+    case 'breakpoint_remove':
+      // 这些重要的调试事件立即刷新
+      buffers.batchBuffer.push(historyEvent);
+      buffers.lastEditEvent = null;
+      buffers.lastEditTime = 0;
+      flushHistoryBuffer(problemId, 'batch');
+      break;
+
+    case 'breakpoint_condition_change':
+    case 'debug_console_output':
+    case 'debug_program_running':
+    case 'debug_expr_eval':
+    case 'debug_command_sent':
+      // 这些调试事件批量刷新
+      buffers.batchBuffer.push(historyEvent);
+      if (buffers.batchTimer) {
+        clearTimeout(buffers.batchTimer);
+      }
+      buffers.batchTimer = setTimeout(() => flushHistoryBuffer(problemId, 'batch'), HISTORY_FLUSH_BATCH_INTERVAL_MS) as any;
+      break;
+
     default:
       console.warn(`未知的历史事件类型: ${eventType}`);
       break;
@@ -1101,9 +1130,10 @@ class CppFunctionExtractor {
       
       const functionName = functionNameMatch[1];
       
-      // 使用更精确的括号匹配算法来提取完整的函数定义
+      // 改进的正则表达式，支持复杂类型（如 vector<string>）
+      // 匹配：返回类型（可能包含<>等符号） + 函数名 + 参数列表 + {
       const functionStartPattern = new RegExp(
-        `(\\w+\\s+${functionName}\\s*\\([^)]*\\)\\s*\\{)`,
+        `([\\w<>,\\s*&]+\\s+${functionName}\\s*\\([^{]*\\)\\s*\\{)`,
         'g'
       );
       

@@ -69,7 +69,54 @@ export interface TestResultEvent extends HistoryEventBase {
   errorMessage?: string; // For test_failed
 }
 
-export type HistoryEvent = CodeEditEvent | ProgramRunStartEvent | ProgramOutputEvent | ProgramRunEndEvent | ProblemLifecycleEvent | AudioEvent | TestStartEvent | TestResultEvent;
+// 调试相关事件类型定义
+export interface DebugControlEvent extends HistoryEventBase {
+  eventType: 'debug_button_clicked' | 'debug_start' | 'debug_exit';
+  codeSnapshot?: string; // 调试开始时的代码快照（仅用于 debug_start）
+}
+
+// 调试单步执行事件（合并操作和结果）
+export interface DebugStepEvent extends HistoryEventBase {
+  eventType: 'debug_step';
+  stepType: 'continue' | 'stepover' | 'stepinto' | 'stepout' | 'restart';
+  stopReason?: string; // 停止原因：breakpoint-hit, end-stepping-range, function-finished, exited 等
+  stopLocation?: { file: string; line: number; code?: string }; // 停止位置（包含该行代码）
+  exitCode?: number; // 退出代码（如果程序退出）
+}
+
+export interface DebugBreakpointEvent extends HistoryEventBase {
+  eventType: 'breakpoint_add' | 'breakpoint_remove' | 'breakpoint_condition_change';
+  line: number;
+  fileName: string;
+  condition?: string; // 断点条件表达式
+  hitCount?: number; // 命中次数
+}
+
+export interface DebugConsoleOutputEvent extends HistoryEventBase {
+  eventType: 'debug_console_output';
+  outputData: string; // 调试控制台输出内容
+}
+
+export interface DebugStateChangeEvent extends HistoryEventBase {
+  eventType: 'debug_program_running' | 'debug_program_stopped' | 'debug_program_exited';
+  stopReason?: string; // 停止原因：breakpoint-hit, end-stepping-range, function-finished, exited 等
+  stopLocation?: { file: string; line: number; code?: string }; // 停止位置（包含该行代码）
+  exitCode?: number; // 退出代码
+}
+
+export interface DebugExpressionEvalEvent extends HistoryEventBase {
+  eventType: 'debug_expr_eval';
+  expression: string; // 求值的表达式
+  result: string; // 求值结果
+}
+
+export interface DebugCommandEvent extends HistoryEventBase {
+  eventType: 'debug_command_sent';
+  command: string; // 发送的 GDB 命令
+  success: boolean; // 命令是否成功
+}
+
+export type HistoryEvent = CodeEditEvent | ProgramRunStartEvent | ProgramOutputEvent | ProgramRunEndEvent | ProblemLifecycleEvent | AudioEvent | TestStartEvent | TestResultEvent | DebugControlEvent | DebugStepEvent | DebugBreakpointEvent | DebugConsoleOutputEvent | DebugStateChangeEvent | DebugExpressionEvalEvent | DebugCommandEvent;
 
 // 定义问题数据结构
 export interface Problem {

@@ -89,6 +89,15 @@
         </nz-form-item>
       </div>
 
+      <!-- 文件名提示 -->
+      <div class="filename-warning">
+        <nz-alert 
+          nzType="warning" 
+          nzMessage="请勿修改导出文件的文件名！"
+          nzShowIcon>
+        </nz-alert>
+      </div>
+
       <!-- 选择题目 -->
       <div class="problem-selection">
         <div class="selection-header">
@@ -146,10 +155,10 @@
                       <nz-tag [nzColor]="getTestStatusTagColor(problem)" *ngIf="hasTestStatus(problem)">
                         {{ getTestStatusText(problem) }}
                       </nz-tag>
-                      <nz-tag nzColor="orange" *ngIf="!hasProblemContent(problem) && (problem.Code !== '' || problem.Audio !== '')">
-                        <i nz-icon nzType="warning"></i> 缺少{{ problem.Code === '' ? '代码' : '音频' }}
+                      <nz-tag nzColor="orange" *ngIf="!hasProblemContent(problem) && (problem.Code !== '' || problem.Audio !== '' || hasTestStatus(problem))">
+                        <i nz-icon nzType="warning"></i> 缺少{{ getMissingContentHint(problem) }}
                       </nz-tag>
-                      <nz-tag nzColor="default" *ngIf="problem.Code === '' && problem.Audio === ''">
+                      <nz-tag nzColor="default" *ngIf="problem.Code === '' && problem.Audio === '' && !hasTestStatus(problem)">
                         <i nz-icon nzType="exclamation-circle"></i> 无内容
                       </nz-tag>
                     </div>

@@ -7,6 +7,7 @@ import { Tab } from './tabs.service';
 import { ElectronService } from '../core/services';
 import { cppLang, cppLangConf } from '../configs/cppLanguageConfig';
 import { SimplifiedContentChange } from './dsalab-types';
+import { DSALabHistoryService } from './dsalab-history.service';
 
 // All standard C++ headers filename
 const stdCppHeaders = [
@@ -62,11 +63,14 @@ export class EditorService {
 
   private dsalabProblemService: any; // 延迟加载以避免循环依赖
   private isComposing = false; // 用于识别IME输入
+  private currentProblemId: string | null = null; // 当前问题ID，用于历史记录
+  private currentFileName: string = ''; // 当前文件名
 
   constructor(
     private monacoEditorLoaderService: MonacoEditorLoaderService, 
     private electronService: ElectronService,
-    private injector: Injector
+    private injector: Injector,
+    private historyService: DSALabHistoryService
   ) {
     this.editorText.pipe(
       debounceTime(300),
@@ -245,14 +249,36 @@ export class EditorService {
         currentModel.getDecorationRange(v.id).startLineNumber === lineNumber
       );
       if (index !== -1) {
+        // 删除断点
         currentModel.deltaDecorations([this.modelInfos[uri].bkptDecs[index].id], []);
         this.modelInfos[uri].bkptDecs.splice(index, 1);
+        
+        // 记录断点删除事件
+        if (this.currentProblemId) {
+          this.historyService.recordDebugBreakpointEvent(
+            this.currentProblemId,
+            'breakpoint_remove',
+            lineNumber,
+            this.currentFileName
+          );
+        }
       } else {
+        // 添加断点
         this.modelInfos[uri].bkptDecs.push({
           id: currentModel.deltaDecorations([], [this.bkptInfoToDecoration(lineNumber)])[0],
           hitCount: null,
           expression: null
         });
+        
+        // 记录断点添加事件
+        if (this.currentProblemId) {
+          this.historyService.recordDebugBreakpointEvent(
+            this.currentProblemId,
+            'breakpoint_add',
+            lineNumber,
+            this.currentFileName
+          );
+        }
       }
       this.updateBkptInfo(currentModel);
     }
@@ -648,5 +674,15 @@ export class EditorService {
     if (this.lastTraceUri !== null)
       monaco.editor.getModel(this.lastTraceUri)?.deltaDecorations(this.traceDecoration, []);
     this.traceDecoration = [];
+  }
+
+  /**
+   * 设置当前问题ID和文件名，用于历史记录
+   * @param problemId 问题ID
+   * @param fileName 文件名
+   */
+  setCurrentProblemContext(problemId: string | null, fileName: string = ''): void {
+    this.currentProblemId = problemId;
+    this.currentFileName = fileName;
   }
 }

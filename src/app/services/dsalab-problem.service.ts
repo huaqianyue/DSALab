@@ -6,6 +6,7 @@ import { DSALabPathsService } from './dsalab-paths.service';
 import { DSALabHistoryService } from './dsalab-history.service';
 import { DebugService } from './debug.service';
 import { DSALabSettingsService } from './dsalab-settings.service';
+import { EditorService } from './editor.service';
 
 type AutoRefreshStatus = 'idle' | 'loading' | 'success' | 'failed';
 
@@ -28,7 +29,8 @@ export class DSALabProblemService {
     private pathsService: DSALabPathsService,
     private historyService: DSALabHistoryService,
     private debugService: DebugService,
-    private settingsService: DSALabSettingsService
+    private settingsService: DSALabSettingsService,
+    private editorService: EditorService
   ) {
     this.initializeService();
     this.setupCDNLoadedListener();
@@ -195,6 +197,10 @@ export class DSALabProblemService {
       }
 
       this.currentProblemSubject.next(problem);
+      
+      // 设置调试和编辑器服务的问题上下文
+      this.debugService.setCurrentProblemId(problemId);
+      this.editorService.setCurrentProblemContext(problemId, workspaceData.filePath || problemId);
       
       // 记录历史事件（使用专用服务）
       this.recordProblemLifecycleEvent(problemId, 'problem_loaded', workspaceData.content);

@@ -177,15 +177,18 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
       // 不导出已删除的题目
       if (problem.isDelete) return false;
       
-      // DSALab要求：必须同时有代码和音频才能导出
+      // DSALab要求：必须同时有代码、音频和测试结果才能导出
       const hasCode = problem.Code !== '';
       const hasAudio = problem.Audio !== '';
+      const hasTestResult = problem.testStatus !== undefined && 
+                           problem.testStatus !== 'not_tested' && 
+                           problem.testScore !== undefined;
       
-      return hasCode && hasAudio; // 必须同时有代码和音频
+      return hasCode && hasAudio && hasTestResult; // 必须同时有代码、音频和测试结果
     });
 
     if (exportableProblems.length === 0) {
-      this.message.warning('没有可导出的题目，请先完成一些题目的代码和录音（需要同时具备）');
+      this.message.warning('没有可导出的题目，请先完成题目的代码、录音和测试（三者需要同时具备）');
       return;
     }
 
@@ -330,7 +333,7 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
     // 只允许选择有内容的题目
     if (!problem || problem.isDelete || !this.hasProblemContent(problem)) {
       console.warn('❌ Problem cannot be selected:', problemId, 'hasContent:', this.hasProblemContent(problem));
-      this.message.warning('该题目没有可导出的内容（需要同时有代码和音频）');
+      this.message.warning('该题目没有可导出的内容（需要同时有代码、音频和测试结果）');
       return;
     }
 
@@ -381,11 +384,14 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
   hasProblemContent(problem: Problem): boolean {
     if (problem.isDelete) return false;
     
-    // DSALab要求：必须同时有代码和音频才能导出
+    // DSALab要求：必须同时有代码、音频和测试结果才能导出
     const hasCode = problem.Code !== '';
     const hasAudio = problem.Audio !== '';
+    const hasTestResult = problem.testStatus !== undefined && 
+                         problem.testStatus !== 'not_tested' && 
+                         problem.testScore !== undefined;
     
-    return hasCode && hasAudio;
+    return hasCode && hasAudio && hasTestResult;
   }
 
   // 获取可导出的问题数量
@@ -474,5 +480,25 @@ export class DSALabControlComponent implements OnInit, OnDestroy {
       return 'error';
     }
     return 'default';
+  }
+
+  // 获取缺少内容的提示
+  getMissingContentHint(problem: Problem): string {
+    const missing: string[] = [];
+    
+    if (problem.Code === '') {
+      missing.push('代码');
+    }
+    if (problem.Audio === '') {
+      missing.push('音频');
+    }
+    const hasTestResult = problem.testStatus !== undefined && 
+                         problem.testStatus !== 'not_tested' && 
+                         problem.testScore !== undefined;
+    if (!hasTestResult) {
+      missing.push('测试结果');
+    }
+    
+    return missing.join('、');
   }
 }
