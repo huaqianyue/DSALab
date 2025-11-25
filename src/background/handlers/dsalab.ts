@@ -1104,87 +1104,75 @@ ipcMain.handle('dsalab-save-settings', async (event, settings: DSALabSettings): 
 
 // 函数提取器
 class CppFunctionExtractor {
-  extractStudentFunction(sourceCode: string, functionSignature: string): {
+  /*
+  extractStudentFunction(sourceCode: string, functionSignature: string) {
+    // 旧的函数提取逻辑，暂时保留注释
+  }
+  */
+
+  extractClassDefinition(sourceCode: string, classSignature: string): {
     success: boolean;
     extractedCode: string;
     error?: string;
   } {
     try {
-      // 从函数签名中提取函数名
-      const functionNameMatch = functionSignature.match(/(\w+)\s*\(/);
-      if (!functionNameMatch) {
+      // 支持 "class Solution" 或直接传类名
+      const classNameMatch = classSignature.match(/class\s+(\w+)/);
+      const fallbackName = classSignature.trim();
+      const className = classNameMatch?.[1] || (fallbackName ? fallbackName : 'Solution');
+
+      const classStartPattern = new RegExp(`class\\s+${className}\\s*\\{`, 'g');
+      const classStartIndex = sourceCode.search(classStartPattern);
+
+      if (classStartIndex === -1) {
         return {
           success: false,
           extractedCode: '',
-          error: '无法从函数签名中提取函数名'
+          error: `未找到类: ${className}`
         };
       }
-      
-      const functionName = functionNameMatch[1];
-      
-      // 改进的正则表达式，支持复杂类型（如 vector<string>）
-      // 匹配：返回类型（可能包含<>等符号） + 函数名 + 参数列表 + {
-      const functionStartPattern = new RegExp(
-        `([\\w<>,\\s*&]+\\s+${functionName}\\s*\\([^{]*\\)\\s*\\{)`,
-        'g'
-      );
-      
-      const functionStartMatch = sourceCode.match(functionStartPattern);
-      
-      if (!functionStartMatch) {
-        return {
-          success: false,
-          extractedCode: '',
-          error: `未找到函数: ${functionName}`
-        };
-      }
-      
-      // 找到函数开始位置
-      const functionStartIndex = sourceCode.search(functionStartPattern);
-      if (functionStartIndex === -1) {
-        return {
-          success: false,
-          extractedCode: '',
-          error: `未找到函数: ${functionName}`
-        };
-      }
-      
-      // 从函数开始位置开始，使用括号匹配算法找到完整的函数
+
       let braceCount = 0;
-      let functionEndIndex = functionStartIndex;
-      let inFunction = false;
-      
-      for (let i = functionStartIndex; i < sourceCode.length; i++) {
+      let classEndIndex = classStartIndex;
+      let inClass = false;
+
+      for (let i = classStartIndex; i < sourceCode.length; i++) {
         const char = sourceCode[i];
-        
+
         if (char === '{') {
           braceCount++;
-          inFunction = true;
+          inClass = true;
         } else if (char === '}') {
           braceCount--;
-          if (inFunction && braceCount === 0) {
-            functionEndIndex = i;
+          if (inClass && braceCount === 0) {
+            classEndIndex = i + 1;
             break;
           }
         }
       }
-      
+
       if (braceCount !== 0) {
         return {
           success: false,
           extractedCode: '',
-          error: `函数 ${functionName} 的括号不匹配`
+          error: `类 ${className} 的括号不匹配`
         };
       }
-      
-      // 提取完整的函数定义
-      const extractedCode = sourceCode.substring(functionStartIndex, functionEndIndex + 1);
-      
+
+      // 包含可能存在的尾部分号
+      while (classEndIndex < sourceCode.length && /\s/.test(sourceCode[classEndIndex])) {
+        classEndIndex++;
+      }
+      if (sourceCode[classEndIndex] === ';') {
+        classEndIndex++;
+      }
+
+      const extractedCode = sourceCode.substring(classStartIndex, classEndIndex);
+
       return {
         success: true,
-        extractedCode: extractedCode
+        extractedCode
       };
-      
     } catch (error: any) {
       return {
         success: false,
@@ -1363,14 +1351,15 @@ ipcMain.handle('dsalab-run-test', async (event, problemId: string) => {
       };
     }
     
-    // 3. 提取学生函数
+    // 3. 提取学生类
     const extractor = new CppFunctionExtractor();
-    const extractResult = extractor.extractStudentFunction(studentCode, problem.functionSignature || '');
+    const classSignature = problem.functionSignature || 'class Solution';
+    const extractResult = extractor.extractClassDefinition(studentCode, classSignature);
     
     if (!extractResult.success) {
       return { 
         success: false, 
-        error: `函数提取失败: ${extractResult.error}` 
+        error: `类提取失败: ${extractResult.error}` 
       };
     }
     
