@@ -90,8 +90,9 @@ class DSALabPaths {
 // CDN 问题列表 URL（支持多个备用CDN）
 const CDN_PROBLEMS_URLS = [
   'https://raw.githubusercontent.com/huaqianyue/DSALab/refs/heads/main/problem.json',
-  'https://cdn.jsdmirror.com/gh/huaqianyue/DSALab@main/problem.json',
-  'https://cdn.jsdmirror.cn/gh/huaqianyue/DSALab@main/problem.json'
+  'https://cdn.jsdmirror.cn/gh/huaqianyue/DSALab@main/problem.json',
+  'https://cdn.jsdmirror.com/gh/huaqianyue/DSALab@main/problem.json'
+  
 ];
 
 // 历史记录缓冲区
